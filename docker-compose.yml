@@ -1,0 +1,217 @@
+version: "3.9"
+
+# ════════════════════════════════════════════════════════
+#   ENAYI HOTELS & SUITES — Docker Compose
+#   All services: DB, Redis, Backend, Celery, Frontend, Nginx
+# ════════════════════════════════════════════════════════
+
+services:
+
+  # ── PostgreSQL Database ────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: enayi_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-enayi_hotels}
+      POSTGRES_USER:     ${POSTGRES_USER:-enayi_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-enayi_pass_2024}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docs/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-enayi_user} -d ${POSTGRES_DB:-enayi_hotels}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - enayi_network
+
+  # ── Redis (Cache + Celery + WebSocket) ────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: enayi_redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - enayi_network
+
+  # ── Django Backend ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: enayi_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-enayi_user}:${POSTGRES_PASSWORD:-enayi_pass_2024}@db:5432/${POSTGRES_DB:-enayi_hotels}
+      REDIS_URL:    redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - media_files:/app/media
+      - static_files:/app/staticfiles
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo '🔧 Running migrations...' &&
+        python manage.py migrate --noinput &&
+        echo '📦 Collecting static files...' &&
+        python manage.py collectstatic --noinput --clear &&
+        echo '🌱 Loading fixtures if available...' &&
+        python manage.py loaddata fixtures/seed.json 2>/dev/null || true &&
+        echo '🚀 Starting Gunicorn...' &&
+        gunicorn config.wsgi:application
+          --bind 0.0.0.0:8000
+          --workers 4
+          --worker-class gthread
+          --threads 2
+          --timeout 120
+          --reload
+          --access-logfile -
+          --error-logfile -
+      "
+    networks:
+      - enayi_network
+
+  # ── Celery Worker ──────────────────────────────────────
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: enayi_celery
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-enayi_user}:${POSTGRES_PASSWORD:-enayi_pass_2024}@db:5432/${POSTGRES_DB:-enayi_hotels}
+      REDIS_URL:    redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - media_files:/app/media
+    depends_on:
+      - db
+      - redis
+      - backend
+    command: celery -A config worker --loglevel=info --concurrency=2 -Q default,emails,payments
+    networks:
+      - enayi_network
+
+  # ── Celery Beat (Scheduled Tasks) ─────────────────────
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: enayi_celery_beat
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-enayi_user}:${POSTGRES_PASSWORD:-enayi_pass_2024}@db:5432/${POSTGRES_DB:-enayi_hotels}
+      REDIS_URL:    redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - db
+      - redis
+    command: celery -A config beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    networks:
+      - enayi_network
+
+  # ── React Frontend ─────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL:              ${VITE_API_URL:-http://localhost:8000}
+        VITE_FLUTTERWAVE_PK:       ${VITE_FLUTTERWAVE_PK:-}
+        VITE_PAYSTACK_PK:          ${VITE_PAYSTACK_PK:-}
+        VITE_STRIPE_PK:            ${VITE_STRIPE_PK:-}
+        VITE_PAYPAL_CLIENT_ID:     ${VITE_PAYPAL_CLIENT_ID:-}
+        VITE_GOOGLE_MAPS_KEY:      ${VITE_GOOGLE_MAPS_KEY:-}
+    container_name: enayi_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - enayi_network
+
+  # ── Nginx Reverse Proxy ────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: enayi_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - static_files:/var/www/static:ro
+      - media_files:/var/www/media:ro
+      - certbot_conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - enayi_network
+
+  # ── PgAdmin — Database Management UI ──────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: enayi_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL:    admin@enayihotels.com
+      PGADMIN_DEFAULT_PASSWORD: admin_pass_2024
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+    networks:
+      - enayi_network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  media_files:
+    driver: local
+  static_files:
+    driver: local
+  pgadmin_data:
+    driver: local
+  certbot_conf:
+    driver: local
+  certbot_www:
+    driver: local
+
+networks:
+  enayi_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,57 @@
+# ── Django Core ─────────────────────────────────────────
+# setuptools provides pkg_resources, required by drf_yasg. Pinned <81 because
+# setuptools 81 removed pkg_resources, which would break the import.
+setuptools<81
+Django==4.2.9
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+django-environ==0.11.2
+django-filter==23.5
+drf-yasg==1.21.7
+django-extensions==3.2.3
+
+# ── Database ─────────────────────────────────────────────
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
+# ── Server ───────────────────────────────────────────────
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# ── Async / Queue ─────────────────────────────────────────
+celery==5.3.6
+redis==5.0.1
+django-redis==5.4.0
+django-celery-beat==2.6.0
+channels==4.0.0
+channels-redis==4.2.0
+
+# ── Media / Images ───────────────────────────────────────
+Pillow==10.2.0
+django-imagekit==5.0.0
+
+# ── AI ────────────────────────────────────────────────────
+openai==1.10.0
+
+# ── Payments ─────────────────────────────────────────────
+stripe==8.0.0
+requests==2.31.0
+
+# ── Phone / Validation ───────────────────────────────────
+phonenumbers==8.13.27
+django-phonenumber-field==7.3.0
+
+# ── Utils ─────────────────────────────────────────────────
+python-slugify==8.0.2
+python-dateutil==2.8.2
+cryptography==41.0.7
+Markdown==3.5.2
+django-storages==1.14.2
+boto3==1.34.0
+qrcode==7.4.2
+reportlab==4.0.9
+# weasyprint removed: unused in this codebase and requires system libs
+# (libpango/libcairo) not present in Render's native Python build, a common
+# cause of failed deploys. Re-add with an apt build step only if you wire up
+# HTML-to-PDF rendering later.
