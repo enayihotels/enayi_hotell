@@ -17,9 +17,12 @@ export default function AdminLayout() {
   return (
     <div className="flex h-screen bg-enayi-bg overflow-hidden">
       <aside className="w-56 flex-shrink-0 flex flex-col bg-enayi-surface border-r border-enayi-border">
-        <div className="p-4 border-b border-enayi-border">
-          <div className="font-display font-semibold text-enayi-text text-sm">Enayi Admin</div>
-          <div className="text-enayi-gold text-xs">Hotel Management System</div>
+        <div className="p-4 border-b border-enayi-border flex items-center gap-2.5">
+          <img src="/logo.jpg" alt="Enayi" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+          <div>
+            <div className="font-display font-semibold text-enayi-text text-sm">Enayi Admin</div>
+            <div className="text-enayi-gold text-xs">Hotel Management System</div>
+          </div>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-hide">
           {ADMIN_NAV.map(({href,icon:Icon,label}) => (

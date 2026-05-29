@@ -55,9 +55,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl border border-enayi-gold/40 bg-enayi-gold/8 flex items-center justify-center">
-              <span className="text-enayi-gold font-display font-bold text-lg">E</span>
-            </div>
+            <img src="/logo.jpg" alt="Enayi Hotels & Suites" className="h-12 w-auto rounded-lg" />
             <div>
               <div className="font-display font-semibold text-enayi-text text-lg">Enayi Hotels & Suites</div>
               <div className="text-enayi-muted text-xs">Rayfield Road, Jos — Plateau State</div>
@@ -117,9 +115,7 @@ export default function LoginPage() {
         >
           {/* Mobile logo */}
           <Link to="/" className="flex items-center gap-2.5 mb-10 lg:hidden">
-            <div className="w-9 h-9 rounded-xl border border-enayi-gold/40 bg-enayi-gold/8 flex items-center justify-center">
-              <span className="text-enayi-gold font-display font-bold">E</span>
-            </div>
+            <img src="/logo.jpg" alt="Enayi Hotels" className="h-9 w-auto rounded-lg" />
             <span className="font-display font-semibold text-enayi-text">Enayi Hotels & Suites</span>
           </Link>
 

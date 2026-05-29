@@ -41,9 +41,7 @@ export default function PublicLayout() {
       )}>
         <nav className="container-site flex items-center justify-between h-20">
           <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl border border-enayi-gold/30 bg-enayi-gold/5 flex items-center justify-center group-hover:border-enayi-gold/60 transition-all">
-              <span className="text-enayi-gold font-display font-bold text-lg">E</span>
-            </div>
+            <img src="/logo.jpg" alt="Enayi Hotels & Suites" className="h-12 w-auto rounded-lg" />
             <div>
               <div className="font-display font-semibold text-enayi-text text-lg leading-none">Enayi Hotels</div>
               <div className="text-enayi-muted text-[10px] tracking-widest uppercase mt-0.5">& Suites · Jos</div>
