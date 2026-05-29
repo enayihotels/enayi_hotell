@@ -6,9 +6,12 @@ export default defineConfig({
   plugins: [react()],
 
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: [
+      // Explicit aliases first (more specific must come before more general)
+      { find: '@/components/ui', replacement: path.resolve(__dirname, './src/components/ui/index.tsx') },
+      { find: '@/types', replacement: path.resolve(__dirname, './src/types/index.ts') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+    ],
   },
 
   server: {
