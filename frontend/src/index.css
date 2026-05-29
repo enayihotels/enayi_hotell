@@ -4,21 +4,22 @@
 
 @layer base {
   :root {
-    /* ── ENAYI BRAND COLOR VARIABLES — VELVET PLUM ───────────── */
-    /* Deep Lilac · Warm Coral · Cream · Soft Lilac              */
+    /* ── ENAYI BRAND COLOR VARIABLES — LAVENDER CORAL ────────── */
+    /* Light Lilac · Royal Purple · Warm Coral · Deep Plum       */
     --gold: #E89B7B; --gold-light: #F5B79B; --gold-dark: #C77559;
-    --bg: #3D2A5C; --surface: #4D3A6C; --panel: #5A4878;
-    --border: #6B5A88; --text: #FAF5EF; --muted: #B8A8C9;
+    --bg: #F3EDF9; --surface: #FFFFFF; --panel: #FAF6FC;
+    --border: #E2D4F0; --text: #2D1B47; --muted: #7A6B96;
+    --purple: #6B3DA8; --plum: #4A2D6B;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
   body { @apply bg-enayi-bg text-enayi-text font-body; min-height: 100vh; }
-  h1,h2 { @apply font-display; }
-  h3,h4 { @apply font-heading; }
+  h1,h2 { @apply font-display; color: var(--plum); }
+  h3,h4 { @apply font-heading; color: var(--plum); }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 999px; }
-  ::selection { background: rgba(232,155,123,0.25); color: var(--gold-light); }
+  ::selection { background: rgba(232,155,123,0.30); color: var(--plum); }
 }
 
 @layer components {
@@ -29,35 +30,35 @@
   .btn-gold-lg { @apply btn-lg text-white hover:shadow-gold-lg hover:scale-[1.02]; background: linear-gradient(135deg, #E89B7B 0%, #F5B79B 50%, #C77559 100%); }
   .btn-outline { @apply btn-md border border-enayi-gold text-enayi-gold hover:bg-enayi-gold hover:text-white; }
   .btn-ghost { @apply btn-md text-enayi-muted hover:text-enayi-text hover:bg-enayi-subtle; }
-  .btn-surface { @apply btn-md bg-enayi-surface border border-enayi-border text-enayi-text hover:border-enayi-gold/30; }
-  .input { @apply w-full bg-enayi-surface border border-enayi-border text-enayi-text placeholder:text-enayi-muted rounded-xl px-4 py-3 font-body text-sm outline-none focus:border-enayi-gold focus:ring-2 focus:ring-enayi-gold/15 transition-all; }
+  .btn-surface { @apply btn-md bg-enayi-surface border border-enayi-border text-enayi-text hover:border-enayi-gold/40; }
+  .input { @apply w-full bg-enayi-surface border border-enayi-border text-enayi-text placeholder:text-enayi-muted rounded-xl px-4 py-3 font-body text-sm outline-none focus:border-enayi-gold focus:ring-2 focus:ring-enayi-gold/20 transition-all; }
   .label { @apply block text-sm font-medium text-enayi-muted mb-2; }
   .form-group { @apply flex flex-col gap-1.5; }
-  .form-error { @apply text-xs text-red-400 mt-1; }
-  .card { @apply bg-enayi-surface border border-enayi-border rounded-2xl transition-all duration-300; }
-  .card-hover { @apply card hover:border-enayi-gold/20 hover:shadow-gold-glow hover:-translate-y-0.5; }
-  .card-gold { @apply card border-enayi-gold/20; background: linear-gradient(145deg, rgba(232,155,123,0.06) 0%, rgba(77,58,108,0.95) 100%); }
-  .text-gold { @apply bg-clip-text text-transparent; background-image: linear-gradient(135deg,#E89B7B 0%,#F5B79B 50%,#C77559 100%); }
+  .form-error { @apply text-xs text-red-500 mt-1; }
+  .card { @apply bg-enayi-surface border border-enayi-border rounded-2xl shadow-card transition-all duration-300; }
+  .card-hover { @apply card hover:border-enayi-gold/40 hover:shadow-gold-glow hover:-translate-y-0.5; }
+  .card-gold { @apply card border-enayi-gold/30; background: linear-gradient(145deg, rgba(232,155,123,0.10) 0%, rgba(255,255,255,1) 100%); }
+  .text-gold { @apply bg-clip-text text-transparent; background-image: linear-gradient(135deg,#E89B7B 0%,#C77559 50%,#E89B7B 100%); }
   .gold-shimmer-text { background: linear-gradient(90deg,#E89B7B 0%,#F5B79B 25%,#E89B7B 50%,#F5B79B 75%,#E89B7B 100%); background-size: 200% auto; @apply bg-clip-text text-transparent; animation: shimmer 4s linear infinite; }
   .section { @apply py-20 md:py-28; }
   .section-sm { @apply py-12 md:py-16; }
   .container-site { @apply mx-auto max-w-[1360px] px-4 sm:px-6 lg:px-12; }
-  .gold-line { @apply w-14 h-0.5 rounded-full; background: linear-gradient(90deg,#E89B7B,#F5B79B); }
+  .gold-line { @apply w-14 h-0.5 rounded-full; background: linear-gradient(90deg,#E89B7B,#C77559); }
   .gold-line-center { @apply gold-line mx-auto; }
   .badge { @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold; }
-  .badge-gold { @apply badge bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20; }
-  .badge-green { @apply badge bg-green-500/10 text-green-400 border border-green-500/20; }
-  .badge-red { @apply badge bg-red-500/10 text-red-400 border border-red-500/20; }
-  .badge-blue { @apply badge bg-blue-500/10 text-blue-400 border border-blue-500/20; }
+  .badge-gold { @apply badge bg-enayi-gold/15 text-enayi-gold border border-enayi-gold/30; }
+  .badge-green { @apply badge bg-green-500/10 text-green-700 border border-green-500/20; }
+  .badge-red { @apply badge bg-red-500/10 text-red-700 border border-red-500/20; }
+  .badge-blue { @apply badge bg-blue-500/10 text-blue-700 border border-blue-500/20; }
   .nav-link { @apply relative text-enayi-muted font-body font-medium text-sm transition-colors duration-200 hover:text-enayi-text; }
-  .nav-link::after { content: ''; @apply absolute -bottom-1 left-0 right-0 h-px rounded-full scale-x-0 transition-transform duration-300 origin-left; background: linear-gradient(90deg,#E89B7B,#F5B79B); }
+  .nav-link::after { content: ''; @apply absolute -bottom-1 left-0 right-0 h-px rounded-full scale-x-0 transition-transform duration-300 origin-left; background: linear-gradient(90deg,#E89B7B,#C77559); }
   .nav-link:hover::after, .nav-link.active::after { @apply scale-x-100; }
   .nav-link.active { @apply text-enayi-gold; }
-  .skeleton { @apply rounded-xl; background: linear-gradient(90deg,#5A4878 0%,#6B5A88 50%,#5A4878 100%); background-size: 200% 100%; animation: shimmer 2s linear infinite; }
-  .glow-orb { @apply absolute rounded-full pointer-events-none; background: radial-gradient(circle,rgba(232,155,123,0.12) 0%,transparent 70%); filter: blur(40px); }
+  .skeleton { @apply rounded-xl; background: linear-gradient(90deg,#E2D4F0 0%,#ECDFEF 50%,#E2D4F0 100%); background-size: 200% 100%; animation: shimmer 2s linear infinite; }
+  .glow-orb { @apply absolute rounded-full pointer-events-none; background: radial-gradient(circle,rgba(232,155,123,0.18) 0%,transparent 70%); filter: blur(40px); }
   .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .bg-grid { background-image: linear-gradient(rgba(232,155,123,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(232,155,123,0.03) 1px,transparent 1px); background-size: 64px 64px; }
+  .bg-grid { background-image: linear-gradient(rgba(107,61,168,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(107,61,168,0.04) 1px,transparent 1px); background-size: 64px 64px; }
 }
 
 @keyframes shimmer { 0%{background-position:-200% center} 100%{background-position:200% center} }

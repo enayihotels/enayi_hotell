@@ -4,25 +4,27 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ── ENAYI BRAND PALETTE — VELVET PLUM ──────────────────
-        // Deep Lilac · Warm Coral · Cream · Soft Lilac
-        // Note: "gold" key kept for code compatibility — values are coral shades now.
+        // ── ENAYI BRAND PALETTE — LAVENDER CORAL (Light Theme) ─────
+        // Light Lilac · Royal Purple · Warm Coral · Deep Plum
+        // Note: "gold" key kept for code compatibility — values are coral shades.
         gold: {
           50:'#FDF2EC', 100:'#FADFCF', 200:'#F5C4A9', 300:'#F0A883',
           400:'#EC9F7F', 500:'#E89B7B', 600:'#C77559', 700:'#A05A42',
           800:'#7A422F', 900:'#532A1D', 950:'#2E1810'
         },
         enayi: {
-          bg:'#3D2A5C',          // Deep lilac plum background
-          surface:'#4D3A6C',     // Lighter plum for cards
-          panel:'#5A4878',       // Plum panel
-          border:'#6B5A88',      // Soft lilac border
+          bg:'#F3EDF9',          // Light lilac background
+          surface:'#FFFFFF',     // White cards/surfaces
+          panel:'#FAF6FC',       // Off-white panels
+          border:'#E2D4F0',      // Soft lilac border
           gold:'#E89B7B',        // PRIMARY ACCENT — Warm Coral
           gold2:'#F5B79B',       // Lighter coral
-          gold3:'#C77559',       // Deeper terracotta
-          text:'#FAF5EF',        // Warm cream text
-          muted:'#B8A8C9',       // Soft lilac-gray muted
-          subtle:'#2E1F47'       // Subtle darker plum
+          gold3:'#C77559',       // Deeper coral
+          text:'#2D1B47',        // Very dark plum for readability
+          muted:'#7A6B96',       // Medium purple muted
+          subtle:'#ECDFEF',      // Subtle lilac tint
+          purple:'#6B3DA8',      // Royal purple secondary
+          plum:'#4A2D6B'         // Deep plum headers/logo
         }
       },
       fontFamily: {
@@ -31,10 +33,10 @@ export default {
         body:['"DM Sans"','system-ui','sans-serif']
       },
       boxShadow: {
-        gold:'0 4px 20px rgba(232,155,123,0.30)',
-        'gold-lg':'0 8px 40px rgba(232,155,123,0.40)',
-        'gold-glow':'0 0 60px rgba(232,155,123,0.20)',
-        card:'0 2px 12px rgba(0,0,0,0.4)'
+        gold:'0 4px 20px rgba(232,155,123,0.35)',
+        'gold-lg':'0 8px 40px rgba(232,155,123,0.45)',
+        'gold-glow':'0 0 60px rgba(232,155,123,0.25)',
+        card:'0 2px 12px rgba(74,45,107,0.08)'
       },
       animation: {
         shimmer:'shimmer 2.5s linear infinite',
