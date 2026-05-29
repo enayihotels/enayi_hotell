@@ -4,25 +4,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ── ENAYI BRAND PALETTE ──────────────────────────────────────────────
-        // Navy Blue · White · Dodger Blue
-        // Note: the key "gold" is kept for code compatibility — values are now blue shades.
+        // ── ENAYI BRAND PALETTE — VELVET PLUM ──────────────────
+        // Deep Lilac · Warm Coral · Cream · Soft Lilac
+        // Note: "gold" key kept for code compatibility — values are coral shades now.
         gold: {
-          50:'#EFF6FF', 100:'#DBEAFE', 200:'#BFDBFE', 300:'#93C5FD',
-          400:'#60A5FA', 500:'#1E90FF', 600:'#1565C0', 700:'#0D47A1',
-          800:'#0A3680', 900:'#082A5E', 950:'#051936'
+          50:'#FDF2EC', 100:'#FADFCF', 200:'#F5C4A9', 300:'#F0A883',
+          400:'#EC9F7F', 500:'#E89B7B', 600:'#C77559', 700:'#A05A42',
+          800:'#7A422F', 900:'#532A1D', 950:'#2E1810'
         },
         enayi: {
-          bg:'#0A1628',          // Deep navy background
-          surface:'#0F1F38',     // Lighter navy for cards / surfaces
-          panel:'#152848',       // Navy panel
-          border:'#1F3252',      // Navy border lines
-          gold:'#1E90FF',        // PRIMARY ACCENT — Dodger Blue (replaces gold)
-          gold2:'#5BA8FF',       // Lighter dodger blue (highlights)
-          gold3:'#1565C0',       // Deeper blue (gradients)
-          text:'#FFFFFF',        // Pure white text
-          muted:'#8FA3BD',       // Soft blue-gray for secondary text
-          subtle:'#1A2C46'       // Subtle navy tint
+          bg:'#3D2A5C',          // Deep lilac plum background
+          surface:'#4D3A6C',     // Lighter plum for cards
+          panel:'#5A4878',       // Plum panel
+          border:'#6B5A88',      // Soft lilac border
+          gold:'#E89B7B',        // PRIMARY ACCENT — Warm Coral
+          gold2:'#F5B79B',       // Lighter coral
+          gold3:'#C77559',       // Deeper terracotta
+          text:'#FAF5EF',        // Warm cream text
+          muted:'#B8A8C9',       // Soft lilac-gray muted
+          subtle:'#2E1F47'       // Subtle darker plum
         }
       },
       fontFamily: {
@@ -31,10 +31,10 @@ export default {
         body:['"DM Sans"','system-ui','sans-serif']
       },
       boxShadow: {
-        gold:'0 4px 20px rgba(30,144,255,0.30)',
-        'gold-lg':'0 8px 40px rgba(30,144,255,0.40)',
-        'gold-glow':'0 0 60px rgba(30,144,255,0.20)',
-        card:'0 2px 12px rgba(0,0,0,0.6)'
+        gold:'0 4px 20px rgba(232,155,123,0.30)',
+        'gold-lg':'0 8px 40px rgba(232,155,123,0.40)',
+        'gold-glow':'0 0 60px rgba(232,155,123,0.20)',
+        card:'0 2px 12px rgba(0,0,0,0.4)'
       },
       animation: {
         shimmer:'shimmer 2.5s linear infinite',

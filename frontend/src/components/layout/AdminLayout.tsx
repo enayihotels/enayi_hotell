@@ -18,7 +18,7 @@ export default function AdminLayout() {
     <div className="flex h-screen bg-enayi-bg overflow-hidden">
       <aside className="w-56 flex-shrink-0 flex flex-col bg-enayi-surface border-r border-enayi-border">
         <div className="p-4 border-b border-enayi-border flex items-center gap-2.5">
-          <img src="/logo.jpg" alt="Enayi" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+          <img src="/logo.png" alt="Enayi" className="w-8 h-8 object-contain flex-shrink-0" />
           <div>
             <div className="font-display font-semibold text-enayi-text text-sm">Enayi Admin</div>
             <div className="text-enayi-gold text-xs">Hotel Management System</div>

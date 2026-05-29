@@ -32,7 +32,7 @@ export default function DashboardLayout() {
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-enayi-surface border-r border-enayi-border">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-enayi-border">
-        <img src="/logo.jpg" alt="Enayi Hotels" className="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+        <img src="/logo.png" alt="Enayi Hotels" className="w-8 h-8 object-contain flex-shrink-0" />
         {!collapsed && <div><div className="font-display font-semibold text-enayi-text text-sm">Enayi Hotels</div><div className="text-enayi-muted text-[10px]">Guest Portal</div></div>}
       </div>
       <nav className="flex-1 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto scrollbar-hide">

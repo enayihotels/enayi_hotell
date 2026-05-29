@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [react()],
 
   resolve: {
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
     alias: [
       // Explicit aliases first (more specific must come before more general)
       { find: '@/components/ui', replacement: path.resolve(__dirname, './src/components/ui/index.tsx') },
