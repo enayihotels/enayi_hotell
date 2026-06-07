@@ -186,6 +186,7 @@ MEDIA_ROOT  = BASE_DIR / "media"
 FILE_UPLOAD_MAX_MEMORY_SIZE   = 15 * 1024 * 1024   # 15MB
 DATA_UPLOAD_MAX_MEMORY_SIZE    = 50 * 1024 * 1024   # 50MB
 
+# build-trigger: force-redeploy-fix-categories
 # ─── CORS ─────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
