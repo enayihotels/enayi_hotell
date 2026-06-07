@@ -106,10 +106,46 @@ class CreateBookingSerializer(serializers.Serializer):
             rooms = rooms.filter(hotel=hotel)
         room = rooms.order_by("floor", "room_number").first()
 
+        # If no room found with exact category, try finding equivalent category
+        # at the selected branch (handles duplicate categories with branch names)
+        if not room and hotel:
+            import re as _re
+            branch_words = ["zaramaganda", "fwawei", "fwavei"]
+            clean = category.name
+            for w in branch_words:
+                clean = _re.sub(w, "", clean, flags=_re.IGNORECASE)
+            clean = _re.sub(r"\s+", " ", clean).strip()
+
+            # Find all categories with equivalent clean name
+            from apps.rooms.models import RoomCategory
+            all_cats = RoomCategory.objects.all()
+            equiv_ids = []
+            for c in all_cats:
+                c_clean = c.name
+                for w in branch_words:
+                    c_clean = _re.sub(w, "", c_clean, flags=_re.IGNORECASE)
+                c_clean = _re.sub(r"\s+", " ", c_clean).strip()
+                if c_clean.lower() == clean.lower():
+                    equiv_ids.append(c.id)
+
+            if equiv_ids:
+                rooms = Room.objects.filter(
+                    category_id__in=equiv_ids,
+                    status="available",
+                    hotel=hotel,
+                ).exclude(id__in=taken)
+                room = rooms.order_by("floor", "room_number").first()
+
         if not room:
             where = f" at {hotel.name}" if hotel else ""
+            # Clean category name for user-friendly error
+            import re as _re2
+            clean_cat = category.name
+            for w in ["Zaramaganda", "Fwawei", "Fwavei", "zaramaganda", "fwawei", "fwavei"]:
+                clean_cat = clean_cat.replace(w, "").strip()
+            clean_cat = _re2.sub(r"\s+", " ", clean_cat).strip(" -_,.")
             raise serializers.ValidationError(
-                {"detail": f"No {category.name} rooms are available{where} for those dates."}
+                {"detail": f"No {clean_cat} rooms are available{where} for those dates."}
             )
 
         # Branch-specific nightly rate (falls back to the class default).
