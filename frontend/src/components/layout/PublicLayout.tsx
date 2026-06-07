@@ -51,10 +51,10 @@ export default function PublicLayout() {
           <Link to="/" className="flex items-center gap-4 group">
             <div className="relative">
               <img
-                src="/logo.svg"
+                src="/logo.png"
                 alt="Enayi Hotels & Suites"
-                className="h-20 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                className="h-24 w-auto object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-lg"
+                style={{filter:'drop-shadow(0 0 12px rgba(201,162,39,0.5))'}}
               />
             </div>
             <div className="border-l-2 border-enayi-gold/60 pl-5">
