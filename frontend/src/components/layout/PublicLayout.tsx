@@ -57,24 +57,31 @@ export default function PublicLayout() {
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             </div>
-            <div className="border-l-2 border-enayi-gold/50 pl-5">
-              <div className="font-display font-bold text-white text-3xl leading-none tracking-wide"
-                   style={{textShadow:'0 0 40px rgba(201,162,39,0.3)'}}>
+            <div className="border-l-2 border-enayi-gold/60 pl-5">
+              {/* Hotel name — same visual weight as hero heading */}
+              <div
+                className="font-display font-black text-white leading-none tracking-wide"
+                style={{
+                  fontSize: 'clamp(1.6rem, 3vw, 2.2rem)',
+                  textShadow: '0 2px 20px rgba(201,162,39,0.4), 0 0 60px rgba(201,162,39,0.15)',
+                  letterSpacing: '0.02em',
+                }}
+              >
                 Enayi Hotels
               </div>
-              <div className="flex items-center gap-2 mt-1.5">
-                <div className="h-px w-8 bg-gradient-to-r from-enayi-gold to-transparent" />
-                <div className="text-enayi-gold text-[11px] tracking-[0.3em] uppercase font-semibold">
+              <div className="flex items-center gap-2 mt-2">
+                <div className="h-px w-10 bg-gradient-to-r from-enayi-gold to-transparent" />
+                <div className="text-enayi-gold text-[11px] tracking-[0.3em] uppercase font-bold">
                   &amp; Suites &nbsp;·&nbsp; Jos
                 </div>
-                <div className="h-px w-8 bg-gradient-to-l from-enayi-gold to-transparent" />
+                <div className="h-px w-10 bg-gradient-to-l from-enayi-gold to-transparent" />
               </div>
               {/* 5-star rating */}
               <div className="flex items-center gap-1 mt-1.5">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={11} className="text-enayi-gold" fill="currentColor" />
+                  <Star key={i} size={12} className="text-enayi-gold" fill="currentColor" />
                 ))}
-                <span className="text-enayi-gold text-[10px] tracking-widest uppercase ml-1 font-semibold">5 Star</span>
+                <span className="text-enayi-gold text-[10px] tracking-widest uppercase ml-1.5 font-bold">5 Star</span>
               </div>
             </div>
           </Link>
