@@ -69,8 +69,32 @@ export default function BookingPage() {
   const f = watch()
   const nights = f.check_in && f.check_out ? Math.max((new Date(f.check_out).getTime() - new Date(f.check_in).getTime()) / 86400000, 0) : 0
 
-  // Which classes does the chosen branch offer? (fall back to all if unseeded)
-  const offered = (rooms ?? []).filter(c => c.branch_prices?.some(bp => bp.hotel === branchId))
+  // Strip branch words from category name for clean display
+  const cleanName = (name: string) =>
+    name.replace(/zaramaganda/gi,'').replace(/fwawei/gi,'').replace(/fwavei/gi,'')
+        .replace(/\s+/g,' ').trim().replace(/^[-\s]+|[-\s]+$/g,'')
+
+  // Filter categories for selected branch:
+  // 1. Try branch_prices match first
+  // 2. If no branch_prices set, use room name to guess branch
+  //    (e.g. "STANDARD ROOM ZARAMAGANDA" only shows for Zaramaganda branch)
+  const selectedHotel = (hotels ?? []).find(h => h.id === branchId)
+  const branchName = selectedHotel?.name?.toLowerCase() ?? ''
+  const branchSlug = selectedHotel?.branch?.toLowerCase() ?? ''
+
+  const offered = (rooms ?? []).filter(c => {
+    // Has explicit branch price for this branch -> show it
+    if (c.branch_prices?.some((bp: any) => bp.hotel === branchId)) return true
+    // Has branch prices but none for this branch -> don't show
+    if (c.branch_prices?.length > 0) return false
+    // No branch prices at all: filter by name
+    const nameLower = c.name.toLowerCase()
+    const hasZara  = nameLower.includes('zaramaganda')
+    const hasFwav  = nameLower.includes('fwawei') || nameLower.includes('fwavei')
+    if (hasZara && !hasFwav) return branchSlug.includes('zaramaganda') || branchName.includes('zaramaganda')
+    if (hasFwav && !hasZara) return branchSlug.includes('fwawei') || branchName.includes('fwawei') || branchSlug.includes('fwavei')
+    return true // no branch name in category -> show for all
+  })
   const classList = offered.length ? offered : (rooms ?? [])
 
   const catId = room?.id || selectedCat
