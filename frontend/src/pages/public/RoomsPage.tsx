@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -42,7 +42,6 @@ const STATUS_STYLE: Record<string, string> = {
   cleaning:    'bg-blue-500/15   text-blue-400   border-blue-500/30',
 }
 
-// Map category slug/name to a real hotel room photo
 function getRoomImage(slug: string, name: string): string {
   const s = (slug + ' ' + name).toLowerCase()
   if (s.includes('presidential'))                             return '/rooms/presidential.jpg'
@@ -56,74 +55,48 @@ function getRoomImage(slug: string, name: string): string {
   if (s.includes('family'))                                  return '/rooms/family-room.jpg'
   if (s.includes('single'))                                  return '/rooms/single-room.jpg'
   if (s.includes('standard'))                                return '/rooms/standard-room.jpg'
-  // Final fallback — always show a real room, never blank
   return '/rooms/standard-room.jpg'
 }
 
-// Modal to show room details + image
-function RoomModal({ room, catName, catSlug, onClose }: {
-  room: RoomEntry; catName: string; catSlug: string; onClose: () => void
+function RoomModal({ room, catName, catSlug, branchName, onClose }: {
+  room: RoomEntry; catName: string; catSlug: string; branchName?: string; onClose: () => void
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.92, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.92, opacity: 0 }}
-        transition={{ duration: 0.22 }}
+      onClick={onClose}>
+      <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.92, opacity: 0 }} transition={{ duration: 0.22 }}
         onClick={e => e.stopPropagation()}
-        className="bg-enayi-surface border border-enayi-gold/30 rounded-2xl overflow-hidden
-                   w-full max-w-lg shadow-2xl"
-      >
-        {/* Room image */}
+        className="bg-enayi-surface border border-enayi-gold/30 rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl">
         <div className="relative aspect-video">
-          <img
-            src={getRoomImage(catSlug, catName)}
-            alt={catName}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/90 via-transparent to-transparent" />
-
-          {/* Status badge */}
+          <img src={getRoomImage(catSlug, catName)} alt={catName}
+               className="w-full h-full object-cover"/>
+          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/90 via-transparent to-transparent"/>
           <div className="absolute top-4 right-4">
-            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5
-                             rounded-full border ${STATUS_STYLE[room.status] ?? STATUS_STYLE.occupied}`}>
-              {room.is_available
-                ? <><CheckCircle size={12}/> Available</>
-                : <><XCircle size={12}/> {room.status.charAt(0).toUpperCase() + room.status.slice(1)}</>
-              }
+            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border
+              ${STATUS_STYLE[room.status] ?? STATUS_STYLE.occupied}`}>
+              {room.is_available ? <><CheckCircle size={12}/> Available</> : <><XCircle size={12}/> {room.status}</>}
             </span>
           </div>
-
-          {/* Room number overlay */}
           <div className="absolute bottom-4 left-4">
-            <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest mb-1">
-              Room Number
-            </p>
-            <p className="font-display font-bold text-4xl text-white">
-              {room.room_number}
-            </p>
+            {branchName && <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest mb-0.5">{branchName}</p>}
+            <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest mb-1">Room Number</p>
+            <p className="font-display font-bold text-4xl text-white">{room.room_number}</p>
           </div>
         </div>
-
-        {/* Room details */}
         <div className="p-6">
           <h3 className="font-display text-2xl text-enayi-text mb-1">{catName}</h3>
           <div className="h-px w-12 mb-4" style={{background:'linear-gradient(90deg,#C9A227,transparent)'}}/>
-
           <div className="grid grid-cols-2 gap-3 mb-5">
             {[
-              { icon: Maximize2, label: 'Floor',    value: `Floor ${room.floor}`         },
-              { icon: Eye,       label: 'View',     value: room.view_type.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase()) },
-              { icon: Wind,      label: 'Balcony',  value: room.has_balcony ? 'Yes' : 'No' },
-              { icon: BedDouble, label: 'Category', value: catName                       },
+              { icon: Maximize2, label: 'Floor',   value: `Floor ${room.floor}` },
+              { icon: Eye,       label: 'View',    value: room.view_type.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase()) },
+              { icon: Wind,      label: 'Balcony', value: room.has_balcony ? 'Yes' : 'No' },
+              { icon: BedDouble, label: 'Type',    value: catName },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="bg-enayi-bg/50 rounded-xl px-4 py-3 flex items-center gap-3">
-                <Icon size={16} className="text-enayi-gold shrink-0" />
+                <Icon size={16} className="text-enayi-gold shrink-0"/>
                 <div>
                   <p className="text-enayi-muted text-xs">{label}</p>
                   <p className="text-enayi-text text-sm font-medium">{value}</p>
@@ -131,16 +104,13 @@ function RoomModal({ room, catName, catSlug, onClose }: {
               </div>
             ))}
           </div>
-
           <div className="flex gap-3">
-            <a href="/book"
-               className="flex-1 btn-gold text-center text-sm py-3 font-semibold rounded-xl
-                          flex items-center justify-center gap-2">
+            <a href="/book" className="flex-1 text-center text-sm py-3 font-semibold rounded-xl
+               bg-enayi-gold text-enayi-bg flex items-center justify-center gap-2 hover:brightness-110 transition-all">
               Book This Room
             </a>
-            <button onClick={onClose}
-              className="px-4 py-3 rounded-xl border border-enayi-border text-enayi-muted
-                         hover:text-enayi-text hover:border-enayi-gold/40 transition-colors text-sm">
+            <button onClick={onClose} className="px-4 py-3 rounded-xl border border-enayi-border
+               text-enayi-muted hover:text-enayi-text hover:border-enayi-gold/40 transition-colors text-sm">
               Close
             </button>
           </div>
@@ -150,92 +120,146 @@ function RoomModal({ room, catName, catSlug, onClose }: {
   )
 }
 
+// Merge categories from multiple branches for "All Branches" view
+function mergeCategories(branches: BranchData[]): CategoryGroup[] {
+  const merged: Record<string, CategoryGroup & { branches: string[] }> = {}
+  for (const branch of branches) {
+    for (const cat of branch.categories) {
+      const key = cat.category.toLowerCase().trim()
+      if (!merged[key]) {
+        merged[key] = { ...cat, branches: [branch.hotel_name], rooms: [...cat.rooms] }
+      } else {
+        merged[key].rooms = [...merged[key].rooms, ...cat.rooms]
+        merged[key].free_count += cat.free_count
+        merged[key].total_count += cat.total_count
+        merged[key].branches.push(branch.hotel_name)
+      }
+    }
+  }
+  return Object.values(merged).sort((a, b) => a.category.localeCompare(b.category))
+}
+
 export default function RoomsPage() {
-  const [selectedHotel, setSelectedHotel] = useState('')
-  const [openCat, setOpenCat]             = useState<string | null>(null)
-  const [selectedRoom, setSelectedRoom]   = useState<{room: RoomEntry; catName: string; catSlug: string} | null>(null)
+  const [selectedHotel, setSelectedHotel] = useState<string | 'all'>('all')
+  const [openCat, setOpenCat]   = useState<string | null>(null)
+  const [selectedRoom, setSelectedRoom] = useState<{
+    room: RoomEntry; catName: string; catSlug: string; branchName?: string
+  } | null>(null)
 
   const { data: hotels = [], isLoading: hotelsLoading } = useQuery<Hotel[]>({
     queryKey: ['hotels'],
-    queryFn:  () => api.get('/hotels/').then(r =>
-      Array.isArray(r.data) ? r.data : (r.data?.results ?? [])),
+    queryFn: () => api.get('/hotels/').then(r => Array.isArray(r.data) ? r.data : (r.data?.results ?? [])),
     retry: 2, retryDelay: 3000,
   })
 
-  const { data, isLoading, isError, refetch } = useQuery<BranchData>({
+  // Query for each hotel individually
+  const branchQueries = hotels.map(h => ({
+    id: h.id,
+    name: h.name,
+    query: useQuery<BranchData>({
+      queryKey: ['branch-rooms', h.id],
+      queryFn: () => api.get(`/rooms/branch-availability/?hotel=${h.id}`).then(r => r.data),
+      retry: 2, retryDelay: 4000,
+    })
+  }))
+
+  const singleQuery = useQuery<BranchData>({
     queryKey: ['branch-rooms', selectedHotel],
-    queryFn:  () => api.get(`/rooms/branch-availability/?hotel=${selectedHotel}`).then(r => r.data),
-    enabled: !!selectedHotel,
+    queryFn: () => api.get(`/rooms/branch-availability/?hotel=${selectedHotel}`).then(r => r.data),
+    enabled: selectedHotel !== 'all' && !!selectedHotel,
     retry: 2, retryDelay: 4000,
   })
 
+  // Compute what to display
+  const displayData = useMemo(() => {
+    if (selectedHotel === 'all') {
+      const allBranches = branchQueries
+        .filter(q => q.query.data)
+        .map(q => q.query.data!)
+      if (allBranches.length === 0) return null
+      const merged = mergeCategories(allBranches)
+      return {
+        hotel_name: 'All Branches',
+        branch: 'Combined',
+        total_rooms: allBranches.reduce((a, b) => a + b.total_rooms, 0),
+        free_rooms:  allBranches.reduce((a, b) => a + b.free_rooms, 0),
+        categories: merged,
+      } as BranchData
+    }
+    return singleQuery.data ?? null
+  }, [selectedHotel, singleQuery.data, branchQueries.map(q => q.query.data).join(',')])
+
+  const isLoading = selectedHotel === 'all'
+    ? branchQueries.some(q => q.query.isLoading)
+    : singleQuery.isLoading
+  const isError = selectedHotel === 'all'
+    ? branchQueries.every(q => q.query.isError)
+    : singleQuery.isError
+  const refetch = () => selectedHotel === 'all'
+    ? branchQueries.forEach(q => q.query.refetch())
+    : singleQuery.refetch()
+
   return (
     <div className="bg-enayi-bg min-h-screen">
-
       {/* Page header */}
       <div className="section-sm bg-enayi-surface border-b border-enayi-border text-center">
         <div className="container-site">
           <div className="badge-gold inline-flex mb-4">Room Directory</div>
-          <h1 className="font-display text-4xl md:text-5xl text-enayi-text mb-4">
-            Browse Rooms by Branch
-          </h1>
-          <div className="gold-line-center mb-5" />
+          <h1 className="font-display text-4xl md:text-5xl text-enayi-text mb-4">Browse Rooms by Branch</h1>
+          <div className="gold-line-center mb-5"/>
           <p className="text-enayi-muted text-lg max-w-xl mx-auto">
-            Select a branch, choose a room category, then click any room number
-            to see its photo and full details.
+            Select a branch, expand a room category, then click any room number to see its photo and details.
           </p>
         </div>
       </div>
 
       <div className="container-site py-12">
 
-        {/* ── CENTRED BOLD BRANCH SELECTOR ─────────────────────────────── */}
-        <div className="max-w-2xl mx-auto mb-12 text-center">
+        {/* Branch selector cards */}
+        <div className="max-w-3xl mx-auto mb-12 text-center">
           <p className="text-enayi-gold font-bold text-sm uppercase tracking-[0.3em] mb-3">
             Step 1 — Choose Your Branch
           </p>
-          <h2 className="font-display text-3xl text-white mb-6">
-            Which Enayi Hotels location?
-          </h2>
+          <h2 className="font-display text-3xl text-white mb-6">Which Enayi Hotels location?</h2>
 
           {hotelsLoading ? (
             <div className="flex items-center justify-center gap-2 text-enayi-muted py-4">
-              <Loader2 size={18} className="animate-spin" /> Loading branches...
+              <Loader2 size={18} className="animate-spin"/> Loading branches...
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* "All" option */}
-              <button
-                onClick={() => { setSelectedHotel(''); setOpenCat(null); }}
+              {/* All Branches */}
+              <button onClick={() => { setSelectedHotel('all'); setOpenCat(null); }}
                 className={`p-5 rounded-2xl border-2 transition-all text-left
-                  ${!selectedHotel
+                  ${selectedHotel === 'all'
                     ? 'border-enayi-gold bg-enayi-gold/10'
-                    : 'border-enayi-border hover:border-enayi-gold/40'}`}
-              >
-                <Building2 size={28} className={!selectedHotel ? 'text-enayi-gold' : 'text-enayi-muted'} />
-                <p className={`font-display text-xl mt-2 ${!selectedHotel ? 'text-enayi-gold' : 'text-enayi-text'}`}>
+                    : 'border-enayi-border hover:border-enayi-gold/40'}`}>
+                <Building2 size={28} className={selectedHotel === 'all' ? 'text-enayi-gold' : 'text-enayi-muted'}/>
+                <p className={`font-display text-xl mt-2 ${selectedHotel === 'all' ? 'text-enayi-gold' : 'text-enayi-text'}`}>
                   All Branches
                 </p>
-                <p className="text-enayi-muted text-sm mt-0.5">View overview of both branches</p>
+                <p className="text-enayi-muted text-sm mt-0.5">All rooms from both branches</p>
+                {selectedHotel === 'all' && (
+                  <span className="inline-flex items-center gap-1 mt-2 text-xs text-enayi-gold font-semibold">
+                    <CheckCircle size={11}/> Selected
+                  </span>
+                )}
               </button>
 
               {hotels.map(h => (
-                <button
-                  key={h.id}
-                  onClick={() => { setSelectedHotel(h.id); setOpenCat(null); }}
+                <button key={h.id} onClick={() => { setSelectedHotel(h.id); setOpenCat(null); }}
                   className={`p-5 rounded-2xl border-2 transition-all text-left
                     ${selectedHotel === h.id
                       ? 'border-enayi-gold bg-enayi-gold/10'
-                      : 'border-enayi-border hover:border-enayi-gold/40'}`}
-                >
-                  <Building2 size={28} className={selectedHotel === h.id ? 'text-enayi-gold' : 'text-enayi-muted'} />
+                      : 'border-enayi-border hover:border-enayi-gold/40'}`}>
+                  <Building2 size={28} className={selectedHotel === h.id ? 'text-enayi-gold' : 'text-enayi-muted'}/>
                   <p className={`font-display text-xl mt-2 ${selectedHotel === h.id ? 'text-enayi-gold' : 'text-enayi-text'}`}>
-                    {h.name.replace('Enayi Hotels & Suites — ', '').replace('Enayi Hotels & Suites - ', '')}
+                    {h.name.replace(/enayi hotels.*?—\s*/i,'').replace(/enayi hotels.*?-\s*/i,'')}
                   </p>
                   <p className="text-enayi-muted text-sm mt-0.5 capitalize">{h.branch} Branch</p>
                   {selectedHotel === h.id && (
                     <span className="inline-flex items-center gap-1 mt-2 text-xs text-enayi-gold font-semibold">
-                      <CheckCircle size={11} /> Selected
+                      <CheckCircle size={11}/> Selected
                     </span>
                   )}
                 </button>
@@ -244,148 +268,115 @@ export default function RoomsPage() {
           )}
         </div>
 
-        {/* No branch selected */}
-        {!selectedHotel && !hotelsLoading && (
-          <div className="card text-center py-16 max-w-md mx-auto">
-            <Building2 size={48} className="text-enayi-gold/30 mx-auto mb-4" />
-            <p className="text-enayi-text font-display text-xl mb-2">Select a Branch Above</p>
-            <p className="text-enayi-muted">Click Fwawei or Zaramaganda to see available rooms</p>
-          </div>
-        )}
-
         {/* Loading */}
-        {selectedHotel && isLoading && (
+        {isLoading && (
           <div className="text-center py-16">
-            <Loader2 size={36} className="animate-spin text-enayi-gold mx-auto mb-4" />
+            <Loader2 size={36} className="animate-spin text-enayi-gold mx-auto mb-4"/>
             <p className="text-enayi-muted">Loading rooms...</p>
-            <p className="text-enayi-muted/60 text-sm mt-1">Server may be waking up, please wait</p>
           </div>
         )}
 
         {/* Error */}
-        {selectedHotel && isError && !isLoading && (
+        {isError && !isLoading && (
           <div className="card border-rose-500/30 bg-rose-500/5 text-center py-12 max-w-sm mx-auto">
-            <AlertCircle size={36} className="text-rose-400 mx-auto mb-4" />
+            <AlertCircle size={36} className="text-rose-400 mx-auto mb-4"/>
             <p className="text-rose-300 font-medium mb-2">Could not load rooms</p>
             <p className="text-enayi-muted text-sm mb-5">Server may still be starting. Try again.</p>
-            <button onClick={() => refetch()}
-              className="inline-flex items-center gap-2 btn-outline text-sm px-5 py-2.5">
-              <RefreshCw size={14} /> Try Again
+            <button onClick={refetch}
+              className="inline-flex items-center gap-2 text-sm px-5 py-2.5
+                         border border-enayi-gold text-enayi-gold rounded-xl hover:bg-enayi-gold/10 transition-colors">
+              <RefreshCw size={14}/> Try Again
             </button>
           </div>
         )}
 
         {/* Room data */}
-        {data && !isLoading && (
+        {displayData && !isLoading && (
           <div className="space-y-4">
-
-            {/* Branch summary */}
-            <div className="card-gold p-5 flex items-center justify-between flex-wrap gap-4 mb-8">
+            {/* Summary bar */}
+            <div className="card-gold p-5 flex items-center justify-between flex-wrap gap-4 mb-6">
               <div>
-                <h2 className="font-display text-2xl text-enayi-text">{data.hotel_name}</h2>
-                <p className="text-enayi-muted text-sm mt-0.5 capitalize">{data.branch} Branch</p>
+                <h2 className="font-display text-2xl text-enayi-text">{displayData.hotel_name}</h2>
+                <p className="text-enayi-muted text-sm mt-0.5 capitalize">{displayData.branch}</p>
               </div>
               <div className="flex gap-8">
                 <div className="text-center">
-                  <p className="font-display text-3xl text-emerald-400">{data.free_rooms}</p>
+                  <p className="font-display text-3xl text-emerald-400">{displayData.free_rooms}</p>
                   <p className="text-enayi-muted text-xs uppercase tracking-wider mt-0.5">Available</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-display text-3xl text-enayi-text">{data.total_rooms}</p>
+                  <p className="font-display text-3xl text-enayi-text">{displayData.total_rooms}</p>
                   <p className="text-enayi-muted text-xs uppercase tracking-wider mt-0.5">Total</p>
                 </div>
               </div>
             </div>
 
-            <p className="text-enayi-muted text-sm text-center mb-6">
-              Step 2 — Click a room category to expand, then click a room number to view its photo
+            <p className="text-enayi-muted text-sm text-center mb-4">
+              Step 2 — Click a category to expand, then click a room number to view its photo
             </p>
 
-            {data.categories.length === 0 && (
+            {displayData.categories.length === 0 && (
               <div className="card text-center py-12">
-                <BedDouble size={36} className="text-enayi-gold/30 mx-auto mb-3" />
-                <p className="text-enayi-muted">No rooms found for this branch yet.</p>
+                <BedDouble size={36} className="text-enayi-gold/30 mx-auto mb-3"/>
+                <p className="text-enayi-muted">No rooms found yet.</p>
               </div>
             )}
 
-            {data.categories.map(cat => (
-              <div key={cat.category_slug} className="card overflow-hidden">
-
-                {/* Category header with image preview */}
+            {displayData.categories.map(cat => (
+              <div key={cat.category_slug + cat.category} className="card overflow-hidden">
                 <button
                   onClick={() => setOpenCat(openCat === cat.category_slug ? null : cat.category_slug)}
-                  className="w-full flex items-center gap-4 p-4 hover:bg-white/3 transition-colors text-left"
-                >
-                  {/* Thumbnail */}
+                  className="w-full flex items-center gap-4 p-4 hover:bg-white/3 transition-colors text-left">
                   <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 border border-enayi-gold/20">
-                    <img
-                      src={getRoomImage(cat.category_slug, cat.category)}
-                      alt={cat.category}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={getRoomImage(cat.category_slug, cat.category)}
+                         alt={cat.category} className="w-full h-full object-cover"/>
                   </div>
-
                   <div className="flex-1 min-w-0">
                     <p className="text-enayi-text font-semibold text-base">{cat.category}</p>
                     <p className="text-enayi-muted text-xs mt-0.5">{cat.total_count} rooms total</p>
                   </div>
-
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
                       <span className="text-emerald-400 font-bold text-xl">{cat.free_count}</span>
                       <span className="text-enayi-muted text-sm"> / {cat.total_count} free</span>
                     </div>
                     <ChevronDown size={16} className={`text-enayi-muted transition-transform duration-200
-                      ${openCat === cat.category_slug ? 'rotate-180' : ''}`} />
+                      ${openCat === cat.category_slug ? 'rotate-180' : ''}`}/>
                   </div>
                 </button>
 
-                {/* Expanded room grid */}
                 <AnimatePresence>
                   {openCat === cat.category_slug && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="overflow-hidden border-t border-enayi-border"
-                    >
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
+                      className="overflow-hidden border-t border-enayi-border">
                       <div className="p-5">
-                        {/* Room image preview */}
+                        {/* Category image */}
                         <div className="relative rounded-xl overflow-hidden mb-5 aspect-video max-h-52">
-                          <img
-                            src={getRoomImage(cat.category_slug, cat.category)}
-                            alt={cat.category}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/80 via-transparent to-transparent" />
+                          <img src={getRoomImage(cat.category_slug, cat.category)}
+                               alt={cat.category} className="w-full h-full object-cover"/>
+                          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/80 via-transparent to-transparent"/>
                           <div className="absolute bottom-3 left-4">
-                            <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest">
-                              {cat.category}
-                            </p>
-                            <p className="text-white/70 text-xs">Click a room number below to see details</p>
+                            <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest">{cat.category}</p>
+                            <p className="text-white/70 text-xs">Click a room number to see details</p>
                           </div>
                         </div>
 
-                        {/* Room number grid */}
                         <p className="text-enayi-muted text-xs uppercase tracking-widest mb-3 font-semibold">
                           Room Numbers — click to view
                         </p>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 mb-5">
                           {cat.rooms.map(room => (
-                            <motion.button
-                              key={room.id}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.97 }}
-                              onClick={() => setSelectedRoom({ room, catName: cat.category, catSlug: cat.category_slug })}
+                            <motion.button key={room.id}
+                              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
+                              onClick={() => setSelectedRoom({
+                                room, catName: cat.category, catSlug: cat.category_slug
+                              })}
                               className={`rounded-xl border p-3 text-center transition-all cursor-pointer
                                 ${STATUS_STYLE[room.status] ?? STATUS_STYLE.occupied}
-                                hover:ring-2 hover:ring-enayi-gold/50`}
-                            >
+                                hover:ring-2 hover:ring-enayi-gold/50`}>
                               <div className="flex items-center justify-center gap-1 mb-1">
-                                {room.is_available
-                                  ? <CheckCircle size={11} />
-                                  : <XCircle size={11} />}
+                                {room.is_available ? <CheckCircle size={11}/> : <XCircle size={11}/>}
                                 <span className="font-mono font-bold text-sm">{room.room_number}</span>
                               </div>
                               <p className="text-xs opacity-65">Fl. {room.floor}</p>
@@ -393,16 +384,13 @@ export default function RoomsPage() {
                           ))}
                         </div>
 
-                        {/* Legend */}
                         <div className="flex flex-wrap gap-2 pt-4 border-t border-enayi-border">
                           {Object.entries({
                             available: 'Available', occupied: 'Occupied',
                             reserved: 'Reserved', maintenance: 'Maintenance', cleaning: 'Cleaning',
                           }).map(([s, l]) => (
-                            <span key={s} className={`inline-flex items-center gap-1 text-xs px-2.5 py-1
-                                                      rounded-full border ${STATUS_STYLE[s] ?? ''}`}>
-                              {l}
-                            </span>
+                            <span key={s} className={`inline-flex items-center gap-1 text-xs
+                              px-2.5 py-1 rounded-full border ${STATUS_STYLE[s] ?? ''}`}>{l}</span>
                           ))}
                         </div>
                       </div>
@@ -415,15 +403,11 @@ export default function RoomsPage() {
         )}
       </div>
 
-      {/* Room detail modal */}
       <AnimatePresence>
         {selectedRoom && (
-          <RoomModal
-            room={selectedRoom.room}
-            catName={selectedRoom.catName}
-            catSlug={selectedRoom.catSlug}
-            onClose={() => setSelectedRoom(null)}
-          />
+          <RoomModal room={selectedRoom.room} catName={selectedRoom.catName}
+            catSlug={selectedRoom.catSlug} branchName={selectedRoom.branchName}
+            onClose={() => setSelectedRoom(null)}/>
         )}
       </AnimatePresence>
     </div>
