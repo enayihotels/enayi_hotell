@@ -42,20 +42,22 @@ const STATUS_STYLE: Record<string, string> = {
   cleaning:    'bg-blue-500/15   text-blue-400   border-blue-500/30',
 }
 
-// Map category slug/name to a placeholder image
+// Map category slug/name to a real hotel room photo
 function getRoomImage(slug: string, name: string): string {
   const s = (slug + ' ' + name).toLowerCase()
-  if (s.includes('presidential'))   return '/rooms/presidential.jpg'
-  if (s.includes('honeymoon'))      return '/rooms/honeymoon-suite.jpg'
-  if (s.includes('suite'))          return '/rooms/suite.jpg'
-  if (s.includes('executive'))      return '/rooms/executive-deluxe.jpg'
-  if (s.includes('deluxe'))         return '/rooms/deluxe-room.jpg'
+  if (s.includes('presidential'))                             return '/rooms/presidential.jpg'
+  if (s.includes('honeymoon'))                               return '/rooms/honeymoon-suite.jpg'
+  if (s.includes('suite'))                                   return '/rooms/suite.jpg'
+  if (s.includes('executive') || s.includes('exec'))         return '/rooms/executive-deluxe.jpg'
   if (s.includes('classic plus') || s.includes('classic-plus')) return '/rooms/classic-plus.jpg'
-  if (s.includes('classic'))        return '/rooms/classic-room.jpg'
-  if (s.includes('superior'))       return '/rooms/superior-room.jpg'
-  if (s.includes('family'))         return '/rooms/family-room.jpg'
-  if (s.includes('standard'))       return '/rooms/standard-room.jpg'
-  return '/rooms/classic-room.jpg'  // fallback
+  if (s.includes('deluxe'))                                  return '/rooms/deluxe-room.jpg'
+  if (s.includes('classic'))                                 return '/rooms/classic-room.jpg'
+  if (s.includes('superior'))                                return '/rooms/superior-room.jpg'
+  if (s.includes('family'))                                  return '/rooms/family-room.jpg'
+  if (s.includes('single'))                                  return '/rooms/single-room.jpg'
+  if (s.includes('standard'))                                return '/rooms/standard-room.jpg'
+  // Final fallback — always show a real room, never blank
+  return '/rooms/standard-room.jpg'
 }
 
 // Modal to show room details + image
