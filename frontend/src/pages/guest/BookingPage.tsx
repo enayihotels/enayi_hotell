@@ -95,7 +95,15 @@ export default function BookingPage() {
     if (hasFwav && !hasZara) return branchSlug.includes('fwawei') || branchName.includes('fwawei') || branchSlug.includes('fwavei')
     return true // no branch name in category -> show for all
   })
-  const classList = offered.length ? offered : (rooms ?? [])
+  const rawList = offered.length ? offered : (rooms ?? [])
+  // Deduplicate by clean name — if two categories clean to the same name, keep only one
+  const seen = new Set<string>()
+  const classList = rawList.filter(r => {
+    const key = cleanName(r.name).toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 
   const catId = room?.id || selectedCat
   const selectedRoom: Cat | undefined = room || classList.find(r => r.id === catId)
