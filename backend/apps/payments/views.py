@@ -96,6 +96,13 @@ def fulfill_payment(payment: Payment) -> None:
                 event.status = "fully_paid"
             event.save(update_fields=["amount_paid", "status"])
 
+        # Send receipt email after successful fulfillment
+        try:
+            from .receipt import send_payment_receipt
+            send_payment_receipt(payment)
+        except Exception as email_exc:
+            logger.warning(f"Receipt email failed for {payment.transaction_reference}: {email_exc}")
+
     except Exception as exc:
         logger.exception(f"fulfill_payment error for {payment.transaction_reference}: {exc}")
 
