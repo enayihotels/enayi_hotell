@@ -29,8 +29,19 @@ class RoomCategoryAdmin(admin.ModelAdmin):
 
 class RoomAdmin(admin.ModelAdmin):
     list_display = ["room_number", "hotel", "category", "floor", "status", "has_balcony", "view_type"]
-    list_filter = ["hotel", "status", "floor", "category"]
+    list_filter  = ["hotel", "status", "floor", "category"]
     search_fields = ["room_number"]
+    actions = ["mark_available", "mark_maintenance"]
+
+    def mark_available(self, request, queryset):
+        updated = queryset.update(status="available")
+        self.message_user(request, f"{updated} room(s) marked as available.")
+    mark_available.short_description = "Mark selected rooms as Available"
+
+    def mark_maintenance(self, request, queryset):
+        updated = queryset.update(status="maintenance")
+        self.message_user(request, f"{updated} room(s) marked as under maintenance.")
+    mark_maintenance.short_description = "Mark selected rooms as Under Maintenance"
 
 
 class RoomCategoryPriceAdmin(admin.ModelAdmin):
