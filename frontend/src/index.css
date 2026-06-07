@@ -5,17 +5,30 @@
 @layer base {
   :root {
     /* ── ENAYI 5-STAR LUXURY BRAND VARIABLES ─────────────────── */
-    /* Deep Navy · Champagne Gold · Ivory · Rich Charcoal         */
     --gold: #C9A227; --gold-light: #E4BB35; --gold-dark: #A67C1A;
     --bg: #0B1120; --surface: #111827; --panel: #162035;
     --border: #1E2D47; --text: #F5F0E8; --muted: #8A9AB5;
     --navy: #0B1120; --cream: #F9F5EC;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
-  body { @apply bg-enayi-bg text-enayi-text font-body; min-height: 100vh; }
-  h1,h2 { @apply font-display; color: var(--text); }
-  h3,h4 { @apply font-heading; color: var(--text); }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #0B1120 !important;
+    color: #F5F0E8;
+  }
+  body {
+    @apply bg-enayi-bg text-enayi-text font-body;
+    min-height: 100vh;
+    background-color: #0B1120 !important;
+  }
+  #root {
+    background-color: #0B1120;
+    min-height: 100vh;
+  }
+  h1, h2 { @apply font-display; color: var(--text); }
+  h3, h4 { @apply font-heading; color: var(--text); }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 999px; }
