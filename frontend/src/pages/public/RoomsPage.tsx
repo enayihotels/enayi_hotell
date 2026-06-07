@@ -58,8 +58,9 @@ function getRoomImage(slug: string, name: string): string {
   return '/rooms/standard-room.jpg'
 }
 
-function RoomModal({ room, catName, catSlug, branchName, onClose }: {
-  room: RoomEntry; catName: string; catSlug: string; branchName?: string; onClose: () => void
+function RoomModal({ room, catName, catSlug, branchName, hotelId, onClose }: {
+  room: RoomEntry; catName: string; catSlug: string;
+  branchName?: string; hotelId?: string; onClose: () => void
 }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -370,7 +371,8 @@ export default function RoomsPage() {
                             <motion.button key={room.id}
                               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
                               onClick={() => setSelectedRoom({
-                                room, catName: cat.category, catSlug: cat.category_slug
+                                room, catName: cat.category, catSlug: cat.category_slug,
+                                hotelId: selectedHotel !== 'all' ? selectedHotel : undefined
                               })}
                               className={`rounded-xl border p-3 text-center transition-all cursor-pointer
                                 ${STATUS_STYLE[room.status] ?? STATUS_STYLE.occupied}
@@ -407,6 +409,7 @@ export default function RoomsPage() {
         {selectedRoom && (
           <RoomModal room={selectedRoom.room} catName={selectedRoom.catName}
             catSlug={selectedRoom.catSlug} branchName={selectedRoom.branchName}
+            hotelId={selectedRoom.hotelId}
             onClose={() => setSelectedRoom(null)}/>
         )}
       </AnimatePresence>
