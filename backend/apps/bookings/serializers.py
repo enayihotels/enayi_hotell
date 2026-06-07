@@ -49,12 +49,7 @@ class BookingSerializer(serializers.ModelSerializer):
 
 
 class CreateBookingSerializer(serializers.Serializer):
-    """Create a booking — auto-assigns an available room in the chosen branch.
-
-    `hotel_id` is the branch (Zaramaganda / Fwawei). When given, the room rate
-    is that branch's price for the class, and only rooms at that branch are used.
-    It stays optional so older calls that omit it keep working.
-    """
+    """Create a booking — auto-assigns an available room in the chosen branch."""
     category_id        = serializers.UUIDField()
     hotel_id           = serializers.UUIDField(required=False)
     check_in           = serializers.DateField()
@@ -76,6 +71,7 @@ class CreateBookingSerializer(serializers.Serializer):
         return data
 
     def create(self, validated_data):
+        import re
         from apps.rooms.models import RoomCategory, Room
         from apps.hotels.models import Hotel
 
@@ -83,72 +79,99 @@ class CreateBookingSerializer(serializers.Serializer):
         check_in  = validated_data["check_in"]
         check_out = validated_data["check_out"]
 
+        # Resolve category
         try:
-            category = RoomCategory.objects.get(id=validated_data["category_id"], is_active=True)
+            category = RoomCategory.objects.get(
+                id=validated_data["category_id"], is_active=True
+            )
         except RoomCategory.DoesNotExist:
             raise serializers.ValidationError({"category_id": "Room class not found."})
 
+        # Resolve hotel/branch
         hotel = None
         if validated_data.get("hotel_id"):
             try:
-                hotel = Hotel.objects.get(id=validated_data["hotel_id"], is_active=True)
+                hotel = Hotel.objects.get(
+                    id=validated_data["hotel_id"], is_active=True
+                )
             except Hotel.DoesNotExist:
                 raise serializers.ValidationError({"hotel_id": "Branch not found."})
 
-        # Rooms already taken for any overlapping, active booking.
-        taken = Booking.objects.filter(
+        # Find all equivalent category IDs (handles duplicate names like
+        # "STANDARD ROOM FWAWEI" and "STANDARD ROOM ZARAMAGANDA")
+        BRANCH_WORDS = ["zaramaganda", "fwawei", "fwavei"]
+
+        def strip_branch(name):
+            n = name
+            for w in BRANCH_WORDS:
+                n = re.sub(w, "", n, flags=re.IGNORECASE)
+            return re.sub(r"\s+", " ", n).strip().lower()
+
+        target_clean = strip_branch(category.name)
+        equiv_ids = [
+            c.id for c in RoomCategory.objects.filter(is_active=True)
+            if strip_branch(c.name) == target_clean
+        ]
+        if category.id not in equiv_ids:
+            equiv_ids.append(category.id)
+
+        # Rooms with active overlapping bookings (genuinely taken)
+        taken = set(Booking.objects.filter(
             status__in=["pending", "confirmed", "checked_in"],
-            check_in__lt=check_out, check_out__gt=check_in,
-        ).values_list("room_id", flat=True)
+            check_in__lt=check_out,
+            check_out__gt=check_in,
+        ).values_list("room_id", flat=True))
 
-        rooms = Room.objects.filter(category=category, status="available").exclude(id__in=taken)
+        # Auto-reset stale "reserved" rooms at this hotel that have no
+        # active booking — fixes the free-tier sleep/wake issue
         if hotel:
-            rooms = rooms.filter(hotel=hotel)
-        room = rooms.order_by("floor", "room_number").first()
+            all_active = set(Booking.objects.filter(
+                status__in=["pending", "confirmed", "checked_in"],
+            ).values_list("room_id", flat=True))
+            Room.objects.filter(
+                hotel=hotel,
+                status="reserved",
+            ).exclude(id__in=all_active).update(status="available")
 
-        # If no room found with exact category, try finding equivalent category
-        # at the selected branch (handles duplicate categories with branch names)
+        # Build base queryset: correct category + not taken
+        base_qs = Room.objects.filter(
+            category_id__in=equiv_ids,
+        ).exclude(id__in=taken)
+
+        if hotel:
+            base_qs = base_qs.filter(hotel=hotel)
+
+        # Tier 1: available rooms
+        room = base_qs.filter(
+            status="available"
+        ).order_by("floor", "room_number").first()
+
+        # Tier 2: any non-maintenance room (catches cleaning/stale-reserved)
+        if not room:
+            room = base_qs.exclude(
+                status__in=["occupied", "maintenance"]
+            ).order_by("floor", "room_number").first()
+
+        # Tier 3: broaden search across all hotel rooms with matching category
         if not room and hotel:
-            import re as _re
-            branch_words = ["zaramaganda", "fwawei", "fwavei"]
-            clean = category.name
-            for w in branch_words:
-                clean = _re.sub(w, "", clean, flags=_re.IGNORECASE)
-            clean = _re.sub(r"\s+", " ", clean).strip()
-
-            # Find all categories with equivalent clean name
-            from apps.rooms.models import RoomCategory
-            all_cats = RoomCategory.objects.all()
-            equiv_ids = []
-            for c in all_cats:
-                c_clean = c.name
-                for w in branch_words:
-                    c_clean = _re.sub(w, "", c_clean, flags=_re.IGNORECASE)
-                c_clean = _re.sub(r"\s+", " ", c_clean).strip()
-                if c_clean.lower() == clean.lower():
-                    equiv_ids.append(c.id)
-
-            if equiv_ids:
-                rooms = Room.objects.filter(
-                    category_id__in=equiv_ids,
-                    status="available",
-                    hotel=hotel,
-                ).exclude(id__in=taken)
-                room = rooms.order_by("floor", "room_number").first()
+            room = Room.objects.filter(
+                hotel=hotel,
+                category_id__in=equiv_ids,
+            ).exclude(id__in=taken).exclude(
+                status__in=["occupied", "maintenance"]
+            ).order_by("floor", "room_number").first()
 
         if not room:
+            clean_cat = strip_branch(category.name).title()
             where = f" at {hotel.name}" if hotel else ""
-            # Clean category name for user-friendly error
-            import re as _re2
-            clean_cat = category.name
-            for w in ["Zaramaganda", "Fwawei", "Fwavei", "zaramaganda", "fwawei", "fwavei"]:
-                clean_cat = clean_cat.replace(w, "").strip()
-            clean_cat = _re2.sub(r"\s+", " ", clean_cat).strip(" -_,.")
             raise serializers.ValidationError(
-                {"detail": f"No {clean_cat} rooms are available{where} for those dates."}
+                {"detail": (
+                    f"No {clean_cat} rooms are currently available{where}. "
+                    "Please try different dates or contact us directly."
+                )}
             )
 
-        # Branch-specific nightly rate (falls back to the class default).
+        # Get branch-specific rate
         rate = category.get_current_price(hotel or room.hotel)
 
         booking = Booking.objects.create(
@@ -168,24 +191,8 @@ class CreateBookingSerializer(serializers.Serializer):
             status="pending",
         )
 
-        # Hold the room so it shows as occupied right away.
         room.status = "reserved"
         room.save(update_fields=["status"])
-
-        # Release any OTHER available rooms at this branch
-        # (in case reset_rooms_available set booked rooms back to available)
-        from apps.rooms.models import Room as _Room
-        from django.utils import timezone as _tz
-        today = _tz.now().date()
-        active_room_ids = set(Booking.objects.filter(
-            status__in=["pending", "confirmed", "checked_in"],
-        ).values_list("room_id", flat=True))
-        _Room.objects.filter(
-            hotel=booking.hotel,
-            status="available",
-            id__in=active_room_ids,
-        ).update(status="reserved")
-
         return booking
 
 
