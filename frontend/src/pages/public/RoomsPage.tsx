@@ -1,236 +1,219 @@
-import { useState, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
-import { Star, Users, Maximize2, BedDouble, MapPin, ImageIcon } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { BedDouble, CheckCircle, XCircle, Loader2, Building2, ChevronDown } from 'lucide-react'
 import api from '@/utils/api'
-import { formatCurrency } from '@/utils/helpers'
-import { PageSpinner } from '@/components/ui'
-import type { RoomCategory } from '@/types'
 
-// ── Branch type (kept local) ─────────────────────────────────
-interface BranchPrice {
-  hotel: string
-  branch: string
-  branch_name: string
-  base_price: string
-  weekend_price: string
-  holiday_price: string
-  breakfast_price: string
-  current_price: string
-  current_price_with_breakfast: string
-}
-
-interface Hotel {
+interface RoomNumber {
   id: string
-  name: string
+  room_number: string
+  floor: number
+  status: string
+  view_type: string
+  has_balcony: boolean
+  category_name: string
+  is_available: boolean
+}
+interface BranchRoomData {
+  hotel_id: string
+  hotel_name: string
   branch: string
-  slug: string
-  tagline?: string
-  city?: string
-  state?: string
-  is_active?: boolean
+  categories: {
+    category_id: string
+    category_name: string
+    slug: string
+    available: number
+    total: number
+    rooms: RoomNumber[]
+  }[]
 }
 
-// Extend RoomCategory with branch_prices (it's in the API response)
-interface RoomCategoryExt extends RoomCategory {
-  branch_prices?: BranchPrice[]
-}
+interface Hotel { id: string; name: string; branch: string }
 
-export default function RoomsPage() {
-  // 'all' shows base prices; otherwise we filter by branch id
-  const [selectedBranch, setSelectedBranch] = useState<string>('all')
+export default function RoomNumbersPage() {
+  const [selectedHotel, setSelectedHotel] = useState<string>('')
+  const [openCategory, setOpenCategory] = useState<string | null>(null)
 
-  const { data: hotels } = useQuery<Hotel[]>({
+  const { data: hotels = [] } = useQuery<Hotel[]>({
     queryKey: ['hotels'],
-    queryFn: () =>
-      api.get('/hotels/').then(r =>
-        Array.isArray(r.data) ? r.data : (r.data?.results ?? [])
-      ),
+    queryFn: () => api.get('/hotels/').then(r => Array.isArray(r.data) ? r.data : r.data?.results ?? []),
   })
 
-  const { data: rooms, isLoading } = useQuery<RoomCategoryExt[]>({
-    queryKey: ['rooms'],
-    queryFn: () =>
-      api.get('/rooms/categories/').then(r => r.data.results ?? r.data),
+  const { data, isLoading } = useQuery<BranchRoomData>({
+    queryKey: ['branch-rooms', selectedHotel],
+    queryFn: () => api.get(`/rooms/branch-availability/?hotel=${selectedHotel}`).then(r => r.data),
+    enabled: !!selectedHotel,
   })
 
-  // Build branch list with "All branches" first
-  const branches = useMemo(() => {
-    return [
-      { id: 'all', name: 'All Branches', branch: 'all' as const },
-      ...(hotels ?? []),
-    ]
-  }, [hotels])
-
-  // Filter & price-resolve rooms for the selected branch
-  const visibleRooms = useMemo(() => {
-    if (!rooms) return []
-    if (selectedBranch === 'all') {
-      return rooms.map(r => ({
-        room: r,
-        priceLabel: Number(r.current_price ?? r.base_price ?? 0),
-        branchName: null,
-      }))
-    }
-    return rooms
-      .map(r => {
-        const bp = r.branch_prices?.find(p => p.hotel === selectedBranch)
-        if (!bp) return null
-        return {
-          room: r,
-          priceLabel: Number(bp.current_price),
-          branchName: bp.branch_name,
-        }
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null)
-  }, [rooms, selectedBranch])
-
-  if (isLoading) return <PageSpinner />
-
-  const selectedBranchObj = hotels?.find(h => h.id === selectedBranch)
+  const statusColor = (s: string) => ({
+    available:   'bg-jade/15 text-jade border-jade/30',
+    occupied:    'bg-rose-500/15 text-rose-400 border-rose-500/30',
+    reserved:    'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    maintenance: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
+    cleaning:    'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  }[s] ?? 'bg-white/10 text-white/40 border-white/10')
 
   return (
     <div className="bg-enayi-bg min-h-screen">
       {/* Header */}
       <div className="section-sm bg-enayi-surface border-b border-enayi-border text-center">
         <div className="container-site">
-          <div className="badge-gold inline-flex mb-4">🛏️ Rooms & Suites</div>
-          <h1 className="font-display text-5xl text-enayi-text mb-4">Our Rooms</h1>
-          <div className="gold-line-center mb-4" />
-          <p className="text-enayi-muted text-lg max-w-lg mx-auto">
-            Choose a branch to explore its rooms and branch-specific pricing.
+          <div className="badge-gold inline-flex mb-4">Room Directory</div>
+          <h1 className="font-display text-4xl md:text-5xl text-enayi-text mb-4">
+            Room Numbers by Branch
+          </h1>
+          <div className="gold-line-center mb-5" />
+          <p className="text-enayi-muted text-lg max-w-xl mx-auto">
+            Browse all rooms by category and see real-time availability at each branch.
           </p>
         </div>
       </div>
 
       <div className="container-site section">
-        {/* Branch Tabs */}
-        <div className="flex flex-wrap gap-3 mb-10 justify-center">
-          {branches.map(b => {
-            const isActive = selectedBranch === b.id
-            return (
-              <button
-                key={b.id}
-                onClick={() => setSelectedBranch(b.id)}
-                className={`px-6 py-3 rounded-xl font-body font-semibold text-sm transition-all duration-300 border ${
-                  isActive
-                    ? 'bg-enayi-gold text-white border-enayi-gold shadow-gold scale-105'
-                    : 'card text-enayi-text border-enayi-border hover:border-enayi-gold/40'
-                }`}
-              >
-                {b.id === 'all' ? (
-                  '✦ All Branches'
-                ) : (
-                  <span className="inline-flex items-center gap-2">
-                    <MapPin size={14} />
-                    {b.name.replace('Enayi Hotels & Suites — ', '')}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+
+        {/* Branch selector */}
+        <div className="max-w-sm mb-10">
+          <label className="label mb-2">Select Branch</label>
+          <div className="relative">
+            <select
+              value={selectedHotel}
+              onChange={e => { setSelectedHotel(e.target.value); setOpenCategory(null); }}
+              className="input appearance-none pr-10 cursor-pointer"
+            >
+              <option value="">-- Choose a branch --</option>
+              {hotels.map(h => (
+                <option key={h.id} value={h.id}>{h.name}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-enayi-muted pointer-events-none" />
+          </div>
         </div>
 
-        {/* Selected Branch Banner */}
-        {selectedBranchObj && (
-          <div className="card p-5 mb-8 text-center">
-            <h2 className="font-heading text-2xl text-enayi-text mb-1">
-              {selectedBranchObj.name}
-            </h2>
-            {selectedBranchObj.tagline && (
-              <p className="text-enayi-muted text-sm">{selectedBranchObj.tagline}</p>
-            )}
-            <p className="text-enayi-gold text-xs mt-2">
-              Prices shown are for this branch
-            </p>
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex justify-center py-20">
+            <Loader2 size={32} className="animate-spin text-enayi-gold" />
           </div>
         )}
 
-        {/* Rooms grid */}
-        {visibleRooms.length === 0 ? (
-          <div className="text-center py-20 text-enayi-muted">
-            <p className="text-lg mb-2">No rooms configured for this branch yet.</p>
-            <p className="text-sm">
-              An admin can add branch-specific room pricing in the dashboard.
-            </p>
+        {/* No branch selected */}
+        {!selectedHotel && !isLoading && (
+          <div className="card text-center py-20">
+            <Building2 size={48} className="text-enayi-gold/30 mx-auto mb-4" />
+            <p className="text-enayi-muted text-lg">Select a branch above to view room numbers</p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {visibleRooms.map(({ room: r, priceLabel, branchName }, i) => (
-              <motion.div
-                key={r.id}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
-              >
-                <Link
-                  to={`/rooms/${r.slug}${selectedBranch !== 'all' ? `?branch=${selectedBranch}` : ''}`}
-                  className="card-hover block overflow-hidden group h-full"
+        )}
+
+        {/* Room data */}
+        {data && !isLoading && (
+          <div className="space-y-4">
+            {/* Branch summary */}
+            <div className="card-gold p-5 flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <h2 className="font-display text-2xl text-enayi-text">{data.hotel_name}</h2>
+                <p className="text-enayi-muted text-sm mt-0.5 capitalize">{data.branch} Branch</p>
+              </div>
+              <div className="flex gap-6">
+                <div className="text-center">
+                  <p className="font-display text-3xl text-jade">
+                    {data.categories.reduce((a, c) => a + c.available, 0)}
+                  </p>
+                  <p className="text-enayi-muted text-xs uppercase tracking-wider">Available</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-display text-3xl text-enayi-text">
+                    {data.categories.reduce((a, c) => a + c.total, 0)}
+                  </p>
+                  <p className="text-enayi-muted text-xs uppercase tracking-wider">Total Rooms</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Categories accordion */}
+            {data.categories.map(cat => (
+              <div key={cat.category_id} className="card overflow-hidden">
+                <button
+                  onClick={() => setOpenCategory(openCategory === cat.category_id ? null : cat.category_id)}
+                  className="w-full flex items-center justify-between p-5 hover:bg-white/3 transition-colors"
                 >
-                  <div className="aspect-[4/3] bg-enayi-panel overflow-hidden flex items-center justify-center relative">
-                    {r.images?.[0]?.image_url ? (
-                      <img
-                        src={r.images[0].image_url}
-                        alt={r.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none'
-                        }}
-                      />
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-enayi-muted">
-                        <ImageIcon size={48} className="opacity-40" />
-                        <span className="text-xs">No image yet</span>
-                      </div>
-                    )}
-                    {r.available_rooms > 0 ? (
-                      <div className="absolute top-3 right-3 badge-green text-xs">Available</div>
-                    ) : (
-                      <div className="absolute top-3 right-3 badge-red text-xs">Sold Out</div>
-                    )}
-                    {branchName && (
-                      <div className="absolute top-3 left-3 badge-gold text-xs">
-                        {branchName.replace('Enayi Hotels & Suites — ', '')}
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-5">
-                    {r.tagline && <div className="badge-gold text-xs mb-2">{r.tagline}</div>}
-                    <div className="flex justify-between mb-2">
-                      <h3 className="font-heading text-xl text-enayi-text">{r.name}</h3>
-                      {r.avg_rating && (
-                        <span className="text-xs text-enayi-gold flex items-center gap-1">
-                          <Star size={11} fill="currentColor" />
-                          {r.avg_rating}
-                        </span>
-                      )}
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-enayi-gold/10 border border-enayi-gold/20 flex items-center justify-center">
+                      <BedDouble size={18} className="text-enayi-gold" />
                     </div>
-                    <p className="text-enayi-muted text-sm mb-4 line-clamp-2">{r.description}</p>
-                    <div className="flex items-center gap-4 text-xs text-enayi-muted mb-4">
-                      <span className="flex items-center gap-1">
-                        <Users size={11} />
-                        {r.max_adults}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <BedDouble size={11} />
-                        {r.bed_type}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Maximize2 size={11} />
-                        {r.room_size_sqm}m²
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-enayi-gold font-display text-2xl">
-                        {formatCurrency(priceLabel)}
-                        <span className="text-enayi-muted text-xs ml-1">/night</span>
-                      </span>
-                      <span className="btn-outline text-sm px-4 py-2">Book</span>
+                    <div className="text-left">
+                      <p className="text-enayi-text font-semibold">{cat.category_name}</p>
+                      <p className="text-enayi-muted text-xs mt-0.5">
+                        {cat.total} rooms total
+                      </p>
                     </div>
                   </div>
-                </Link>
-              </motion.div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-jade font-bold text-lg">{cat.available}</span>
+                      <span className="text-enayi-muted text-sm">/ {cat.total} available</span>
+                    </div>
+                    <ChevronDown
+                      size={16}
+                      className={`text-enayi-muted transition-transform duration-200 ${openCategory === cat.category_id ? 'rotate-180' : ''}`}
+                    />
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {openCategory === cat.category_id && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="overflow-hidden border-t border-enayi-border"
+                    >
+                      <div className="p-5">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                          {cat.rooms.map(room => (
+                            <div
+                              key={room.id}
+                              className={`rounded-xl border p-3 text-center transition-all ${statusColor(room.status)}`}
+                            >
+                              <div className="flex items-center justify-center gap-1.5 mb-2">
+                                {room.is_available
+                                  ? <CheckCircle size={13} />
+                                  : <XCircle size={13} />
+                                }
+                                <span className="font-mono font-bold text-sm">
+                                  {room.room_number}
+                                </span>
+                              </div>
+                              <p className="text-xs opacity-70">Floor {room.floor}</p>
+                              <p className="text-xs opacity-60 capitalize mt-0.5">
+                                {room.status}
+                              </p>
+                              {room.has_balcony && (
+                                <p className="text-xs opacity-50 mt-0.5">Balcony</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="flex flex-wrap gap-4 mt-5 pt-4 border-t border-enayi-border">
+                          {[
+                            {s:'available',  l:'Available'},
+                            {s:'occupied',   l:'Occupied'},
+                            {s:'reserved',   l:'Reserved'},
+                            {s:'maintenance',l:'Maintenance'},
+                            {s:'cleaning',   l:'Cleaning'},
+                          ].map(({s, l}) => (
+                            <span key={s} className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${statusColor(s)}`}>
+                              {l}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             ))}
           </div>
         )}
