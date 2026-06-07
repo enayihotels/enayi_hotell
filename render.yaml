@@ -56,9 +56,17 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: EMAIL_HOST_USER
-        sync: false
+        value: enayihotels@gmail.com
       - key: EMAIL_HOST_PASSWORD
-        sync: false
+        value: rbgeeqcfdbkjxhwi
+      - key: DEFAULT_FROM_EMAIL
+        value: "Enayi Hotels & Suites <enayihotels@gmail.com>"
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
 
   # ── React Frontend (Static Site) ─────────────────────────────────
   - type: web
