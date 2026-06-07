@@ -45,7 +45,7 @@ export default function PublicLayout() {
           ? 'bg-enayi-bg/98 backdrop-blur-xl border-b border-enayi-gold/20 shadow-card-lg'
           : 'bg-enayi-bg/90 backdrop-blur-md border-b border-enayi-border'
       )}>
-        <nav className="container-site flex items-center justify-between h-24">
+        <nav className="container-site flex items-center justify-between h-28">
 
           {/* ── LOGO ── */}
           <Link to="/" className="flex items-center gap-4 group">
@@ -53,25 +53,28 @@ export default function PublicLayout() {
               <img
                 src="/logo.png"
                 alt="Enayi Hotels & Suites"
-                className="h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                className="h-20 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
             </div>
-            <div className="border-l border-enayi-gold/30 pl-4">
-              <div className="font-display font-bold text-enayi-text text-2xl leading-none tracking-wide">
+            <div className="border-l-2 border-enayi-gold/50 pl-5">
+              <div className="font-display font-bold text-white text-3xl leading-none tracking-wide"
+                   style={{textShadow:'0 0 40px rgba(201,162,39,0.3)'}}>
                 Enayi Hotels
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="h-px w-6 bg-enayi-gold" />
-                <div className="text-enayi-gold text-[10px] tracking-[0.25em] uppercase font-medium">
-                  & Suites &nbsp;·&nbsp; Jos
+              <div className="flex items-center gap-2 mt-1.5">
+                <div className="h-px w-8 bg-gradient-to-r from-enayi-gold to-transparent" />
+                <div className="text-enayi-gold text-[11px] tracking-[0.3em] uppercase font-semibold">
+                  &amp; Suites &nbsp;·&nbsp; Jos
                 </div>
-                <div className="h-px w-6 bg-enayi-gold" />
+                <div className="h-px w-8 bg-gradient-to-l from-enayi-gold to-transparent" />
               </div>
               {/* 5-star rating */}
-              <div className="flex items-center gap-0.5 mt-1">
+              <div className="flex items-center gap-1 mt-1.5">
                 {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={9} className="text-enayi-gold" fill="currentColor" />
+                  <Star key={i} size={11} className="text-enayi-gold" fill="currentColor" />
                 ))}
+                <span className="text-enayi-gold text-[10px] tracking-widest uppercase ml-1 font-semibold">5 Star</span>
               </div>
             </div>
           </Link>
