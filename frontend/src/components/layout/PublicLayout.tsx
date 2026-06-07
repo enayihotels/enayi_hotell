@@ -210,11 +210,11 @@ export default function PublicLayout() {
             <div className="flex flex-col gap-5 text-sm text-enayi-muted">
               <div>
                 <div className="text-enayi-gold text-[10px] font-semibold uppercase tracking-[0.2em] mb-2">Address</div>
-                <p>Rayfield Road, Jos<br />Plateau State, Nigeria</p>
+                <p>Rayfield Zarmaganda Road, Off Railway Crossing, Jos<br />Plateau State, Nigeria</p>
               </div>
               <div>
                 <div className="text-enayi-gold text-[10px] font-semibold uppercase tracking-[0.2em] mb-2">Phone</div>
-                <a href="tel:+2348000000000" className="hover:text-enayi-gold transition-colors">+234(0)9138943008</a>
+                <a href="tel:+2349138943008" className="hover:text-enayi-gold transition-colors">+234(0)9138943008</a>
               </div>
               <div>
                 <div className="text-enayi-gold text-[10px] font-semibold uppercase tracking-[0.2em] mb-2">Email</div>
