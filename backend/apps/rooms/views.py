@@ -130,11 +130,14 @@ class BranchRoomsView(APIView):
                 "rooms": [], "free_count": 0, "total_count": 0,
             })
             entry["rooms"].append({
-                "room_number": room.room_number,
-                "floor": room.floor,
-                "status": room.status,
-                "is_occupied": occupied,
-                "label": "Occupied" if occupied else "Available",
+                "id":           str(room.id),
+                "room_number":  room.room_number,
+                "floor":        room.floor,
+                "status":       room.status,
+                "has_balcony":  room.has_balcony,
+                "view_type":    room.view_type,
+                "is_available": not occupied,
+                "is_occupied":  occupied,
             })
             entry["total_count"] += 1
             if not occupied:
