@@ -24,6 +24,17 @@ interface RoomNo { room_number: string; floor: number; status: string; is_occupi
 
 const list = <T,>(d: any): T[] => (Array.isArray(d) ? d : (d?.results ?? []))
 
+// Strip branch names from category display
+function cleanCatName(name: string): string {
+  return name
+    .replace(/zaramaganda/gi, '')
+    .replace(/fwawei/gi, '')
+    .replace(/fwavei/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[-\s]+|[-\s]+$/g, '')
+}
+
 export default function BookingPage() {
   const { slug } = useParams()
 
@@ -147,13 +158,13 @@ export default function BookingPage() {
             {selectedRoom && branch && (
               <div className="card overflow-hidden">
                 <div className="aspect-[16/9] bg-enayi-panel relative">
-                  {img ? <img src={img} alt={selectedRoom.name} className="w-full h-full object-cover"/>
+                  {img ? <img src={img} alt={cleanCatName(selectedRoom.name)} className="w-full h-full object-cover"/>
                        : <div className="w-full h-full flex items-center justify-center text-enayi-muted"><ImageIcon size={40}/></div>}
                   <span className="absolute top-3 left-3 badge-gold">{branch.name?.replace('Enayi Hotels & Suites — ', '') || branch.branch}</span>
                 </div>
                 <div className="p-5">
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-heading text-xl text-enayi-text">{selectedRoom.name}</h3>
+                    <h3 className="font-heading text-xl text-enayi-text">{cleanCatName(selectedRoom.name)}</h3>
                     <div className="text-enayi-gold font-display text-2xl">{formatCurrency(price)}<span className="text-enayi-muted text-xs font-normal">/night</span></div>
                   </div>
                   {selectedRoom.description && <p className="text-enayi-muted text-sm mb-3">{selectedRoom.description}</p>}
@@ -229,7 +240,7 @@ export default function BookingPage() {
                 <>
                   <div className="space-y-2 mb-4 text-sm">
                     <div className="flex justify-between"><span className="text-enayi-muted">Branch</span><span className="text-enayi-text">{branch.name?.replace('Enayi Hotels & Suites — ', '') || branch.branch}</span></div>
-                    <div className="flex justify-between"><span className="text-enayi-muted">{selectedRoom.name}</span><span className="text-enayi-text">{formatCurrency(price)}/night</span></div>
+                    <div className="flex justify-between"><span className="text-enayi-muted">{cleanCatName(selectedRoom.name)}</span><span className="text-enayi-text">{formatCurrency(price)}/night</span></div>
                     <div className="flex justify-between"><span className="text-enayi-muted">Nights</span><span className="text-enayi-text">{nights}</span></div>
                     <div className="flex justify-between"><span className="text-enayi-muted">Room subtotal</span><span className="text-enayi-text">{formatCurrency(subtotal)}</span></div>
                     {addons > 0 && <div className="flex justify-between"><span className="text-enayi-muted">Add-ons</span><span className="text-enayi-text">{formatCurrency(addons)}</span></div>}
