@@ -51,7 +51,7 @@ export default function PublicLayout() {
           <Link to="/" className="flex items-center gap-4 group">
             <div className="relative">
               <img
-                src="/logo.png"
+                src="/logo.svg"
                 alt="Enayi Hotels & Suites"
                 className="h-20 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
