@@ -30,8 +30,8 @@ export default function PublicLayout() {
       {/* ── Top bar ─────────────────────────────────────────────── */}
       <div className="hidden md:flex items-center justify-between px-12 py-2.5 bg-enayi-surface border-b border-enayi-border text-[11px] text-enayi-muted tracking-widest uppercase">
         <div className="flex items-center gap-8">
-          <span className="flex items-center gap-2"><MapPin size={11} className="text-enayi-gold" /> Rayfield Road, Jos, Plateau State</span>
-          <span className="flex items-center gap-2"><Phone size={11} className="text-enayi-gold" /> +234-800-000-0000</span>
+          <span className="flex items-center gap-2"><MapPin size={11} className="text-enayi-gold" /> Rayfield Zarmaganda Road, Off Railway Crossing, Jos</span>
+          <span className="flex items-center gap-2"><Phone size={11} className="text-enayi-gold" /> +234(0)9138943008</span>
         </div>
         <span className="flex items-center gap-2 text-enayi-gold">
           <Star size={9} fill="currentColor" /> Check-in 2pm &nbsp;&middot;&nbsp; Check-out 12pm &nbsp;&middot;&nbsp; 24hr Front Desk <Star size={9} fill="currentColor" />
@@ -214,7 +214,7 @@ export default function PublicLayout() {
               </div>
               <div>
                 <div className="text-enayi-gold text-[10px] font-semibold uppercase tracking-[0.2em] mb-2">Phone</div>
-                <a href="tel:+2348000000000" className="hover:text-enayi-gold transition-colors">+234-800-000-0000</a>
+                <a href="tel:+2348000000000" className="hover:text-enayi-gold transition-colors">+234(0)9138943008</a>
               </div>
               <div>
                 <div className="text-enayi-gold text-[10px] font-semibold uppercase tracking-[0.2em] mb-2">Email</div>
