@@ -165,7 +165,7 @@ export default function BookingPage() {
                         <button key={r.id} type="button" onClick={() => setSelectedCat(r.id)}
                           className={`card p-4 text-left transition-all ${catId === r.id ? 'border-enayi-gold bg-enayi-gold/5' : 'hover:border-enayi-gold/30'}`}>
                           <div className="flex justify-between items-start mb-2">
-                            <span className="font-semibold text-enayi-text text-sm">{r.name}</span>
+                            <span className="font-semibold text-enayi-text text-sm">{cleanName(r.name)}</span>
                             {r.avg_rating && <span className="text-xs text-enayi-gold flex items-center gap-1"><Star size={10} fill="currentColor"/>{r.avg_rating}</span>}
                           </div>
                           <div className="text-xs text-enayi-muted mb-2">{r.bed_type} · {r.room_size_sqm}m² · {r.max_adults} adults</div>
