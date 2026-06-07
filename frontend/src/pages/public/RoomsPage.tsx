@@ -106,7 +106,7 @@ function RoomModal({ room, catName, catSlug, branchName, hotelId, onClose }: {
             ))}
           </div>
           <div className="flex gap-3">
-            <a href="/book" className="flex-1 text-center text-sm py-3 font-semibold rounded-xl
+            <a href={`/book/${catSlug}${hotelId ? `?hotel=${hotelId}` : ""}`} className="flex-1 text-center text-sm py-3 font-semibold rounded-xl
                bg-enayi-gold text-enayi-bg flex items-center justify-center gap-2 hover:brightness-110 transition-all">
               Book This Room
             </a>
@@ -144,7 +144,7 @@ export default function RoomsPage() {
   const [selectedHotel, setSelectedHotel] = useState<string | 'all'>('all')
   const [openCat, setOpenCat]   = useState<string | null>(null)
   const [selectedRoom, setSelectedRoom] = useState<{
-    room: RoomEntry; catName: string; catSlug: string; branchName?: string
+    room: RoomEntry; catName: string; catSlug: string; branchName?: string; hotelId?: string
   } | null>(null)
 
   const { data: hotels = [], isLoading: hotelsLoading } = useQuery<Hotel[]>({
