@@ -54,7 +54,16 @@
 
   /* Typography */
   .text-gold { @apply bg-clip-text text-transparent; background-image: linear-gradient(135deg,#E4BB35 0%,#C9A227 50%,#E4BB35 100%); }
-  .gold-shimmer-text { @apply bg-clip-text text-transparent; background: linear-gradient(90deg,#C9A227 0%,#E4BB35 25%,#C9A227 50%,#E4BB35 75%,#C9A227 100%); background-size: 200% auto; animation: shimmer 4s linear infinite; }
+  .gold-shimmer-text {
+    background: linear-gradient(90deg,#C9A227 0%,#E4BB35 25%,#C9A227 50%,#E4BB35 75%,#C9A227 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 4s linear infinite;
+    display: inline-block;
+  }
 
   /* Layout */
   .section { @apply py-24 md:py-32; }
