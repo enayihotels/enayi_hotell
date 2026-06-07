@@ -37,6 +37,8 @@ function cleanCatName(name: string): string {
 
 export default function BookingPage() {
   const { slug } = useParams()
+  // Read hotel from URL query param e.g. /book/standard-room?hotel=<uuid>
+  const urlHotel = new URLSearchParams(window.location.search).get('hotel') ?? 
 
   const { data: hotels } = useQuery<HotelLite[]>({
     queryKey: ['hotels'],
@@ -56,12 +58,14 @@ export default function BookingPage() {
   const [selectedCat, setSelectedCat] = useState<string>('')
   const createBooking = useCreateBooking()
 
-  // Default to the flagship (or first) branch once hotels load.
+  // Pre-select branch from URL param, else default to flagship/first branch.
   useEffect(() => {
-    if (!branchId && hotels?.length) {
+    if (urlHotel && hotels?.some(h => h.id === urlHotel)) {
+      setBranchId(urlHotel)
+    } else if (!branchId && hotels?.length) {
       setBranchId((hotels.find(h => h.is_primary) ?? hotels[0]).id)
     }
-  }, [hotels, branchId])
+  }, [hotels, branchId, urlHotel])
 
   const { register, handleSubmit, watch } = useForm({
     defaultValues: { check_in: today(), check_out: tomorrow(), adults: 1, children: 0, special_requests: '', breakfast_included: false, airport_pickup: false, late_checkout: false, early_checkin: false },
