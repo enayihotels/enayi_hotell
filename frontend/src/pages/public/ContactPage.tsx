@@ -14,7 +14,7 @@ export default function ContactPage() {
       <div className="section-sm bg-enayi-surface border-b border-enayi-border text-center"><div className="container-site"><div className="badge-gold inline-flex mb-4">📞 Contact</div><h1 className="font-display text-5xl text-enayi-text mb-4">Get in Touch</h1><div className="gold-line-center mb-5"/><p className="text-enayi-muted text-lg">We're available 24/7 to assist you.</p></div></div>
       <div className="container-site section grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div className="space-y-6">
-          {[{icon:MapPin,t:'Address',v:['Rayfield Road, Jos','Plateau State, Nigeria']},{icon:Phone,t:'Phone',v:['+234-800-000-0000','24/7']},{icon:Mail,t:'Email',v:['info@enayihotels.com']},{icon:Clock,t:'Hours',v:['Front Desk: 24 hours','Check-in 2pm · Check-out 12pm']}].map(({icon:Icon,t,v})=>(
+          {[{icon:MapPin,t:'Address',v:['Rayfield Zarmaganda Road, Off Railway Crossing','Jos, Plateau State, Nigeria']},{icon:Phone,t:'Phone',v:['+234(0)9138943008','+234(0)901 5636764']},{icon:Mail,t:'Email',v:['info@enayihotels.com']},{icon:Clock,t:'Hours',v:['Front Desk: 24 hours','Check-in 2pm · Check-out 12pm']}].map(({icon:Icon,t,v})=>(
             <div key={t} className="flex items-start gap-4"><div className="w-10 h-10 rounded-xl bg-enayi-gold/10 border border-enayi-gold/20 flex items-center justify-center flex-shrink-0"><Icon size={16} className="text-enayi-gold"/></div><div><div className="text-enayi-gold text-xs font-semibold uppercase tracking-wider mb-1">{t}</div>{v.map(l=><p key={l} className="text-enayi-text text-sm">{l}</p>)}</div></div>
           ))}
         </div>
