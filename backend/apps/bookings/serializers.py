@@ -135,6 +135,21 @@ class CreateBookingSerializer(serializers.Serializer):
         # Hold the room so it shows as occupied right away.
         room.status = "reserved"
         room.save(update_fields=["status"])
+
+        # Release any OTHER available rooms at this branch
+        # (in case reset_rooms_available set booked rooms back to available)
+        from apps.rooms.models import Room as _Room
+        from django.utils import timezone as _tz
+        today = _tz.now().date()
+        active_room_ids = set(Booking.objects.filter(
+            status__in=["pending", "confirmed", "checked_in"],
+        ).values_list("room_id", flat=True))
+        _Room.objects.filter(
+            hotel=booking.hotel,
+            status="available",
+            id__in=active_room_ids,
+        ).update(status="reserved")
+
         return booking
 
 
