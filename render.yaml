@@ -57,15 +57,21 @@ services:
         sync: false
       - key: EMAIL_HOST_USER
         value: enayihotels@gmail.com
+        value: enayihotels@gmail.com
       - key: EMAIL_HOST_PASSWORD
+        value: rbgeeqcfdbkjxhwi
         value: rbgeeqcfdbkjxhwi
       - key: DEFAULT_FROM_EMAIL
         value: "Enayi Hotels & Suites <enayihotels@gmail.com>"
+        value: "Enayi Hotels & Suites <enayihotels@gmail.com>"
       - key: EMAIL_HOST
+        value: smtp.gmail.com
         value: smtp.gmail.com
       - key: EMAIL_PORT
         value: "587"
+        value: "587"
       - key: EMAIL_USE_TLS
+        value: "True"
         value: "True"
 
   # ── React Frontend (Static Site) ─────────────────────────────────
