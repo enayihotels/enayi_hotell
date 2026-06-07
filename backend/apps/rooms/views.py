@@ -140,4 +140,17 @@ class BranchRoomsView(APIView):
             if not occupied:
                 entry["free_count"] += 1
 
-        return Response({"classes": list(grouped.values())})
+        # Build response in format expected by frontend
+        hotel_obj = rooms.first().hotel if rooms.exists() else None
+        categories = list(grouped.values())
+        total = sum(c["total_count"] for c in categories)
+        free  = sum(c["free_count"]  for c in categories)
+
+        return Response({
+            "hotel_id":    str(hotel_obj.id)   if hotel_obj else key,
+            "hotel_name":  hotel_obj.name       if hotel_obj else key,
+            "branch":      hotel_obj.branch     if hotel_obj else key,
+            "total_rooms": total,
+            "free_rooms":  free,
+            "categories":  categories,
+        })
