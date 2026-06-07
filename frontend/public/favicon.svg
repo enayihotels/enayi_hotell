@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E4BB35"/>
+      <stop offset="50%" style="stop-color:#C9A227"/>
+      <stop offset="100%" style="stop-color:#A67C1A"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer ring -->
+  <circle cx="100" cy="100" r="95" fill="none" stroke="url(#gold)" stroke-width="2"/>
+  <!-- Inner ring -->
+  <circle cx="100" cy="100" r="82" fill="none" stroke="url(#gold)" stroke-width="0.5" stroke-dasharray="4 4"/>
+  <!-- Crown top -->
+  <path d="M65 85 L80 60 L100 78 L120 60 L135 85 L130 90 L70 90 Z"
+        fill="url(#gold)"/>
+  <!-- Crown base -->
+  <rect x="68" y="90" width="64" height="8" rx="2" fill="url(#gold)"/>
+  <!-- Decorative diamonds on crown -->
+  <circle cx="80" cy="72" r="4" fill="#0B1120" stroke="url(#gold)" stroke-width="1.5"/>
+  <circle cx="100" cy="65" r="5" fill="#0B1120" stroke="url(#gold)" stroke-width="1.5"/>
+  <circle cx="120" cy="72" r="4" fill="#0B1120" stroke="url(#gold)" stroke-width="1.5"/>
+  <!-- E letter -->
+  <text x="100" y="145" text-anchor="middle"
+        font-family="Georgia, serif" font-size="52" font-weight="bold"
+        fill="url(#gold)" letter-spacing="2">E</text>
+  <!-- Bottom ornament line -->
+  <line x1="60" y1="158" x2="140" y2="158" stroke="url(#gold)" stroke-width="1"/>
+  <circle cx="100" cy="158" r="3" fill="url(#gold)"/>
+</svg>
