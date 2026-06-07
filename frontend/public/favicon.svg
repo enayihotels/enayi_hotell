@@ -1,29 +1,53 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#E4BB35"/>
-      <stop offset="50%" style="stop-color:#C9A227"/>
-      <stop offset="100%" style="stop-color:#A67C1A"/>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E4BB35;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#C9A227;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#A67C1A;stop-opacity:1"/>
     </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#E4BB35;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#A67C1A;stop-opacity:1"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
-  <!-- Outer ring -->
-  <circle cx="100" cy="100" r="95" fill="none" stroke="url(#gold)" stroke-width="2"/>
-  <!-- Inner ring -->
-  <circle cx="100" cy="100" r="82" fill="none" stroke="url(#gold)" stroke-width="0.5" stroke-dasharray="4 4"/>
-  <!-- Crown top -->
-  <path d="M65 85 L80 60 L100 78 L120 60 L135 85 L130 90 L70 90 Z"
-        fill="url(#gold)"/>
-  <!-- Crown base -->
-  <rect x="68" y="90" width="64" height="8" rx="2" fill="url(#gold)"/>
-  <!-- Decorative diamonds on crown -->
-  <circle cx="80" cy="72" r="4" fill="#0B1120" stroke="url(#gold)" stroke-width="1.5"/>
-  <circle cx="100" cy="65" r="5" fill="#0B1120" stroke="url(#gold)" stroke-width="1.5"/>
-  <circle cx="120" cy="72" r="4" fill="#0B1120" stroke="url(#gold)" stroke-width="1.5"/>
+
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="96" fill="#0B1120" stroke="url(#g1)" stroke-width="3"/>
+  <circle cx="100" cy="100" r="85" fill="none" stroke="url(#g1)" stroke-width="1" stroke-dasharray="3 5" opacity="0.6"/>
+
+  <!-- Shield shape -->
+  <path d="M100 20 L145 45 L145 95 Q145 140 100 165 Q55 140 55 95 L55 45 Z"
+        fill="none" stroke="url(#g1)" stroke-width="3.5" filter="url(#glow)"/>
+  <path d="M100 28 L138 50 L138 95 Q138 133 100 156 Q62 133 62 95 L62 50 Z"
+        fill="rgba(201,162,39,0.06)"/>
+
+  <!-- Crown inside shield -->
+  <path d="M72 96 L80 72 L100 88 L120 72 L128 96 L124 100 L76 100 Z"
+        fill="url(#g2)" filter="url(#glow)"/>
+  <rect x="74" y="100" width="52" height="7" rx="2" fill="url(#g2)"/>
+
+  <!-- Crown jewels -->
+  <circle cx="80" cy="82" r="4.5" fill="#0B1120" stroke="url(#g1)" stroke-width="2"/>
+  <circle cx="100" cy="74" r="5.5" fill="#0B1120" stroke="url(#g1)" stroke-width="2"/>
+  <circle cx="120" cy="82" r="4.5" fill="#0B1120" stroke="url(#g1)" stroke-width="2"/>
+
+  <!-- Inner jewel fill -->
+  <circle cx="80" cy="82" r="2" fill="url(#g1)"/>
+  <circle cx="100" cy="74" r="2.5" fill="url(#g1)"/>
+  <circle cx="120" cy="82" r="2" fill="url(#g1)"/>
+
   <!-- E letter -->
   <text x="100" y="145" text-anchor="middle"
-        font-family="Georgia, serif" font-size="52" font-weight="bold"
-        fill="url(#gold)" letter-spacing="2">E</text>
-  <!-- Bottom ornament line -->
-  <line x1="60" y1="158" x2="140" y2="158" stroke="url(#gold)" stroke-width="1"/>
-  <circle cx="100" cy="158" r="3" fill="url(#gold)"/>
+        font-family="Georgia,serif" font-size="40" font-weight="900"
+        fill="url(#g1)" filter="url(#glow)" letter-spacing="1">E</text>
+
+  <!-- Bottom ornament -->
+  <line x1="68" y1="158" x2="132" y2="158" stroke="url(#g1)" stroke-width="1.5"/>
+  <circle cx="100" cy="158" r="3" fill="url(#g1)"/>
+  <circle cx="82" cy="158" r="1.5" fill="url(#g1)"/>
+  <circle cx="118" cy="158" r="1.5" fill="url(#g1)"/>
 </svg>
