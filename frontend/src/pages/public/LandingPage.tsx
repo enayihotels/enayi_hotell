@@ -54,7 +54,16 @@ export default function LandingPage() {
             <div className="badge-gold inline-flex mb-6">✦ Two Branches in Jos — Zaramaganda & Fwawei</div>
           </motion.div>
           <motion.h1 initial={{opacity:0,y:32}} animate={{opacity:1,y:0}} transition={{duration:0.9,delay:0.1}} className="font-display text-5xl md:text-7xl text-enayi-text leading-none mb-6">
-            Experience the<br/><span className="gold-shimmer-text">Art of Luxury</span>
+            Experience the<br/>
+            <span style={{
+              background: 'linear-gradient(90deg,#C9A227 0%,#E4BB35 30%,#C9A227 60%,#E4BB35 100%)',
+              backgroundSize: '200% auto',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              display: 'inline-block',
+              animation: 'shimmer 4s linear infinite',
+            }}>Art of Luxury</span>
           </motion.h1>
           <motion.p initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.3}} className="text-enayi-muted text-xl max-w-lg mx-auto mb-10">
             Where world-class hospitality meets the warmth of Nigerian culture in the cool highlands of Jos.
