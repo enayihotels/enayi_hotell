@@ -38,7 +38,7 @@ function cleanCatName(name: string): string {
 export default function BookingPage() {
   const { slug } = useParams()
   // Read hotel from URL query param e.g. /book/standard-room?hotel=<uuid>
-  const urlHotel = new URLSearchParams(window.location.search).get('hotel') ?? 
+  const urlHotel = new URLSearchParams(window.location.search).get('hotel') ?? ''
 
   const { data: hotels } = useQuery<HotelLite[]>({
     queryKey: ['hotels'],
