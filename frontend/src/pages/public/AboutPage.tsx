@@ -62,6 +62,52 @@ export default function AboutPage() {
           HERO
           ═══════════════════════════════════════ */}
       <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
+
+      {/* ── Real Hotel Signage — Brand Identity ─────────────────────── */}
+      <section className="container-site py-16">
+        <div className="text-center mb-10">
+          <div className="badge-gold inline-flex mb-4">Our Identity</div>
+          <h2 className="font-display text-4xl text-enayi-text mb-4">
+            Recognised Across Jos
+          </h2>
+          <div className="gold-line-center mb-5" />
+          <p className="text-enayi-muted max-w-xl mx-auto">
+            Enayi Hotels &amp; Suites has become a landmark of luxury and hospitality
+            in Jos, Plateau State — trusted by thousands of guests since our founding.
+          </p>
+        </div>
+        <div className="relative max-w-3xl mx-auto group">
+          <div className="absolute -inset-1 rounded-2xl opacity-40 group-hover:opacity-70 transition-opacity duration-500"
+               style={{background:'linear-gradient(135deg,#C9A227,#E4BB35,#C9A227)'}}>
+          </div>
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-enayi-gold/30">
+            <img
+              src="/hotel-signage.jpg"
+              alt="Enayi Hotels & Suites — Rayfield Zarmaganda Road, Jos"
+              className="w-full h-auto object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/80 via-transparent to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-6">
+              <p className="text-enayi-gold font-semibold text-sm tracking-widest uppercase">
+                Rayfield Zarmaganda Road, Off Railway Crossing
+              </p>
+              <p className="text-white/80 text-sm mt-1">Jos, Plateau State, Nigeria</p>
+              <div className="flex gap-4 mt-2">
+                <a href="tel:+2349138943008"
+                   className="text-enayi-gold text-sm hover:text-white transition-colors font-medium">
+                  +234(0)9138943008
+                </a>
+                <span className="text-white/30">·</span>
+                <a href="tel:+2349015636764"
+                   className="text-enayi-gold text-sm hover:text-white transition-colors font-medium">
+                  +234(0)901 5636764
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
         <div className="absolute inset-0 bg-gradient-to-br from-enayi-panel via-enayi-surface to-enayi-bg" />
         <div className="absolute inset-0 bg-grid opacity-25" />
         <div className="glow-orb w-[500px] h-[500px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-25" />
