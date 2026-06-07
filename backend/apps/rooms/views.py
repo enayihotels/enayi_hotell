@@ -101,13 +101,27 @@ class BranchRoomsView(APIView):
         if not key:
             return Response({"detail": "Pass ?hotel=<branch>."}, status=400)
 
-        hotel_q = Q(hotel__branch=key)
+        # Resolve hotel object first — accept either UUID or branch slug
+        from apps.hotels.models import Hotel as _Hotel
+        hotel_obj_qs = _Hotel.objects.filter(is_active=True)
         try:
-            hotel_q |= Q(hotel_id=_uuid.UUID(str(key)))
+            uid = _uuid.UUID(str(key))
+            hotel_obj = hotel_obj_qs.filter(id=uid).first()
         except (ValueError, TypeError, AttributeError):
-            pass
+            hotel_obj = hotel_obj_qs.filter(branch=key).first()
 
-        rooms = (Room.objects.filter(hotel_q)
+        if not hotel_obj:
+            # Try name contains
+            hotel_obj = hotel_obj_qs.filter(name__icontains=key).first()
+
+        if not hotel_obj:
+            return Response(
+                {"detail": f"No active branch found for: {key}"},
+                status=404,
+            )
+
+        # Filter rooms STRICTLY by this hotel only
+        rooms = (Room.objects.filter(hotel=hotel_obj)
                  .select_related("category", "hotel")
                  .order_by("category__sort_order", "floor", "room_number"))
 
@@ -144,7 +158,17 @@ class BranchRoomsView(APIView):
                 entry["free_count"] += 1
 
         # Build response in format expected by frontend
-        hotel_obj = rooms.first().hotel if rooms.exists() else None
+        # Strip branch names from category display names
+        import re as _re
+        _strip = ["Zaramaganda", "Fwawei", "zaramaganda", "fwawei",
+                  "ZARAMAGANDA", "FWAWEI"]
+        for cat in grouped.values():
+            clean = cat["category"]
+            for word in _strip:
+                clean = clean.replace(word, "").strip(" -_,.")
+            clean = _re.sub(r"\s+", " ", clean).strip()
+            cat["category"] = clean if clean else cat["category"]
+
         categories = list(grouped.values())
         total = sum(c["total_count"] for c in categories)
         free  = sum(c["free_count"]  for c in categories)
