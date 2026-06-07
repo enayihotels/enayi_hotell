@@ -26,7 +26,7 @@ services:
     plan: starter              # $7/mo, always-on (no cold-start failures)
     rootDir: backend
     buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --no-input"
-    preDeployCommand: "python manage.py migrate --no-input && python manage.py reset_rooms_available"
+    preDeployCommand: "python manage.py migrate --no-input && python manage.py fix_room_branches"
     startCommand: "gunicorn config.wsgi:application --workers 2 --threads 4 --timeout 120 --access-logfile - --error-logfile -"
     healthCheckPath: /api/docs/
     envVars:
