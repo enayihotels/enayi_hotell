@@ -107,6 +107,33 @@ export default function BookingPage() {
 
   const catId = room?.id || selectedCat
   const selectedRoom: Cat | undefined = room || classList.find(r => r.id === catId)
+
+  // Resolve the CORRECT category ID for the selected branch.
+  // "Standard Room" selected in Fwawei must use the Fwawei category ID.
+  // Look in the FULL undeduped list for a category that:
+  //   1. Has same clean name as selected category
+  //   2. Has a branch_price for this branch, OR contains branch name
+  const resolvedCatId = (() => {
+    if (!selectedRoom || !branchId) return catId
+    const selClean = cleanName(selectedRoom.name).toLowerCase()
+    const all = rooms ?? []
+    // Try to find exact branch match first
+    const branchMatch = all.find(c =>
+      cleanName(c.name).toLowerCase() === selClean &&
+      c.branch_prices?.some((bp: any) => bp.hotel === branchId)
+    )
+    if (branchMatch) return branchMatch.id
+    // Fall back to name-based match for selected branch
+    const bslug = branchSlug
+    const nameMatch = all.find(c =>
+      cleanName(c.name).toLowerCase() === selClean &&
+      (c.name.toLowerCase().includes(bslug) ||
+       c.name.toLowerCase().includes('fwawei') === bslug.includes('fwawei') ||
+       c.name.toLowerCase().includes('zaramaganda') === bslug.includes('zaramaganda'))
+    )
+    if (nameMatch) return nameMatch.id
+    return catId
+  })()
   const bp = selectedRoom?.branch_prices?.find(p => p.hotel === branchId)
   const price = Number(bp?.current_price ?? selectedRoom?.current_price ?? selectedRoom?.base_price ?? 0)
   const breakfastPerNight = Number(bp?.breakfast_price ?? 3500)
@@ -131,7 +158,7 @@ export default function BookingPage() {
 
   const onSubmit = (data: any) => {
     if (!catId || !branchId) return
-    createBooking.mutate({ ...data, category_id: catId, hotel_id: branchId, adults: Number(data.adults), children: Number(data.children) })
+    createBooking.mutate({ ...data, category_id: resolvedCatId, hotel_id: branchId, adults: Number(data.adults), children: Number(data.children) })
   }
 
   return (
