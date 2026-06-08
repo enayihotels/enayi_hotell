@@ -306,4 +306,16 @@ function BranchLightbox({ hotel, onClose }: { hotel: Hotel; onClose: () => void 
               <button
                 key={img.id}
                 onClick={() => setIdx(i)}
-                className={`shrink-0 w-20 h-14 rounded-lg overflow-h
+                className={`shrink-0 w-20 h-14 rounded-lg overflow-hidden border transition-all ${
+                  i === idx ? 'border-enayi-gold' : 'border-enayi-border opacity-60 hover:opacity-100'
+                }`}
+              >
+                <img src={img.image_url ?? ''} alt="" className="w-full h-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  )
+}
