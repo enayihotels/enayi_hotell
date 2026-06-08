@@ -69,7 +69,7 @@ export default function LandingPage() {
             Where world-class hospitality meets the warmth of Nigerian culture in the cool highlands of Jos.
           </motion.p>
           <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.4}} className="flex gap-4 justify-center flex-wrap">
-            <Link to="/book" className="btn-gold-lg gap-2">Book Your Stay <ArrowRight size={18}/></Link>
+            <Link to="/rooms" className="btn-gold-lg gap-2">Book Your Stay <ArrowRight size={18}/></Link>
             <Link to="/rooms" className="btn-outline">Explore Rooms</Link>
           </motion.div>
         </div>
@@ -111,7 +111,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="section-sm"><div className="container-site"><div className="card-gold rounded-3xl p-10 text-center relative overflow-hidden"><div className="glow-orb w-64 h-64 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20"/><div className="relative z-10"><h2 className="font-display text-4xl text-enayi-text mb-4">Ready for an Unforgettable Stay?</h2><div className="gold-line-center mb-6"/><div className="flex gap-4 justify-center flex-wrap"><Link to="/book" className="btn-gold-lg gap-2">Book a Room <ArrowRight size={18}/></Link><Link to="/contact" className="btn-outline gap-2"><MapPin size={15}/> Contact Us</Link></div></div></div></div></section>
+      <section className="section-sm"><div className="container-site"><div className="card-gold rounded-3xl p-10 text-center relative overflow-hidden"><div className="glow-orb w-64 h-64 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20"/><div className="relative z-10"><h2 className="font-display text-4xl text-enayi-text mb-4">Ready for an Unforgettable Stay?</h2><div className="gold-line-center mb-6"/><div className="flex gap-4 justify-center flex-wrap"><Link to="/rooms" className="btn-gold-lg gap-2">Book a Room <ArrowRight size={18}/></Link><Link to="/contact" className="btn-outline gap-2"><MapPin size={15}/> Contact Us</Link></div></div></div></div></section>
     </div>
   )
 }
@@ -306,16 +306,4 @@ function BranchLightbox({ hotel, onClose }: { hotel: Hotel; onClose: () => void 
               <button
                 key={img.id}
                 onClick={() => setIdx(i)}
-                className={`shrink-0 w-20 h-14 rounded-lg overflow-hidden border transition-all ${
-                  i === idx ? 'border-enayi-gold' : 'border-enayi-border opacity-60 hover:opacity-100'
-                }`}
-              >
-                <img src={img.image_url ?? ''} alt="" className="w-full h-full object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  )
-}
+                className={`shrink-0 w-20 h-14 rounded-lg overflow-h
