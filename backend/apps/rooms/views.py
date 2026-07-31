@@ -123,7 +123,7 @@ class BranchRoomsView(APIView):
         # Filter rooms STRICTLY by this hotel only
         rooms = (Room.objects.filter(hotel=hotel_obj)
                  .select_related("category", "hotel")
-                 .order_by("category__sort_order", "floor", "room_number"))
+                 .order_by("category__base_price", "floor", "room_number"))
 
         cat_slug = request.query_params.get("category")
         if cat_slug:

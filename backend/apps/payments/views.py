@@ -37,7 +37,7 @@ logger = logging.getLogger("apps.payments")
 # ─────────────────────────────────────────────────────────────────────────────
 FLW_BASE = "https://api.flutterwave.com/v3"
 PS_BASE  = "https://api.paystack.co"
-MNF_BASE = "https://api.monnify.com"          # live; swap to https://sandbox.monnify.com for tests
+MNF_BASE = settings.MONNIFY_BASE_URL           # reads from .env — sandbox or live
 
 FLW_HEADERS = {
     "Authorization": f"Bearer {settings.FLUTTERWAVE_SECRET_KEY}",

@@ -52,6 +52,7 @@ class CreateBookingSerializer(serializers.Serializer):
     """Create a booking — auto-assigns an available room in the chosen branch."""
     category_id        = serializers.UUIDField()
     hotel_id           = serializers.UUIDField(required=False)
+    room_id            = serializers.UUIDField(required=False)
     check_in           = serializers.DateField()
     check_out          = serializers.DateField()
     adults             = serializers.IntegerField(min_value=1, max_value=10, default=1)
@@ -133,6 +134,30 @@ class CreateBookingSerializer(serializers.Serializer):
                 status="reserved",
             ).exclude(id__in=all_active).update(status="available")
 
+        # If the guest picked a specific room, honor it (validated) instead
+        # of auto-assigning. Falls through to auto-assign only if room_id
+        # wasn't provided at all.
+        room = None
+        if validated_data.get("room_id"):
+            try:
+                candidate = Room.objects.get(id=validated_data["room_id"])
+            except Room.DoesNotExist:
+                raise serializers.ValidationError({"room_id": "Room not found."})
+
+            if candidate.category_id not in equiv_ids:
+                raise serializers.ValidationError(
+                    {"room_id": "That room doesn't belong to the selected room class."}
+                )
+            if hotel and candidate.hotel_id != hotel.id:
+                raise serializers.ValidationError(
+                    {"room_id": "That room isn't at the selected branch."}
+                )
+            if candidate.id in taken or candidate.status in ["occupied", "maintenance"]:
+                raise serializers.ValidationError(
+                    {"room_id": "That room was just taken — please pick another."}
+                )
+            room = candidate
+
         # Build base queryset: correct category + not taken
         base_qs = Room.objects.filter(
             category_id__in=equiv_ids,
@@ -142,9 +167,10 @@ class CreateBookingSerializer(serializers.Serializer):
             base_qs = base_qs.filter(hotel=hotel)
 
         # Tier 1: available rooms
-        room = base_qs.filter(
-            status="available"
-        ).order_by("floor", "room_number").first()
+        if not room:
+            room = base_qs.filter(
+                status="available"
+            ).order_by("floor", "room_number").first()
 
         # Tier 2: any non-maintenance room (catches cleaning/stale-reserved)
         if not room:
