@@ -18,7 +18,7 @@ export default function GalleryPage() {
     queryKey: ['gallery', tab],
     queryFn: () =>
       api.get('/gallery/images/', {
-        params: tab !== 'all' ? { 'category__category_type': tab } : {},
+        params: tab !== 'all' ? { category: tab } : {},
       }).then(r => r.data?.results ?? r.data),
   })
 
@@ -49,9 +49,9 @@ export default function GalleryPage() {
           {(cats ?? []).map(c => (
             <button
               key={c.id}
-              onClick={() => setTab(c.category_type)}
+              onClick={() => setTab(c.id)}
               className={`px-4 py-2 rounded-xl text-sm transition-all ${
-                tab === c.category_type
+                tab === c.id
                   ? 'bg-enayi-gold text-white shadow-gold'
                   : 'card text-enayi-muted hover:text-enayi-text'
               }`}
@@ -69,14 +69,14 @@ export default function GalleryPage() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             {(images ?? []).map((img, i) => (
               <motion.div
                 key={img.id}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.03 }}
-                className="aspect-square rounded-2xl overflow-hidden bg-enayi-panel group cursor-pointer"
+                className="aspect-square rounded-2xl overflow-hidden bg-enayi-panel group cursor-pointer w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.75rem)] lg:w-[calc(25%-0.75rem)]"
               >
                 {img.image_url ? (
                   <img

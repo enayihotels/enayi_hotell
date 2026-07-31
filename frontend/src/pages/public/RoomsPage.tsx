@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueries } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BedDouble, CheckCircle, XCircle, Loader2,
@@ -58,9 +58,9 @@ function getRoomImage(slug: string, name: string): string {
   return '/rooms/standard-room.jpg'
 }
 
-function RoomModal({ room, catName, catSlug, branchName, hotelId, onClose }: {
+function RoomModal({ room, catName, catSlug, branchName, hotelId, imageUrl, onClose }: {
   room: RoomEntry; catName: string; catSlug: string;
-  branchName?: string; hotelId?: string; onClose: () => void
+  branchName?: string; hotelId?: string; imageUrl: string; onClose: () => void
 }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -71,7 +71,7 @@ function RoomModal({ room, catName, catSlug, branchName, hotelId, onClose }: {
         onClick={e => e.stopPropagation()}
         className="bg-enayi-surface border border-enayi-gold/30 rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl">
         <div className="relative aspect-video">
-          <img src={getRoomImage(catSlug, catName)} alt={catName}
+          <img src={imageUrl} alt={catName}
                className="w-full h-full object-cover"/>
           <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/90 via-transparent to-transparent"/>
           <div className="absolute top-4 right-4">
@@ -153,15 +153,45 @@ export default function RoomsPage() {
     retry: 2, retryDelay: 3000,
   })
 
-  // Query for each hotel individually
-  const branchQueries = hotels.map(h => ({
-    id: h.id,
-    name: h.name,
-    query: useQuery<BranchData>({
+  // Real uploaded category photos (falls back to static guess if none uploaded yet)
+  const { data: roomCategories = [] } = useQuery<any[]>({
+    queryKey: ['room-categories-images'],
+    queryFn: () => api.get('/rooms/categories/').then(r => Array.isArray(r.data) ? r.data : (r.data?.results ?? [])),
+  })
+
+  const categoryImageMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    const list = Array.isArray(roomCategories) ? roomCategories : []
+    for (const cat of list) {
+      if (!cat) continue
+      const images = Array.isArray(cat.images) ? cat.images : []
+      if (images.length === 0) continue
+      const primary = images.find((im: any) => im?.is_primary) ?? images[0]
+      if (primary?.image_url && cat.slug) map[cat.slug] = primary.image_url
+    }
+    return map
+  }, [roomCategories])
+
+  function resolveRoomImage(slug: string, name: string): string {
+    return categoryImageMap[slug] ?? getRoomImage(slug, name)
+  }
+
+  // Query for each hotel individually — useQueries handles a dynamic-length
+  // list of parallel queries as a SINGLE hook call, unlike calling useQuery
+  // inside .map() (which breaks Rules of Hooks once the list length changes).
+  const branchQueryResults = useQueries({
+    queries: hotels.map(h => ({
       queryKey: ['branch-rooms', h.id],
       queryFn: () => api.get(`/rooms/branch-availability/?hotel=${h.id}`).then(r => r.data),
-      retry: 2, retryDelay: 4000,
-    })
+      retry: 2,
+      retryDelay: 4000,
+    })),
+  })
+
+  const branchQueries = hotels.map((h, i) => ({
+    id: h.id,
+    name: h.name,
+    query: branchQueryResults[i],
   }))
 
   const singleQuery = useQuery<BranchData>({
@@ -218,9 +248,6 @@ export default function RoomsPage() {
 
         {/* Branch selector cards */}
         <div className="max-w-3xl mx-auto mb-12 text-center">
-          <p className="text-enayi-gold font-bold text-sm uppercase tracking-[0.3em] mb-3">
-            Step 1 — Choose Your Branch
-          </p>
           <h2 className="font-display text-3xl text-white mb-6">Which Enayi Hotels location?</h2>
 
           {hotelsLoading ? (
@@ -312,10 +339,6 @@ export default function RoomsPage() {
               </div>
             </div>
 
-            <p className="text-enayi-muted text-sm text-center mb-4">
-              Step 2 — Click a category to expand, then click a room number to view its photo
-            </p>
-
             {displayData.categories.length === 0 && (
               <div className="card text-center py-12">
                 <BedDouble size={36} className="text-enayi-gold/30 mx-auto mb-3"/>
@@ -329,7 +352,7 @@ export default function RoomsPage() {
                   onClick={() => setOpenCat(openCat === cat.category_slug ? null : cat.category_slug)}
                   className="w-full flex items-center gap-4 p-4 hover:bg-white/3 transition-colors text-left">
                   <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 border border-enayi-gold/20">
-                    <img src={getRoomImage(cat.category_slug, cat.category)}
+                    <img src={resolveRoomImage(cat.category_slug, cat.category)}
                          alt={cat.category} className="w-full h-full object-cover"/>
                   </div>
                   <div className="flex-1 min-w-0">
@@ -354,7 +377,7 @@ export default function RoomsPage() {
                       <div className="p-5">
                         {/* Category image */}
                         <div className="relative rounded-xl overflow-hidden mb-5 aspect-video max-h-52">
-                          <img src={getRoomImage(cat.category_slug, cat.category)}
+                          <img src={resolveRoomImage(cat.category_slug, cat.category)}
                                alt={cat.category} className="w-full h-full object-cover"/>
                           <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/80 via-transparent to-transparent"/>
                           <div className="absolute bottom-3 left-4">
@@ -410,6 +433,7 @@ export default function RoomsPage() {
           <RoomModal room={selectedRoom.room} catName={selectedRoom.catName}
             catSlug={selectedRoom.catSlug} branchName={selectedRoom.branchName}
             hotelId={selectedRoom.hotelId}
+            imageUrl={resolveRoomImage(selectedRoom.catSlug, selectedRoom.catName)}
             onClose={() => setSelectedRoom(null)}/>
         )}
       </AnimatePresence>

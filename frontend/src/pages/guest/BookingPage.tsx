@@ -102,6 +102,7 @@ export default function BookingPage() {
 
   const [branchId, setBranchId] = useState<string>('')
   const [selectedCat, setSelectedCat] = useState<string>('')
+  const [selectedRoomId, setSelectedRoomId] = useState<string>('')
   const createBooking = useCreateBooking()
 
   // Pre-select branch from URL param, else default to flagship / first
@@ -212,9 +213,20 @@ export default function BookingPage() {
   const totalFree = branchAvail?.free_rooms ?? 0
   const totalAll  = branchAvail?.total_rooms ?? 0
 
+  // The specific physical room the guest clicked, if any
+  const catAvail = selectedRoom ? availByCleanName[cleanName(selectedRoom.name).toLowerCase()] : undefined
+  const pickedRoom = catAvail?.rooms.find(rm => rm.id === selectedRoomId)
+
   const onSubmit = (data: any) => {
     if (!catId || !branchId) return
-    createBooking.mutate({ ...data, category_id: resolvedCatId, hotel_id: branchId, adults: Number(data.adults), children: Number(data.children) })
+    createBooking.mutate({
+      ...data,
+      category_id: resolvedCatId,
+      hotel_id: branchId,
+      ...(selectedRoomId ? { room_id: selectedRoomId } : {}),
+      adults: Number(data.adults),
+      children: Number(data.children),
+    })
   }
 
   return (
@@ -234,7 +246,7 @@ export default function BookingPage() {
               <div className="grid grid-cols-2 gap-3">
                 {(hotels ?? []).map(h => (
                   <button key={h.id} type="button"
-                    onClick={() => { setBranchId(h.id); if (!slug) setSelectedCat('') }}
+                    onClick={() => { setBranchId(h.id); if (!slug) setSelectedCat(''); setSelectedRoomId('') }}
                     className={`card p-4 text-left transition-all ${branchId === h.id ? 'border-enayi-gold bg-enayi-gold/5' : 'hover:border-enayi-gold/30'}`}>
                     <div className="font-semibold text-enayi-text text-sm">{branchLabel(h)}</div>
                     <div className="text-xs text-enayi-muted mt-0.5 capitalize">{h.branch} branch</div>
@@ -263,13 +275,6 @@ export default function BookingPage() {
               </div>
             )}
 
-            {/* Step hint */}
-            {!slug && classList.length > 0 && (
-              <p className="text-enayi-muted text-sm text-center">
-                Step 2 — Click a category to expand &amp; select, then review the room numbers
-              </p>
-            )}
-
             {/* Expandable class list */}
             <div className="space-y-3">
               {classList.map(r => {
@@ -282,7 +287,7 @@ export default function BookingPage() {
                 return (
                   <div key={r.id} className={`card overflow-hidden transition-all ${isExpanded ? 'border-enayi-gold' : ''}`}>
                     <button type="button"
-                      onClick={() => setSelectedCat(prev => prev === r.id ? '' : r.id)}
+                      onClick={() => { setSelectedCat(prev => prev === r.id ? '' : r.id); setSelectedRoomId('') }}
                       className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors text-left">
                       <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 border border-enayi-gold/20">
                         <img src={thumb} alt={displayName} className="w-full h-full object-cover"/>
@@ -349,17 +354,25 @@ export default function BookingPage() {
                             ) : (
                               <>
                                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 mb-5">
-                                  {ra.rooms.map(rm => (
-                                    <div key={rm.id}
-                                      className={`rounded-xl border p-3 text-center transition-all
-                                        ${STATUS_STYLE[rm.status] ?? STATUS_STYLE.occupied}`}>
-                                      <div className="flex items-center justify-center gap-1 mb-1">
-                                        {rm.is_available ? <CheckCircle size={11}/> : <XCircle size={11}/>}
-                                        <span className="font-mono font-bold text-sm">{rm.room_number}</span>
-                                      </div>
-                                      <p className="text-xs opacity-65">Fl. {rm.floor}</p>
-                                    </div>
-                                  ))}
+                                  {ra.rooms.map(rm => {
+                                    const isPicked = selectedRoomId === rm.id
+                                    return (
+                                      <button
+                                        key={rm.id}
+                                        type="button"
+                                        disabled={!rm.is_available}
+                                        onClick={() => setSelectedRoomId(prev => prev === rm.id ? '' : rm.id)}
+                                        className={`rounded-xl border p-3 text-center transition-all
+                                          ${rm.is_available ? 'cursor-pointer hover:scale-[1.03]' : 'cursor-not-allowed opacity-60'}
+                                          ${isPicked ? 'ring-2 ring-enayi-gold border-enayi-gold bg-enayi-gold/10' : STATUS_STYLE[rm.status] ?? STATUS_STYLE.occupied}`}>
+                                        <div className="flex items-center justify-center gap-1 mb-1">
+                                          {rm.is_available ? <CheckCircle size={11}/> : <XCircle size={11}/>}
+                                          <span className="font-mono font-bold text-sm">{rm.room_number}</span>
+                                        </div>
+                                        <p className="text-xs opacity-65">Fl. {rm.floor}</p>
+                                      </button>
+                                    )
+                                  })}
                                 </div>
 
                                 {/* Status legend — same as rooms page */}
@@ -374,7 +387,7 @@ export default function BookingPage() {
                                 </div>
 
                                 <p className="text-enayi-muted text-xs">
-                                  {ra.free_count} of {ra.total_count} free · a free room is assigned automatically when you confirm the booking.
+                                  {ra.free_count} of {ra.total_count} free · click an available room to pick it, or leave unselected and we'll assign one automatically.
                                 </p>
                               </>
                             )}
@@ -427,6 +440,7 @@ export default function BookingPage() {
                   <div className="space-y-2 mb-4 text-sm">
                     <div className="flex justify-between"><span className="text-enayi-muted">Branch</span><span className="text-enayi-text">{branchLabel(branch)}</span></div>
                     <div className="flex justify-between"><span className="text-enayi-muted">{cleanCatName(selectedRoom.name)}</span><span className="text-enayi-text">{formatCurrency(price)}/night</span></div>
+                    {pickedRoom && <div className="flex justify-between"><span className="text-enayi-muted">Room</span><span className="text-enayi-gold font-semibold">{pickedRoom.room_number}</span></div>}
                     <div className="flex justify-between"><span className="text-enayi-muted">Nights</span><span className="text-enayi-text">{nights}</span></div>
                     <div className="flex justify-between"><span className="text-enayi-muted">Room subtotal</span><span className="text-enayi-text">{formatCurrency(subtotal)}</span></div>
                     {addons > 0 && <div className="flex justify-between"><span className="text-enayi-muted">Add-ons</span><span className="text-enayi-text">{formatCurrency(addons)}</span></div>}

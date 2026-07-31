@@ -1,7 +1,7 @@
 import { Outlet, Link, NavLink } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, Phone, MapPin, Bot, Star } from 'lucide-react'
+import { Menu, X, Phone, MapPin, Bot, Star, ChevronRight } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/utils/helpers'
 
@@ -87,7 +87,7 @@ export default function PublicLayout() {
           </Link>
 
           {/* ── Desktop nav ── */}
-          <div className="hidden lg:flex items-center gap-10">
+          <div className="hidden lg:flex items-center gap-6 xl:gap-10 shrink-0">
             {NAV.map(n => (
               <NavLink key={n.href} to={n.href}
                 className={({ isActive }) => cn('nav-link', isActive && 'active')}>
@@ -97,7 +97,7 @@ export default function PublicLayout() {
           </div>
 
           {/* ── CTA buttons ── */}
-          <div className="hidden lg:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-4 ml-6 xl:ml-10 shrink-0">
             {isAuthenticated ? (
               <>
                 <Link to="/concierge"
@@ -182,10 +182,11 @@ export default function PublicLayout() {
           {/* Quick Links */}
           <div>
             <h4 className="text-enayi-gold text-xs font-semibold tracking-[0.2em] uppercase mb-6">Quick Links</h4>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               {[...NAV, {label:'Book a Room',href:'/book'},{label:'Book an Event',href:'/events/book'}].map(l => (
                 <Link key={l.href} to={l.href}
-                  className="text-enayi-muted hover:text-enayi-gold text-sm transition-colors tracking-wide">
+                  className="group flex items-center gap-2 text-enayi-muted hover:text-enayi-gold text-sm transition-colors tracking-wide w-fit">
+                  <ChevronRight size={12} className="text-enayi-gold opacity-0 -ml-4 group-hover:opacity-100 group-hover:ml-0 transition-all duration-200 shrink-0" />
                   {l.label}
                 </Link>
               ))}

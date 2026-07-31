@@ -62,8 +62,45 @@ export default function AboutPage() {
           HERO
           ═══════════════════════════════════════ */}
       <section className="relative min-h-[70vh] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-enayi-panel via-enayi-surface to-enayi-bg" />
+        <div className="absolute inset-0 bg-grid opacity-25" />
+        <div className="glow-orb w-[500px] h-[500px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-25" />
 
-      {/* ── Real Hotel Signage — Brand Identity ─────────────────────── */}
+        <div className="relative z-10 container-site text-center py-24">
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+            <div className="badge-gold inline-flex mb-5">✦ Our Story</div>
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.9, delay: 0.1 }}
+            className="font-display text-display-lg text-enayi-text leading-tight mb-6 text-balance"
+          >
+            More Than a Hotel.<br />
+            <span className="text-gold">A Home Away From Home.</span>
+          </motion.h1>
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className="gold-line-center mb-8"
+          />
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.4 }}
+            className="text-enayi-muted text-xl max-w-2xl mx-auto leading-relaxed"
+          >
+            Nestled on the scenic Rayfield Road in the cool highlands of Jos, Plateau State —
+            Enayi Hotels & Suites has been the definitive address for luxury, comfort,
+            and unforgettable Nigerian hospitality since 2012.
+          </motion.p>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════
+          REAL HOTEL SIGNAGE — BRAND IDENTITY
+          ═══════════════════════════════════════ */}
       <section className="container-site py-16">
         <div className="text-center mb-10">
           <div className="badge-gold inline-flex mb-4">Our Identity</div>
@@ -105,42 +142,6 @@ export default function AboutPage() {
               </div>
             </div>
           </div>
-        </div>
-      </section>
-
-        <div className="absolute inset-0 bg-gradient-to-br from-enayi-panel via-enayi-surface to-enayi-bg" />
-        <div className="absolute inset-0 bg-grid opacity-25" />
-        <div className="glow-orb w-[500px] h-[500px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-25" />
-
-        <div className="relative z-10 container-site text-center py-24">
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-            <div className="badge-gold inline-flex mb-5">✦ Our Story</div>
-          </motion.div>
-
-          <motion.h1
-            initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.1 }}
-            className="font-display text-display-lg text-enayi-text leading-tight mb-6 text-balance"
-          >
-            More Than a Hotel.<br />
-            <span className="text-gold">A Home Away From Home.</span>
-          </motion.h1>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="gold-line-center mb-8"
-          />
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="text-enayi-muted text-xl max-w-2xl mx-auto leading-relaxed"
-          >
-            Nestled on the scenic Rayfield Road in the cool highlands of Jos, Plateau State —
-            Enayi Hotels & Suites has been the definitive address for luxury, comfort,
-            and unforgettable Nigerian hospitality since 2012.
-          </motion.p>
         </div>
       </section>
 
@@ -302,7 +303,7 @@ export default function AboutPage() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.7, delay: 0.1 }}
-                  className={`flex gap-8 md:gap-0 items-start ${i % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'}`}
+                  className={`flex gap-8 md:gap-0 items-start`}
                 >
                   <div className="md:w-1/2 pl-16 md:pl-0 md:pr-12 flex justify-end">
                     {i % 2 === 0 ? (
