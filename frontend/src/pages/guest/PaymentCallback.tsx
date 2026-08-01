@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react'
 import api from '@/utils/api'
 
@@ -65,7 +65,19 @@ function detectGatewayReturn(params: URLSearchParams): {
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PaymentCallback() {
-  const [search] = useSearchParams()
+  // React Router's useSearchParams relies on standard URLSearchParams parsing,
+  // which only treats the FIRST '?' as the query start — anything after that
+  // (including a second '?') is read as a literal character, not a delimiter.
+  // Monnify's redirect sometimes appends "?paymentReference=..." even when our
+  // redirect URL already has a '?', producing a malformed double-'?' query
+  // string that would otherwise swallow paymentReference into the previous
+  // param's value. Normalize any extra '?' into '&' before parsing so every
+  // gateway's callback params are read correctly regardless of this quirk.
+  const search = (() => {
+    const raw = window.location.search.replace(/^\?/, '')
+    const normalized = raw.replace(/\?/g, '&')
+    return new URLSearchParams(normalized)
+  })()
   const [status, setStatus]   = useState<'loading' | 'success' | 'failed' | 'cancelled'>('loading')
   const [gateway, setGateway] = useState('')
   const [attempts, setAttempts] = useState(0)
