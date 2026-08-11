@@ -8,4 +8,6 @@ urlpatterns = [
     path("<uuid:pk>/checkin/",    views.CheckInView.as_view(),           name="booking-checkin"),
     path("<uuid:pk>/checkout/",   views.CheckOutView.as_view(),          name="booking-checkout"),
     path("ref/<str:ref>/",        views.BookingByReferenceView.as_view(),name="booking-by-ref"),
+    path("checkout-approvals/",              views.PendingCheckoutApprovalsView.as_view(), name="checkout-approvals-pending"),
+    path("checkout-approvals/<uuid:pk>/decide/", views.ApproveCheckoutView.as_view(),       name="checkout-approval-decide"),
 ]

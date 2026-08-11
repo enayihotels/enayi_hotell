@@ -1,7 +1,7 @@
 """Enayi Hotels — Bookings Serializers"""
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Booking
+from .models import Booking, CheckoutApprovalRequest
 from apps.rooms.serializers import RoomSerializer
 from apps.accounts.serializers import UserSerializer
 
@@ -224,3 +224,44 @@ class CreateBookingSerializer(serializers.Serializer):
 
 class CancelBookingSerializer(serializers.Serializer):
     reason = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
+
+
+class CheckoutApprovalRequestSerializer(serializers.ModelSerializer):
+    booking_reference = serializers.CharField(source="booking.booking_reference", read_only=True)
+    guest_name        = serializers.SerializerMethodField()
+    room_number       = serializers.CharField(source="booking.room.room_number", read_only=True)
+    requested_by_name = serializers.SerializerMethodField()
+    decided_by_name    = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = CheckoutApprovalRequest
+        fields = [
+            "id", "booking", "booking_reference", "guest_name", "room_number",
+            "requested_by", "requested_by_name", "balance_due_at_request", "reason",
+            "status", "decided_by", "decided_by_name", "decision_note",
+            "decided_at", "created_at",
+        ]
+        read_only_fields = [
+            "id", "booking", "booking_reference", "guest_name", "room_number",
+            "requested_by", "requested_by_name", "balance_due_at_request",
+            "status", "decided_by", "decided_by_name", "decided_at", "created_at",
+        ]
+
+    def get_guest_name(self, obj):
+        return obj.booking.guest.get_full_name() if obj.booking and obj.booking.guest else ""
+
+    def get_requested_by_name(self, obj):
+        return obj.requested_by.get_full_name() if obj.requested_by else ""
+
+    def get_decided_by_name(self, obj):
+        return obj.decided_by.get_full_name() if obj.decided_by else ""
+
+
+class RequestCheckoutApprovalSerializer(serializers.Serializer):
+    """Body accepted by CheckOutView when a balance is outstanding."""
+    reason = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
+
+
+class DecideCheckoutApprovalSerializer(serializers.Serializer):
+    decision      = serializers.ChoiceField(choices=["approve", "reject"])
+    decision_note = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")

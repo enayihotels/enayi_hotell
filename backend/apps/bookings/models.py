@@ -110,3 +110,38 @@ class Booking(models.Model):
     @property
     def is_fully_paid(self):
         return self.amount_paid >= self.total_amount
+
+
+class CheckoutApprovalRequest(models.Model):
+    """A checkout that could not complete automatically because the guest's
+    balance was not fully settled. A manager/admin must approve or reject
+    it before the booking is allowed to move to 'checked_out'.
+
+    This exists to prevent a single staff member from being able to both
+    check a guest out AND write off the outstanding balance unilaterally.
+    """
+    PENDING  = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+    STATUS_CHOICES = [
+        (PENDING, "Pending"), (APPROVED, "Approved"), (REJECTED, "Rejected"),
+    ]
+
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking          = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="checkout_approvals")
+    requested_by     = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="checkout_requests_made")
+    balance_due_at_request = models.DecimalField(max_digits=12, decimal_places=2)
+    reason           = models.TextField(blank=True, help_text="Staff note on why checkout is needed despite balance owed.")
+    status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING, db_index=True)
+    decided_by       = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="checkout_requests_decided")
+    decision_note    = models.TextField(blank=True)
+    decided_at       = models.DateTimeField(blank=True, null=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "checkout_approval_requests"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Checkout approval for {self.booking.booking_reference} ({self.status})"
