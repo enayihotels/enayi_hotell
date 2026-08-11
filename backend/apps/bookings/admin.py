@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Booking, CheckoutApprovalRequest
+from .models import Booking, CheckoutApprovalRequest, CheckinIdentityCheck
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
@@ -17,4 +17,13 @@ class CheckoutApprovalRequestAdmin(admin.ModelAdmin):
     list_filter  = ["status"]
     search_fields = ["booking__booking_reference","requested_by__email","decided_by__email"]
     readonly_fields = ["id","booking","requested_by","balance_due_at_request","created_at"]
+    ordering = ["-created_at"]
+
+
+@admin.register(CheckinIdentityCheck)
+class CheckinIdentityCheckAdmin(admin.ModelAdmin):
+    list_display = ["booking", "verdict", "reference_source", "performed_by", "created_at"]
+    list_filter  = ["verdict", "reference_source"]
+    search_fields = ["booking__booking_reference", "performed_by__email"]
+    readonly_fields = ["id", "booking", "verdict", "confidence_note", "reference_source", "performed_by", "created_at"]
     ordering = ["-created_at"]

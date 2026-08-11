@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-from .models import Booking, CheckoutApprovalRequest
+from .models import Booking, CheckoutApprovalRequest, CheckinIdentityCheck
 from .serializers import (
     BookingSerializer, CreateBookingSerializer,
     CheckoutApprovalRequestSerializer, RequestCheckoutApprovalSerializer,
@@ -338,3 +338,129 @@ class BookingByReferenceView(APIView):
         if booking.guest != request.user and not request.user.is_hotel_staff:
             return Response({"error": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         return Response(BookingSerializer(booking, context={"request": request}).data)
+
+class VerifyGuestIdentityView(APIView):
+    """Staff-triggered, advisory-only face plausibility check at check-in.
+
+    Takes a live selfie (required) and either an uploaded ID photo or
+    falls back to the guest's saved avatar as the reference image. Sends
+    both to a general-purpose vision model for a plausibility read.
+
+    IMPORTANT: this is decision support, not a biometric guarantee. It
+    does NOT gate check-in on its own — CheckInView's OTP requirement is
+    still the actual control. Staff read the verdict and use judgment.
+    No images are stored; only the verdict and a short note are kept.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+
+        booking = get_object_or_404(Booking, pk=pk)
+
+        selfie = request.FILES.get("selfie")
+        if not selfie:
+            return Response({"error": "A selfie photo is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        id_photo = request.FILES.get("id_photo")
+        reference_source = None
+        reference_bytes = None
+
+        if id_photo:
+            reference_bytes = id_photo.read()
+            reference_source = CheckinIdentityCheck.REFERENCE_SOURCE_CHOICES[1][0]  # "uploaded_id"
+        elif booking.guest.avatar:
+            try:
+                with booking.guest.avatar.open("rb") as f:
+                    reference_bytes = f.read()
+                reference_source = CheckinIdentityCheck.REFERENCE_SOURCE_CHOICES[0][0]  # "avatar"
+            except Exception:
+                reference_bytes = None
+
+        if not reference_bytes:
+            return Response(
+                {"error": "No reference photo available. Ask the guest to photograph an ID document, or check they have a profile photo saved."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        selfie_bytes = selfie.read()
+
+        verdict, note = _run_identity_vision_check(selfie_bytes, reference_bytes)
+
+        check = CheckinIdentityCheck.objects.create(
+            booking=booking,
+            verdict=verdict,
+            confidence_note=note,
+            reference_source=reference_source,
+            performed_by=request.user,
+        )
+
+        return Response({
+            "verdict": check.verdict,
+            "verdict_label": dict(CheckinIdentityCheck.VERDICT_CHOICES).get(check.verdict, check.verdict),
+            "note": check.confidence_note,
+            "reference_source": check.reference_source,
+            "disclaimer": "Advisory only — this is a general-purpose visual read, not a biometric guarantee. Use your judgment alongside the check-in code verification.",
+        })
+
+
+def _run_identity_vision_check(selfie_bytes: bytes, reference_bytes: bytes):
+    """Returns (verdict, note). Falls back to ('error', ...) on any
+    failure so the endpoint never 500s just because the AI call failed."""
+    import base64
+    from django.conf import settings
+
+    if not settings.OPENAI_API_KEY:
+        return CheckinIdentityCheck.ERROR, "AI verification is not configured (no API key set)."
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        selfie_b64    = base64.b64encode(selfie_bytes).decode()
+        reference_b64 = base64.b64encode(reference_bytes).decode()
+
+        prompt = (
+            "You are assisting hotel front-desk staff with a plausibility check, NOT a legal or "
+            "biometric identity verification. Compare the two photos: the first is a selfie just taken "
+            "at check-in, the second is a reference photo (ID document or saved profile photo). "
+            "Consider that lighting, angle, glasses, facial hair, and image quality can differ a lot "
+            "between real photos of the same person. "
+            "Respond with EXACTLY this format, nothing else:\n"
+            "VERDICT: <likely_match|uncertain|likely_mismatch>\n"
+            "NOTE: <one short sentence explaining why, in plain language for hotel staff>"
+        )
+
+        response = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{selfie_b64}"}},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{reference_b64}"}},
+                ],
+            }],
+            max_tokens=150,
+            temperature=0.1,
+        )
+
+        text = (response.choices[0].message.content or "").strip()
+        verdict = CheckinIdentityCheck.UNCERTAIN
+        note = text or "Model returned no usable response."
+
+        for line in text.splitlines():
+            if line.upper().startswith("VERDICT:"):
+                raw = line.split(":", 1)[1].strip().lower()
+                if raw in [CheckinIdentityCheck.MATCH, CheckinIdentityCheck.UNCERTAIN, CheckinIdentityCheck.MISMATCH]:
+                    verdict = raw
+            elif line.upper().startswith("NOTE:"):
+                note = line.split(":", 1)[1].strip()
+
+        return verdict, note
+
+    except Exception as exc:
+        import logging
+        logging.getLogger("apps.bookings").warning(f"Identity vision check failed: {exc}")
+        return CheckinIdentityCheck.ERROR, "Could not complete the AI check right now — proceed using the check-in code and your own judgment."

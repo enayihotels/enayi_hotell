@@ -175,3 +175,46 @@ class CheckoutApprovalRequest(models.Model):
 
     def __str__(self):
         return f"Checkout approval for {self.booking.booking_reference} ({self.status})"
+
+
+class CheckinIdentityCheck(models.Model):
+    """Advisory face-plausibility check at check-in — a staff member
+    captures a live selfie and compares it against the guest's uploaded
+    avatar (or a photographed ID document) using a general-purpose vision
+    model. This is a DECISION-SUPPORT tool, not a biometric identity
+    guarantee: it does not block check-in, and its verdict should be
+    read as "worth a second look" rather than definitive proof either
+    way. No photos are retained — only the verdict and a short note, to
+    limit how much sensitive biometric/ID data the system holds.
+    """
+    MATCH      = "likely_match"
+    UNCERTAIN  = "uncertain"
+    MISMATCH   = "likely_mismatch"
+    ERROR      = "error"
+
+    VERDICT_CHOICES = [
+        (MATCH,     "Likely match"),
+        (UNCERTAIN, "Uncertain"),
+        (MISMATCH,  "Likely mismatch"),
+        (ERROR,     "Could not complete check"),
+    ]
+
+    REFERENCE_SOURCE_CHOICES = [
+        ("avatar",      "Guest's saved profile photo"),
+        ("uploaded_id", "ID document photographed at check-in"),
+    ]
+
+    id               = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    booking          = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name="identity_checks")
+    verdict          = models.CharField(max_length=20, choices=VERDICT_CHOICES)
+    confidence_note  = models.TextField(blank=True)
+    reference_source = models.CharField(max_length=20, choices=REFERENCE_SOURCE_CHOICES)
+    performed_by     = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, related_name="identity_checks_performed")
+    created_at       = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "checkin_identity_checks"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Identity check for {self.booking.booking_reference} — {self.verdict}"
