@@ -1,5 +1,6 @@
 """Enayi Hotels — Food & Drink Orders (Kitchen + Bar)"""
 import uuid, random, string
+from decimal import Decimal
 from django.db import models
 
 
@@ -102,7 +103,7 @@ class Order(models.Model):
     def recalculate_totals(self):
         items = self.items.all()
         self.subtotal     = sum(i.total_price for i in items)
-        self.tax          = round(self.subtotal * 7.5 / 100, 2)
+        self.tax          = round(self.subtotal * Decimal("7.5") / Decimal("100"), 2)
         self.total_amount = self.subtotal + self.delivery_charge + self.tax
         self.save(update_fields=["subtotal","tax","total_amount"])
 

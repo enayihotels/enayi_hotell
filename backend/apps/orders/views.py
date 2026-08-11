@@ -1,6 +1,7 @@
 
 from django.utils import timezone
 from datetime import timedelta
+from decimal import Decimal
 
 from rest_framework import generics, filters, status
 from rest_framework.views import APIView
@@ -158,7 +159,7 @@ class OrderListCreateView(APIView):
             total += oi.total_price
 
         order.subtotal = total
-        order.tax = round(total * 7.5 / 100, 2)
+        order.tax = round(total * Decimal("7.5") / Decimal("100"), 2)
         order.total_amount = (
             order.subtotal +
             order.delivery_charge +
