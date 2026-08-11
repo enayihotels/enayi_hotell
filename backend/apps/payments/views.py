@@ -22,6 +22,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.utils import timezone
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -63,6 +64,40 @@ USSD_BANK_MAP = {
     "221": {"name": "Stanbic IBTC Bank",      "ussd": "*909#"},
     "082": {"name": "Keystone Bank",          "ussd": "*7111#"},
 }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Link a Payment to the Booking/Order/EventBooking it's paying for
+# ─────────────────────────────────────────────────────────────────────────────
+_PAYABLE_MODELS = {
+    "booking": ("bookings", "Booking"),
+    "order":   ("orders",   "Order"),
+    "event":   ("events",   "EventBooking"),
+}
+
+
+def _link_payment_to_payable(payment: Payment, purpose: str, metadata: dict) -> None:
+    """Sets payment.content_type/object_id from metadata['booking_id'] (the
+    frontend sends this key for all purposes) so fulfill_payment() can find
+    payment.payable and update the linked record. Silently no-ops if the id
+    is missing or invalid — payment still proceeds, it just won't
+    auto-fulfill anything (matches the previous behavior for those cases).
+    """
+    app_label_model = _PAYABLE_MODELS.get(purpose)
+    payable_id = metadata.get("booking_id") or metadata.get("object_id")
+    if not app_label_model or not payable_id:
+        return
+    app_label, model_name = app_label_model
+    try:
+        from django.apps import apps as django_apps
+        model = django_apps.get_model(app_label, model_name)
+        obj = model.objects.filter(pk=payable_id).first()
+        if obj:
+            payment.content_type = ContentType.objects.get_for_model(model)
+            payment.object_id    = obj.pk
+            payment.save(update_fields=["content_type", "object_id"])
+    except Exception as exc:
+        logger.warning(f"Could not link payment {payment.transaction_reference} to {purpose} {payable_id}: {exc}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -172,6 +207,13 @@ class InitiatePaymentView(APIView):
             ip_address = request.META.get("REMOTE_ADDR"),
             metadata   = data.get("metadata", {}),
         )
+
+        # Link this payment to the booking/order/event it's paying for, so
+        # fulfill_payment() can actually find `payment.payable` and update
+        # the linked record's amount_paid/status once the payment succeeds.
+        # (Previously this was never set for ANY payment method — meaning
+        # no booking, online or offline, ever auto-confirmed via payment.)
+        _link_payment_to_payable(payment, data["purpose"], data.get("metadata", {}))
 
         dispatch = {
             "flutterwave":   self._flutterwave,

@@ -265,3 +265,9 @@ class RequestCheckoutApprovalSerializer(serializers.Serializer):
 class DecideCheckoutApprovalSerializer(serializers.Serializer):
     decision      = serializers.ChoiceField(choices=["approve", "reject"])
     decision_note = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
+
+
+class RecordManualPaymentSerializer(serializers.Serializer):
+    amount    = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=1)
+    method    = serializers.ChoiceField(choices=["cash", "pos"])
+    narration = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")

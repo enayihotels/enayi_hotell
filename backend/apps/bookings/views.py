@@ -8,7 +8,7 @@ from .models import Booking, CheckoutApprovalRequest
 from .serializers import (
     BookingSerializer, CreateBookingSerializer,
     CheckoutApprovalRequestSerializer, RequestCheckoutApprovalSerializer,
-    DecideCheckoutApprovalSerializer,
+    DecideCheckoutApprovalSerializer, RecordManualPaymentSerializer,
 )
 
 
@@ -203,6 +203,75 @@ class ApproveCheckoutView(APIView):
                 "message": "Checkout rejected. Guest remains checked in pending full payment.",
                 "approval_request": CheckoutApprovalRequestSerializer(approval).data,
             })
+
+
+class RecordManualPaymentView(APIView):
+    """Staff records a cash/POS payment collected at the front desk.
+
+    Creates a real Payment record (properly linked to this booking via
+    content_type/object_id) and runs it through the same fulfill_payment()
+    logic used by online gateways — so amount_paid, status (auto-confirm
+    once fully paid), and loyalty points all stay consistent regardless of
+    payment method. This also gives every cash/POS payment an audit trail:
+    who recorded it, how much, and when — unlike editing amount_paid by
+    hand in Django admin.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+
+        booking = get_object_or_404(Booking, pk=pk)
+        if booking.status in ["cancelled", "checked_out", "no_show"]:
+            return Response({"error": f"Cannot record a payment for a booking that is {booking.status}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = RecordManualPaymentSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        amount = serializer.validated_data["amount"]
+        method = serializer.validated_data["method"]
+        note   = serializer.validated_data.get("narration", "")
+
+        if amount > booking.balance_due:
+            return Response(
+                {"error": f"Amount ₦{amount:,.2f} exceeds the outstanding balance of ₦{booking.balance_due:,.2f}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Local import avoids a module-level payments<->bookings import cycle.
+        from apps.payments.models import Payment
+        from apps.payments.views import fulfill_payment
+        from apps.payments.serializers import PaymentSerializer
+        from django.contrib.contenttypes.models import ContentType
+
+        payment = Payment.objects.create(
+            guest         = booking.guest,
+            purpose       = "booking",
+            method        = method,
+            gateway       = method,
+            amount        = amount,
+            currency      = "NGN",
+            status        = "success",
+            narration     = note or f"Front-desk {method.upper()} payment recorded by {request.user.get_full_name()}",
+            content_type  = ContentType.objects.get_for_model(Booking),
+            object_id     = booking.id,
+            verified_at   = timezone.now(),
+            metadata      = {
+                "booking_id":       str(booking.id),
+                "recorded_by":      str(request.user.id),
+                "recorded_by_name": request.user.get_full_name(),
+                "recorded_manually": True,
+            },
+        )
+
+        fulfill_payment(payment)  # updates booking.amount_paid/status + loyalty points + receipt email
+        booking.refresh_from_db()
+
+        return Response({
+            "message": f"₦{amount:,.2f} {method.upper()} payment recorded for {booking.guest.get_full_name()}.",
+            "booking": BookingSerializer(booking, context={"request": request}).data,
+            "payment": PaymentSerializer(payment).data,
+        }, status=status.HTTP_201_CREATED)
 
 
 class BookingByReferenceView(APIView):
