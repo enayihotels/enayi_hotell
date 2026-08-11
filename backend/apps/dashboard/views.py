@@ -362,3 +362,40 @@ class RecentActivityView(APIView):
         )
 
         return Response(activity[:limit])
+
+
+class FraudAuditReportListView(APIView):
+    """GET recent fraud audit reports. Manager/admin only."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ["manager", "admin"]:
+            return Response({"error": "Manager/Admin only."}, status=403)
+
+        from .models import FraudAuditReport
+        from .serializers import FraudAuditReportSerializer
+
+        reports = FraudAuditReport.objects.all()[:30]
+        return Response(FraudAuditReportSerializer(reports, many=True).data)
+
+
+class RunFraudAuditNowView(APIView):
+    """POST triggers an on-demand fraud audit sweep (same logic the nightly
+    job runs), so a manager can check the system without waiting for the
+    scheduled run. Runs synchronously — the queries involved are cheap
+    (bounded to the last N hours) and the OpenAI call has its own timeout,
+    so this stays fast enough to call directly from the UI."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role not in ["manager", "admin"]:
+            return Response({"error": "Manager/Admin only."}, status=403)
+
+        hours = int(request.data.get("hours", 24))
+        hours = max(1, min(hours, 24 * 30))  # clamp between 1 hour and 30 days
+
+        from .tasks import run_fraud_audit
+        from .serializers import FraudAuditReportSerializer
+
+        report = run_fraud_audit(hours=hours, triggered_by="manual")
+        return Response(FraudAuditReportSerializer(report).data, status=201)
