@@ -47,7 +47,10 @@ export default function AdminBookings() {
       setOtpSentTo(res.data?.message || 'Code sent.')
       toast.success('Check-in code emailed to the guest.')
     },
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onError: (err) => {
+      setOtpSentTo('')
+      toast.error(getErrorMessage(err))
+    },
   })
 
   const checkIn = useMutation({
@@ -116,10 +119,11 @@ export default function AdminBookings() {
   })
 
   const handleCheckoutClick = (booking: Booking) => {
-    if (booking.is_fully_paid) {
+    if (booking.is_clear_to_checkout) {
       checkOut.mutate({ bookingId: booking.id })
     } else {
-      // Outstanding balance — collect an optional reason before sending for manager approval.
+      // Outstanding balance (room and/or unpaid Food & Bar orders) — collect
+      // an optional reason before sending for manager approval.
       setPendingCheckout(booking)
     }
   }
@@ -200,6 +204,9 @@ export default function AdminBookings() {
                   {b.is_fully_paid
                     ? <span className="text-green-400 text-xs">Paid</span>
                     : <span className="text-red-400 text-xs font-semibold">{formatCurrency(b.balance_due)} due</span>}
+                  {b.unpaid_orders_total > 0 && (
+                    <div className="text-amber-400 text-[11px] mt-0.5">+{formatCurrency(b.unpaid_orders_total)} unpaid orders</div>
+                  )}
                 </td>
                 <td className="px-4 py-3"><StatusBadge status={b.status}/></td>
                 <td className="px-4 py-3">
@@ -217,11 +224,11 @@ export default function AdminBookings() {
                     {b.status === 'checked_in' && (
                       <Button
                         size="sm"
-                        variant={b.is_fully_paid ? 'outline' : 'danger'}
+                        variant={b.is_clear_to_checkout ? 'outline' : 'danger'}
                         loading={checkOut.isPending && pendingCheckout?.id === b.id}
                         onClick={() => handleCheckoutClick(b)}
                       >
-                        <LogOut size={13} /> {b.is_fully_paid ? 'Check Out' : 'Check Out…'}
+                        <LogOut size={13} /> {b.is_clear_to_checkout ? 'Check Out' : 'Check Out…'}
                       </Button>
                     )}
                   </div>
@@ -239,7 +246,10 @@ export default function AdminBookings() {
             <Alert type="warning">
               <span className="flex items-start gap-1.5">
                 <ShieldAlert size={14} className="mt-0.5 flex-shrink-0" />
-                {pendingCheckout.guest_name} still owes <strong className="mx-1">{formatCurrency(pendingCheckout.balance_due)}</strong>.
+                {pendingCheckout.guest_name} still owes <strong className="mx-1">{formatCurrency(pendingCheckout.total_outstanding)}</strong>
+                {pendingCheckout.unpaid_orders_total > 0 && (
+                  <> (includes {formatCurrency(pendingCheckout.unpaid_orders_total)} in unpaid Food &amp; Bar orders)</>
+                )}.
                 This checkout will be sent to a manager for approval instead of completing immediately.
               </span>
             </Alert>
@@ -303,10 +313,14 @@ export default function AdminBookings() {
       <Modal open={!!checkingInFor} onClose={closeCheckinModal} title="Verify guest to check in" size="sm">
         {checkingInFor && (
           <div className="space-y-4">
-            <Alert type="info">
+            <Alert type={sendOtp.isError ? 'error' : 'info'}>
               <span className="flex items-start gap-1.5">
                 <MailCheck size={14} className="mt-0.5 flex-shrink-0" />
-                {sendOtp.isPending ? 'Sending a check-in code to the guest\u2019s email…' : (otpSentTo || 'A 6-digit code has been emailed to the guest.')}
+                {sendOtp.isPending
+                  ? 'Sending a check-in code to the guest\u2019s email…'
+                  : sendOtp.isError
+                    ? 'Could not send the code. Use Resend, or check the error toast for details.'
+                    : (otpSentTo || 'Preparing to send a check-in code…')}
               </span>
             </Alert>
             <p className="text-enayi-muted text-xs">

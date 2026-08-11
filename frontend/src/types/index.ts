@@ -126,6 +126,9 @@ export interface Booking {
   amount_paid: number
   balance_due: number
   is_fully_paid: boolean
+  unpaid_orders_total: number
+  total_outstanding: number
+  is_clear_to_checkout: boolean
   special_requests: string
   breakfast_included: boolean
   airport_pickup: boolean
