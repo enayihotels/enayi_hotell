@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { StatusBadge, PageSpinner, EmptyState, Button, Modal, Textarea, Alert, Input, Select } from '@/components/ui'
-import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote } from 'lucide-react'
+import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote, MailCheck, RefreshCw } from 'lucide-react'
 import type { Booking, CheckoutApprovalRequest } from '@/types'
 
 const NON_PAYABLE_STATUSES: Booking['status'][] = ['cancelled', 'checked_out', 'no_show']
@@ -23,11 +23,27 @@ export default function AdminBookings() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'pos'>('cash')
   const [paymentNote, setPaymentNote] = useState('')
 
+  // Booking currently going through guest-verified check-in.
+  const [checkingInFor, setCheckingInFor] = useState<Booking | null>(null)
+  const [otpSentTo, setOtpSentTo] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+
+  const sendOtp = useMutation({
+    mutationFn: (bookingId: string) => api.post(`/bookings/${bookingId}/checkin/send-otp/`),
+    onSuccess: (res) => {
+      setOtpSentTo(res.data?.message || 'Code sent.')
+      toast.success('Check-in code emailed to the guest.')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
   const checkIn = useMutation({
-    mutationFn: (bookingId: string) => api.post(`/bookings/${bookingId}/checkin/`),
+    mutationFn: (vars: { bookingId: string; otp_code: string }) =>
+      api.post(`/bookings/${vars.bookingId}/checkin/`, { otp_code: vars.otp_code }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['admin-bookings'] })
       toast.success(res.data?.message || 'Guest checked in.')
+      closeCheckinModal()
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -108,6 +124,24 @@ export default function AdminBookings() {
     })
   }
 
+  const openCheckinModal = (booking: Booking) => {
+    setCheckingInFor(booking)
+    setOtpSentTo('')
+    setOtpCode('')
+    sendOtp.mutate(booking.id)
+  }
+
+  const closeCheckinModal = () => {
+    setCheckingInFor(null)
+    setOtpSentTo('')
+    setOtpCode('')
+  }
+
+  const confirmCheckIn = () => {
+    if (!checkingInFor || otpCode.length !== 6) return
+    checkIn.mutate({ bookingId: checkingInFor.id, otp_code: otpCode })
+  }
+
   if (isLoading) return <PageSpinner />
 
   return (
@@ -140,7 +174,7 @@ export default function AdminBookings() {
                       </Button>
                     )}
                     {b.status === 'confirmed' && (
-                      <Button size="sm" variant="outline" loading={checkIn.isPending} onClick={() => checkIn.mutate(b.id)}>
+                      <Button size="sm" variant="outline" onClick={() => openCheckinModal(b)}>
                         <LogIn size={13} /> Check In
                       </Button>
                     )}
@@ -227,7 +261,46 @@ export default function AdminBookings() {
           </div>
         )}
       </Modal>
+
+      {/* Guest self-verification check-in: a code is emailed to the guest;
+          only the guest can retrieve it, so staff alone can't fabricate an arrival. */}
+      <Modal open={!!checkingInFor} onClose={closeCheckinModal} title="Verify guest to check in" size="sm">
+        {checkingInFor && (
+          <div className="space-y-4">
+            <Alert type="info">
+              <span className="flex items-start gap-1.5">
+                <MailCheck size={14} className="mt-0.5 flex-shrink-0" />
+                {sendOtp.isPending ? 'Sending a check-in code to the guest\u2019s email…' : (otpSentTo || 'A 6-digit code has been emailed to the guest.')}
+              </span>
+            </Alert>
+            <p className="text-enayi-muted text-xs">
+              Ask {checkingInFor.guest_name} to read you the code from their email — this confirms they're the actual account holder before check-in completes.
+            </p>
+            <Input
+              label="6-digit check-in code"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="••••••"
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="text-center tracking-[0.5em] text-lg font-mono"
+            />
+            <div className="flex items-center justify-between gap-2">
+              <Button variant="ghost" size="sm" loading={sendOtp.isPending} onClick={() => sendOtp.mutate(checkingInFor.id)}>
+                <RefreshCw size={13} /> Resend code
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={closeCheckinModal}>Cancel</Button>
+                <Button variant="gold" loading={checkIn.isPending} disabled={otpCode.length !== 6} onClick={confirmCheckIn}>
+                  Confirm check-in
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
+
 
