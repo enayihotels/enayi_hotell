@@ -185,9 +185,10 @@ export default function AdminBookings() {
   if (isLoading) return <PageSpinner />
 
   return (
-    <div className="p-6 space-y-5">
-      <div><h1 className="font-display text-3xl text-enayi-text">All Bookings</h1><p className="text-enayi-muted text-sm">{data?.length??0} total</p></div>
+    <div className="p-4 md:p-6 space-y-5">
+      <div><h1 className="font-display text-2xl md:text-3xl text-enayi-text">All Bookings</h1><p className="text-enayi-muted text-sm">{data?.length??0} total</p></div>
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-enayi-panel border-b border-enayi-border"><tr>{['Reference','Guest','Room','Check-in','Check-out','Amount','Balance','Status','Actions'].map(h=><th key={h} className="text-left px-4 py-3 text-enayi-muted text-xs font-semibold">{h}</th>)}</tr></thead>
           <tbody className="divide-y divide-enayi-border">
@@ -237,6 +238,7 @@ export default function AdminBookings() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Confirmation for underpaid checkout — makes clear this won't complete instantly. */}

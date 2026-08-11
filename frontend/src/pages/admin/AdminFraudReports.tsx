@@ -33,7 +33,7 @@ export default function AdminFraudReports() {
 
   if (!isManagerOrAdmin) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <Alert type="error">This page is restricted to managers and admins.</Alert>
       </div>
     )
@@ -42,7 +42,7 @@ export default function AdminFraudReports() {
   if (isLoading) return <PageSpinner />
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-3xl text-enayi-text">Fraud Audit Reports</h1>

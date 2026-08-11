@@ -32,7 +32,7 @@ export default function AdminOrders() {
   )
 
   return (
-    <div className="p-6 space-y-8">
+    <div className="p-4 md:p-6 space-y-8">
       <h1 className="font-display text-3xl text-enayi-text">Kitchen & Bar Orders</h1>
       <Section title="🍳 Kitchen" orders={kitchen} loading={kl} />
       <Section title="🍸 Bar" orders={bar} loading={bl} />

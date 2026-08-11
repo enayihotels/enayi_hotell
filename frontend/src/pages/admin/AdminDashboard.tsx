@@ -18,7 +18,7 @@ export default function AdminDashboard() {
     {label:'Upcoming Events',value:stats.events.upcoming,sub:`${stats.guests.new_this_month} new guests`,icon:Calendar,color:'text-pink-400'},
   ]
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6">
       <div><h1 className="font-display text-3xl text-enayi-text">Dashboard</h1><p className="text-enayi-muted text-sm mt-1">Enayi Hotels & Suites · Live Overview</p></div>
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map(s=>(

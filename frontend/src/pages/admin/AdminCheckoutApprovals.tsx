@@ -37,7 +37,7 @@ export default function AdminCheckoutApprovals() {
 
   if (!isManagerOrAdmin) {
     return (
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         <Alert type="error">This page is restricted to managers and admins.</Alert>
       </div>
     )
@@ -46,7 +46,7 @@ export default function AdminCheckoutApprovals() {
   if (isLoading) return <PageSpinner />
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-4 md:p-6 space-y-5">
       <div>
         <h1 className="font-display text-3xl text-enayi-text">Checkout Approvals</h1>
         <p className="text-enayi-muted text-sm">{data?.length ?? 0} pending — checkouts held back because the guest's balance wasn't fully settled.</p>
