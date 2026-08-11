@@ -4,10 +4,17 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { StatusBadge, PageSpinner, EmptyState, Button, Modal, Textarea, Alert, Input, Select } from '@/components/ui'
-import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote, MailCheck, RefreshCw } from 'lucide-react'
+import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote, MailCheck, RefreshCw, ScanFace, Camera } from 'lucide-react'
 import type { Booking, CheckoutApprovalRequest } from '@/types'
 
 const NON_PAYABLE_STATUSES: Booking['status'][] = ['cancelled', 'checked_out', 'no_show']
+
+const VERDICT_STYLE: Record<string, { badge: 'green' | 'gold' | 'red' | 'gray'; label: string }> = {
+  likely_match:    { badge: 'green', label: 'Likely match' },
+  uncertain:       { badge: 'gold',  label: 'Uncertain — take a closer look' },
+  likely_mismatch: { badge: 'red',   label: 'Likely mismatch — investigate' },
+  error:           { badge: 'gray',  label: 'Check unavailable' },
+}
 
 export default function AdminBookings() {
   const qc = useQueryClient()
@@ -28,6 +35,12 @@ export default function AdminBookings() {
   const [otpSentTo, setOtpSentTo] = useState('')
   const [otpCode, setOtpCode] = useState('')
 
+  // Optional photo-based plausibility check, nested inside the check-in modal.
+  const [showIdentityCheck, setShowIdentityCheck] = useState(false)
+  const [selfieFile, setSelfieFile] = useState<File | null>(null)
+  const [idPhotoFile, setIdPhotoFile] = useState<File | null>(null)
+  const [identityResult, setIdentityResult] = useState<{ verdict: string; note: string; disclaimer: string } | null>(null)
+
   const sendOtp = useMutation({
     mutationFn: (bookingId: string) => api.post(`/bookings/${bookingId}/checkin/send-otp/`),
     onSuccess: (res) => {
@@ -44,6 +57,21 @@ export default function AdminBookings() {
       qc.invalidateQueries({ queryKey: ['admin-bookings'] })
       toast.success(res.data?.message || 'Guest checked in.')
       closeCheckinModal()
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const verifyIdentity = useMutation({
+    mutationFn: (bookingId: string) => {
+      const form = new FormData()
+      if (selfieFile) form.append('selfie', selfieFile)
+      if (idPhotoFile) form.append('id_photo', idPhotoFile)
+      return api.post(`/bookings/${bookingId}/checkin/verify-identity/`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+    },
+    onSuccess: (res) => {
+      setIdentityResult(res.data)
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -128,6 +156,10 @@ export default function AdminBookings() {
     setCheckingInFor(booking)
     setOtpSentTo('')
     setOtpCode('')
+    setShowIdentityCheck(false)
+    setSelfieFile(null)
+    setIdPhotoFile(null)
+    setIdentityResult(null)
     sendOtp.mutate(booking.id)
   }
 
@@ -135,6 +167,10 @@ export default function AdminBookings() {
     setCheckingInFor(null)
     setOtpSentTo('')
     setOtpCode('')
+    setShowIdentityCheck(false)
+    setSelfieFile(null)
+    setIdPhotoFile(null)
+    setIdentityResult(null)
   }
 
   const confirmCheckIn = () => {
@@ -285,6 +321,58 @@ export default function AdminBookings() {
               onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               className="text-center tracking-[0.5em] text-lg font-mono"
             />
+
+            {!showIdentityCheck ? (
+              <button
+                type="button"
+                className="text-enayi-gold text-xs flex items-center gap-1.5 hover:underline"
+                onClick={() => setShowIdentityCheck(true)}
+              >
+                <ScanFace size={13} /> Optional: run a photo plausibility check
+              </button>
+            ) : (
+              <div className="border border-enayi-border rounded-xl p-4 space-y-3 bg-enayi-panel">
+                <p className="text-enayi-muted text-xs leading-relaxed">
+                  Optional and advisory only — a general visual read, not a biometric guarantee. Take a selfie of the guest now; provide an ID photo too if they have no saved profile photo.
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col items-center justify-center gap-1.5 border border-dashed border-enayi-border rounded-lg p-3 cursor-pointer text-center hover:border-enayi-gold/40 transition-colors">
+                    <Camera size={16} className="text-enayi-muted" />
+                    <span className="text-xs text-enayi-muted">{selfieFile ? selfieFile.name : 'Take selfie'}</span>
+                    <input type="file" accept="image/*" capture="user" className="hidden"
+                      onChange={(e) => setSelfieFile(e.target.files?.[0] ?? null)} />
+                  </label>
+                  <label className="flex flex-col items-center justify-center gap-1.5 border border-dashed border-enayi-border rounded-lg p-3 cursor-pointer text-center hover:border-enayi-gold/40 transition-colors">
+                    <Camera size={16} className="text-enayi-muted" />
+                    <span className="text-xs text-enayi-muted">{idPhotoFile ? idPhotoFile.name : 'Photo of ID (optional)'}</span>
+                    <input type="file" accept="image/*" capture="environment" className="hidden"
+                      onChange={(e) => setIdPhotoFile(e.target.files?.[0] ?? null)} />
+                  </label>
+                </div>
+                <Button
+                  size="sm"
+                  variant="surface"
+                  className="w-full"
+                  loading={verifyIdentity.isPending}
+                  disabled={!selfieFile}
+                  onClick={() => checkingInFor && verifyIdentity.mutate(checkingInFor.id)}
+                >
+                  Run check
+                </Button>
+                {identityResult && (
+                  <Alert type={identityResult.verdict === 'likely_mismatch' ? 'warning' : 'info'}>
+                    <div className="space-y-1">
+                      <div className="font-semibold text-xs">
+                        {VERDICT_STYLE[identityResult.verdict]?.label ?? identityResult.verdict}
+                      </div>
+                      <div className="text-xs">{identityResult.note}</div>
+                      <div className="text-[10px] text-enayi-muted italic mt-1">{identityResult.disclaimer}</div>
+                    </div>
+                  </Alert>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center justify-between gap-2">
               <Button variant="ghost" size="sm" loading={sendOtp.isPending} onClick={() => sendOtp.mutate(checkingInFor.id)}>
                 <RefreshCw size={13} /> Resend code
