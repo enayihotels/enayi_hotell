@@ -6,6 +6,7 @@ urlpatterns = [
     path("<uuid:pk>/",            views.BookingDetailView.as_view(),     name="booking-detail"),
     path("<uuid:pk>/cancel/",     views.CancelBookingView.as_view(),     name="booking-cancel"),
     path("<uuid:pk>/checkin/",    views.CheckInView.as_view(),           name="booking-checkin"),
+    path("<uuid:pk>/checkin/send-otp/", views.SendCheckinOtpView.as_view(), name="booking-checkin-send-otp"),
     path("<uuid:pk>/record-payment/", views.RecordManualPaymentView.as_view(), name="booking-record-payment"),
     path("<uuid:pk>/checkout/",   views.CheckOutView.as_view(),          name="booking-checkout"),
     path("ref/<str:ref>/",        views.BookingByReferenceView.as_view(),name="booking-by-ref"),

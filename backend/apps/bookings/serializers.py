@@ -271,3 +271,7 @@ class RecordManualPaymentSerializer(serializers.Serializer):
     amount    = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=1)
     method    = serializers.ChoiceField(choices=["cash", "pos"])
     narration = serializers.CharField(max_length=500, required=False, allow_blank=True, default="")
+
+
+class CheckInSerializer(serializers.Serializer):
+    otp_code = serializers.CharField(max_length=6, min_length=6)

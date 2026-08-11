@@ -31,6 +31,10 @@ class Booking(models.Model):
     check_out           = models.DateField()
     actual_check_in     = models.DateTimeField(blank=True, null=True)
     actual_check_out    = models.DateTimeField(blank=True, null=True)
+    checkin_otp_code       = models.CharField(max_length=6, blank=True)
+    checkin_otp_sent_at    = models.DateTimeField(blank=True, null=True)
+    checkin_otp_expires_at = models.DateTimeField(blank=True, null=True)
+    checkin_verified_via_otp = models.BooleanField(default=False)
     adults              = models.PositiveIntegerField(default=1)
     children            = models.PositiveIntegerField(default=0)
     status              = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING, db_index=True)
@@ -110,6 +114,32 @@ class Booking(models.Model):
     @property
     def is_fully_paid(self):
         return self.amount_paid >= self.total_amount
+
+    def generate_checkin_otp(self):
+        """Creates a fresh 6-digit check-in code, valid for 15 minutes.
+        Overwrites any previous unused code (resend just issues a new one).
+        """
+        code = "".join(random.choices(string.digits, k=6))
+        self.checkin_otp_code       = code
+        self.checkin_otp_sent_at    = timezone.now()
+        self.checkin_otp_expires_at = timezone.now() + timezone.timedelta(minutes=15)
+        self.save(update_fields=["checkin_otp_code", "checkin_otp_sent_at", "checkin_otp_expires_at"])
+        return code
+
+    def verify_checkin_otp(self, submitted_code: str) -> tuple[bool, str]:
+        """Returns (ok, error_message). On success, clears the code so it
+        can't be reused, and marks this check-in as guest-verified."""
+        if not self.checkin_otp_code:
+            return False, "No check-in code has been sent for this booking yet."
+        if timezone.now() > (self.checkin_otp_expires_at or timezone.now()):
+            return False, "This check-in code has expired. Send a new one."
+        if submitted_code.strip() != self.checkin_otp_code:
+            return False, "Incorrect check-in code."
+        self.checkin_otp_code         = ""
+        self.checkin_otp_expires_at   = None
+        self.checkin_verified_via_otp = True
+        self.save(update_fields=["checkin_otp_code", "checkin_otp_expires_at", "checkin_verified_via_otp"])
+        return True, ""
 
 
 class CheckoutApprovalRequest(models.Model):

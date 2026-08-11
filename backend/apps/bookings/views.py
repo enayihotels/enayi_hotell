@@ -9,6 +9,7 @@ from .serializers import (
     BookingSerializer, CreateBookingSerializer,
     CheckoutApprovalRequestSerializer, RequestCheckoutApprovalSerializer,
     DecideCheckoutApprovalSerializer, RecordManualPaymentSerializer,
+    CheckInSerializer,
 )
 
 
@@ -70,6 +71,11 @@ class CancelBookingView(APIView):
 
 
 class CheckInView(APIView):
+    """Checks a guest in — but only after they've verified themselves with
+    a one-time code sent to their registered email. This means staff alone
+    can no longer decide who's "checked in": the guest has to actually be
+    reachable at their own email and supply the code.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
@@ -78,12 +84,62 @@ class CheckInView(APIView):
         booking = get_object_or_404(Booking, pk=pk)
         if booking.status != "confirmed":
             return Response({"error": "Only confirmed bookings can be checked in."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = CheckInSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        ok, error = booking.verify_checkin_otp(serializer.validated_data["otp_code"])
+        if not ok:
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
         booking.status           = "checked_in"
         booking.actual_check_in  = timezone.now()
         booking.room.status      = "occupied"
         booking.room.save()
         booking.save()
         return Response({"message": f"Guest {booking.guest.get_full_name()} checked in to Room {booking.room.room_number}."})
+
+
+class SendCheckinOtpView(APIView):
+    """Staff triggers this when the guest arrives at the front desk. Emails
+    a fresh 6-digit code to the guest's registered address; the guest reads
+    it back to staff to prove they're the actual account holder before
+    CheckInView will accept the check-in.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+        booking = get_object_or_404(Booking, pk=pk)
+        if booking.status != "confirmed":
+            return Response({"error": "Only confirmed bookings can be sent a check-in code."}, status=status.HTTP_400_BAD_REQUEST)
+        if not booking.guest.email:
+            return Response({"error": "This guest has no email on file — a check-in code can't be sent."}, status=status.HTTP_400_BAD_REQUEST)
+
+        code = booking.generate_checkin_otp()
+
+        from .checkin_otp_email import send_checkin_otp_email
+        sent = send_checkin_otp_email(booking, code)
+        if not sent:
+            return Response({"error": "Could not send the check-in code email. Check the guest's email address and try again."}, status=status.HTTP_502_BAD_GATEWAY)
+
+        masked = _mask_email(booking.guest.email)
+        return Response({
+            "message": f"Check-in code sent to {masked}.",
+            "expires_at": booking.checkin_otp_expires_at,
+        })
+
+
+def _mask_email(email: str) -> str:
+    try:
+        name, domain = email.split("@", 1)
+        if len(name) <= 2:
+            masked_name = name[0] + "*"
+        else:
+            masked_name = name[0] + "*" * (len(name) - 2) + name[-1]
+        return f"{masked_name}@{domain}"
+    except Exception:
+        return email
 
 
 class CheckOutView(APIView):
