@@ -137,6 +137,26 @@ export interface Booking {
   updated_at: string
 }
 
+export type CheckoutApprovalStatus = 'pending' | 'approved' | 'rejected'
+
+export interface CheckoutApprovalRequest {
+  id: string
+  booking: string
+  booking_reference: string
+  guest_name: string
+  room_number: string
+  requested_by: string
+  requested_by_name: string
+  balance_due_at_request: number
+  reason: string
+  status: CheckoutApprovalStatus
+  decided_by: string | null
+  decided_by_name: string
+  decision_note: string
+  decided_at: string | null
+  created_at: string
+}
+
 // ── Orders ──────────────────────────────────────────────
 export interface MenuCategory {
   id: string
