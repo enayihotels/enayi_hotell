@@ -42,6 +42,7 @@ const AdminDashboard    = lazy(() => import('@/pages/admin/AdminDashboard'))
 const AdminRooms        = lazy(() => import('@/pages/admin/AdminRooms'))
 const AdminBookings     = lazy(() => import('@/pages/admin/AdminBookings'))
 const AdminCheckoutApprovals = lazy(() => import('@/pages/admin/AdminCheckoutApprovals'))
+const AdminFraudReports = lazy(() => import('@/pages/admin/AdminFraudReports'))
 const AdminOrders       = lazy(() => import('@/pages/admin/AdminOrders'))
 const AdminEvents       = lazy(() => import('@/pages/admin/AdminEvents'))
 const AdminGallery      = lazy(() => import('@/pages/admin/AdminGallery'))
@@ -116,6 +117,7 @@ export default function App() {
               <Route path="/admin/rooms"     element={<AdminRooms />} />
               <Route path="/admin/bookings"  element={<AdminBookings />} />
               <Route path="/admin/checkout-approvals" element={<AdminCheckoutApprovals />} />
+              <Route path="/admin/fraud-reports" element={<AdminFraudReports />} />
               <Route path="/admin/orders"    element={<AdminOrders />} />
               <Route path="/admin/events"    element={<AdminEvents />} />
               <Route path="/admin/gallery"   element={<AdminGallery />} />

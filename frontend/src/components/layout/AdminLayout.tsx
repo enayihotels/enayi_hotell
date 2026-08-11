@@ -1,5 +1,5 @@
 import { Outlet, Link, NavLink } from 'react-router-dom'
-import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
 
@@ -8,6 +8,7 @@ const ADMIN_NAV = [
   {href:'/admin/rooms',icon:BedDouble,label:'Rooms'},
   {href:'/admin/bookings',icon:CalendarDays,label:'Bookings'},
   {href:'/admin/checkout-approvals',icon:ShieldCheck,label:'Checkout Approvals',managerOnly:true},
+  {href:'/admin/fraud-reports',icon:ShieldAlert,label:'Fraud Audit',managerOnly:true},
   {href:'/admin/orders',icon:Utensils,label:'Orders'},
   {href:'/admin/events',icon:Calendar,label:'Events'},
   {href:'/admin/guests',icon:Users,label:'Guests'},

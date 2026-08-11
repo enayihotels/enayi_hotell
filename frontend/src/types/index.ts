@@ -443,6 +443,41 @@ export interface DashboardStats {
   guests: { total: number; new_this_month: number }
 }
 
+// ── Fraud Audit ──────────────────────────────────────────
+export interface FraudAuditReport {
+  id: string
+  report_date: string
+  period_start: string
+  period_end: string
+  flagged_count: number
+  raw_signals: {
+    checkout_approvals: {
+      total: number
+      approved: number
+      rejected: number
+      pending: number
+      by_staff: Record<string, number>
+      staff_with_repeat_requests: Record<string, number>
+    }
+    manual_payments: {
+      count: number
+      total_amount: number
+      by_staff: Record<string, number>
+    }
+    fast_room_turnovers: Array<{
+      room: string
+      checked_out: string
+      next_checkin: string
+      gap_minutes: number
+    }>
+    unverified_checkins: number
+  }
+  summary_text: string
+  ai_generated: boolean
+  triggered_by: 'scheduled' | 'manual'
+  created_at: string
+}
+
 // ── API helpers ─────────────────────────────────────────
 export interface PaginatedResponse<T> {
   count: number
