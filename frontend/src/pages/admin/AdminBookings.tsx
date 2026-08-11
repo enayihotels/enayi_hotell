@@ -3,9 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency, formatDate } from '@/utils/helpers'
-import { StatusBadge, PageSpinner, EmptyState, Button, Modal, Textarea, Alert } from '@/components/ui'
-import { BedDouble, LogIn, LogOut, ShieldAlert } from 'lucide-react'
+import { StatusBadge, PageSpinner, EmptyState, Button, Modal, Textarea, Alert, Input, Select } from '@/components/ui'
+import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote } from 'lucide-react'
 import type { Booking, CheckoutApprovalRequest } from '@/types'
+
+const NON_PAYABLE_STATUSES: Booking['status'][] = ['cancelled', 'checked_out', 'no_show']
 
 export default function AdminBookings() {
   const qc = useQueryClient()
@@ -14,6 +16,12 @@ export default function AdminBookings() {
   // Booking currently going through the "outstanding balance" checkout flow.
   const [pendingCheckout, setPendingCheckout] = useState<Booking | null>(null)
   const [reason, setReason] = useState('')
+
+  // Booking currently having a cash/POS payment recorded against it.
+  const [recordingPaymentFor, setRecordingPaymentFor] = useState<Booking | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'pos'>('cash')
+  const [paymentNote, setPaymentNote] = useState('')
 
   const checkIn = useMutation({
     mutationFn: (bookingId: string) => api.post(`/bookings/${bookingId}/checkin/`),
@@ -50,6 +58,19 @@ export default function AdminBookings() {
     },
   })
 
+  const recordPayment = useMutation({
+    mutationFn: (vars: { bookingId: string; amount: string; method: 'cash' | 'pos'; narration?: string }) =>
+      api.post(`/bookings/${vars.bookingId}/record-payment/`, {
+        amount: vars.amount, method: vars.method, narration: vars.narration || undefined,
+      }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['admin-bookings'] })
+      toast.success(res.data?.message || 'Payment recorded.')
+      closePaymentModal()
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
   const handleCheckoutClick = (booking: Booking) => {
     if (booking.is_fully_paid) {
       checkOut.mutate({ bookingId: booking.id })
@@ -62,6 +83,29 @@ export default function AdminBookings() {
   const confirmPendingCheckout = () => {
     if (!pendingCheckout) return
     checkOut.mutate({ bookingId: pendingCheckout.id, reason })
+  }
+
+  const openPaymentModal = (booking: Booking) => {
+    setRecordingPaymentFor(booking)
+    setPaymentAmount(String(booking.balance_due))
+    setPaymentMethod('cash')
+    setPaymentNote('')
+  }
+
+  const closePaymentModal = () => {
+    setRecordingPaymentFor(null)
+    setPaymentAmount('')
+    setPaymentNote('')
+  }
+
+  const confirmRecordPayment = () => {
+    if (!recordingPaymentFor) return
+    recordPayment.mutate({
+      bookingId: recordingPaymentFor.id,
+      amount: paymentAmount,
+      method: paymentMethod,
+      narration: paymentNote,
+    })
   }
 
   if (isLoading) return <PageSpinner />
@@ -89,21 +133,28 @@ export default function AdminBookings() {
                 </td>
                 <td className="px-4 py-3"><StatusBadge status={b.status}/></td>
                 <td className="px-4 py-3">
-                  {b.status === 'confirmed' && (
-                    <Button size="sm" variant="outline" loading={checkIn.isPending} onClick={() => checkIn.mutate(b.id)}>
-                      <LogIn size={13} /> Check In
-                    </Button>
-                  )}
-                  {b.status === 'checked_in' && (
-                    <Button
-                      size="sm"
-                      variant={b.is_fully_paid ? 'outline' : 'danger'}
-                      loading={checkOut.isPending && pendingCheckout?.id === b.id}
-                      onClick={() => handleCheckoutClick(b)}
-                    >
-                      <LogOut size={13} /> {b.is_fully_paid ? 'Check Out' : 'Check Out…'}
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {!b.is_fully_paid && !NON_PAYABLE_STATUSES.includes(b.status) && (
+                      <Button size="sm" variant="surface" onClick={() => openPaymentModal(b)}>
+                        <Banknote size={13} /> Record Payment
+                      </Button>
+                    )}
+                    {b.status === 'confirmed' && (
+                      <Button size="sm" variant="outline" loading={checkIn.isPending} onClick={() => checkIn.mutate(b.id)}>
+                        <LogIn size={13} /> Check In
+                      </Button>
+                    )}
+                    {b.status === 'checked_in' && (
+                      <Button
+                        size="sm"
+                        variant={b.is_fully_paid ? 'outline' : 'danger'}
+                        loading={checkOut.isPending && pendingCheckout?.id === b.id}
+                        onClick={() => handleCheckoutClick(b)}
+                      >
+                        <LogOut size={13} /> {b.is_fully_paid ? 'Check Out' : 'Check Out…'}
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -135,6 +186,48 @@ export default function AdminBookings() {
           </div>
         )}
       </Modal>
+
+      {/* Record a cash/POS payment collected at the front desk. */}
+      <Modal open={!!recordingPaymentFor} onClose={closePaymentModal} title="Record cash / POS payment" size="sm">
+        {recordingPaymentFor && (
+          <div className="space-y-4">
+            <Alert type="info">
+              {recordingPaymentFor.guest_name} owes <strong className="mx-1">{formatCurrency(recordingPaymentFor.balance_due)}</strong>.
+              This creates a real payment record tied to your name and completes the booking automatically once fully paid.
+            </Alert>
+            <Input
+              label="Amount received (₦)"
+              type="number"
+              min={1}
+              max={recordingPaymentFor.balance_due}
+              value={paymentAmount}
+              onChange={(e) => setPaymentAmount(e.target.value)}
+            />
+            <Select label="Method" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as 'cash' | 'pos')}>
+              <option value="cash">Cash</option>
+              <option value="pos">POS</option>
+            </Select>
+            <Textarea
+              label="Note (optional)"
+              placeholder="e.g. Full balance settled at check-in."
+              value={paymentNote}
+              onChange={(e) => setPaymentNote(e.target.value)}
+            />
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={closePaymentModal}>Cancel</Button>
+              <Button
+                variant="gold"
+                loading={recordPayment.isPending}
+                disabled={!paymentAmount || Number(paymentAmount) <= 0}
+                onClick={confirmRecordPayment}
+              >
+                Record payment
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
+
