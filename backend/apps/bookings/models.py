@@ -115,6 +115,27 @@ class Booking(models.Model):
     def is_fully_paid(self):
         return self.amount_paid >= self.total_amount
 
+    @property
+    def unpaid_orders_total(self):
+        """Sum of any Food & Bar orders tied to this booking that haven't
+        been paid yet. Cancelled orders don't count against the guest."""
+        return (self.orders
+                .filter(is_paid=False)
+                .exclude(status="cancelled")
+                .aggregate(total=models.Sum("total_amount"))["total"]) or 0
+
+    @property
+    def total_outstanding(self):
+        """Room balance PLUS any unpaid orders — this is the real amount
+        a guest owes before checkout should be allowed to complete
+        without manager approval. Using only balance_due here would miss
+        unpaid room-service/restaurant charges entirely."""
+        return self.balance_due + self.unpaid_orders_total
+
+    @property
+    def is_clear_to_checkout(self):
+        return self.total_outstanding <= 0
+
     def generate_checkin_otp(self):
         """Creates a fresh 6-digit check-in code, valid for 15 minutes.
         Overwrites any previous unused code (resend just issues a new one).

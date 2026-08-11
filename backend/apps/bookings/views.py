@@ -161,7 +161,7 @@ class CheckOutView(APIView):
         if booking.status != "checked_in":
             return Response({"error": "Guest is not checked in."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not booking.is_fully_paid:
+        if not booking.is_clear_to_checkout:
             existing = booking.checkout_approvals.filter(status=CheckoutApprovalRequest.PENDING).first()
             if existing:
                 return Response(
@@ -176,13 +176,17 @@ class CheckOutView(APIView):
             approval = CheckoutApprovalRequest.objects.create(
                 booking=booking,
                 requested_by=request.user,
-                balance_due_at_request=booking.balance_due,
+                balance_due_at_request=booking.total_outstanding,
                 reason=reason_serializer.validated_data.get("reason", ""),
+            )
+            unpaid_orders_note = (
+                f" (includes ₦{booking.unpaid_orders_total:,.2f} in unpaid Food & Bar orders)"
+                if booking.unpaid_orders_total else ""
             )
             return Response(
                 {
                     "error": (
-                        f"Guest has an outstanding balance of ₦{booking.balance_due:,.2f}. "
+                        f"Guest has an outstanding balance of ₦{booking.total_outstanding:,.2f}{unpaid_orders_note}. "
                         "Checkout requires manager approval before it can be completed."
                     ),
                     "approval_request": CheckoutApprovalRequestSerializer(approval).data,
@@ -228,6 +232,22 @@ class ApproveCheckoutView(APIView):
         approval = get_object_or_404(CheckoutApprovalRequest, pk=pk)
         if approval.status != CheckoutApprovalRequest.PENDING:
             return Response({"error": f"This request was already {approval.status}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if approval.booking.status != "checked_in":
+            # The booking already resolved through another path (e.g. the
+            # balance got cleared and staff re-ran checkout directly, or
+            # the guest was checked out/cancelled some other way) — mark
+            # this stale request superseded instead of re-running checkout
+            # side effects like loyalty points a second time.
+            approval.status        = CheckoutApprovalRequest.APPROVED if approval.booking.status == "checked_out" else CheckoutApprovalRequest.REJECTED
+            approval.decided_by    = request.user
+            approval.decision_note = f"Auto-resolved: booking status is already '{approval.booking.status}'."
+            approval.decided_at    = timezone.now()
+            approval.save()
+            return Response({
+                "message": f"This booking is already {approval.booking.status} — no action needed.",
+                "approval_request": CheckoutApprovalRequestSerializer(approval).data,
+            })
 
         decision_serializer = DecideCheckoutApprovalSerializer(data=request.data)
         decision_serializer.is_valid(raise_exception=True)

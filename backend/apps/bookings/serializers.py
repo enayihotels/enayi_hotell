@@ -11,6 +11,9 @@ class BookingSerializer(serializers.ModelSerializer):
     room_detail = serializers.SerializerMethodField()
     balance_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     is_fully_paid = serializers.BooleanField(read_only=True)
+    unpaid_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    total_outstanding    = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    is_clear_to_checkout = serializers.BooleanField(read_only=True)
 
     class Meta:
         model  = Booking
@@ -21,6 +24,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "room_rate_per_night", "total_nights", "subtotal",
             "tax_amount", "discount_amount", "total_amount",
             "amount_paid", "balance_due", "is_fully_paid",
+            "unpaid_orders_total", "total_outstanding", "is_clear_to_checkout",
             "special_requests", "breakfast_included", "airport_pickup",
             "late_checkout", "early_checkin",
             "cancellation_reason", "cancelled_at", "notes",
@@ -29,7 +33,9 @@ class BookingSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "booking_reference", "guest_name", "room_detail",
             "total_nights", "subtotal", "tax_amount", "total_amount",
-            "balance_due", "is_fully_paid", "actual_check_in", "actual_check_out",
+            "balance_due", "is_fully_paid", "unpaid_orders_total",
+            "total_outstanding", "is_clear_to_checkout",
+            "actual_check_in", "actual_check_out",
             "cancelled_at", "created_at", "updated_at",
         ]
 
