@@ -169,6 +169,8 @@ class RoomImageUploadView(APIView):
         if not images: return Response({"error":"No images."},status=400)
         created = []
         for img in images:
+            from .image_utils import optimize_image_file
+            img = optimize_image_file(img)
             ri = RoomImage.objects.create(room_category=category,image=img,caption=request.data.get("caption",""),is_primary=len(created)==0 and not category.images.filter(is_primary=True).exists())
             created.append(RoomImageSerializer(ri,context={"request":request}).data)
         return Response({"uploaded":len(created),"images":created},status=201)
@@ -327,6 +329,8 @@ class RoomPhotoListUploadView(APIView):
             return Response({"error": "No images."}, status=400)
         created = []
         for img in images:
+            from .image_utils import optimize_image_file
+            img = optimize_image_file(img)
             rp = RoomPhoto.objects.create(room=room, image=img, caption=request.data.get("caption", ""))
             created.append(RoomPhotoSerializer(rp, context={"request": request}).data)
         return Response({"uploaded": len(created), "photos": created}, status=201)

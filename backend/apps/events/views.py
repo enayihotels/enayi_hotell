@@ -120,6 +120,9 @@ class EventHallImageUploadView(APIView):
 
         for img in images:
 
+            from apps.rooms.image_utils import optimize_image_file
+            img = optimize_image_file(img)
+
             ei = EventHallImage.objects.create(
                 hall=hall,
                 image=img,

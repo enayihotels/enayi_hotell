@@ -183,6 +183,8 @@ class GalleryImageUploadView(APIView):
         created = []
 
         for img in images:
+            from apps.rooms.image_utils import optimize_image_file
+            img = optimize_image_file(img)
             gi = GalleryImage.objects.create(
                 category=category,
                 image=img,
