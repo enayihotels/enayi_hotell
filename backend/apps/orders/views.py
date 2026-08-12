@@ -2,6 +2,7 @@
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
+from django.db import transaction
 
 from rest_framework import generics, filters, status
 from rest_framework.views import APIView
@@ -115,68 +116,95 @@ class OrderListCreateView(APIView):
             except Room.DoesNotExist:
                 pass
 
-        order = Order.objects.create(
-            guest=request.user,
-            source=data["source"],
-            special_instructions=data.get(
-                "special_instructions",
-                ""
-            ),
-            room=room
-        )
+        # Auto-link this order to the guest's current stay — the same
+        # way real room service "charges it to the room" without the
+        # guest having to specify anything. Without this, orders were
+        # never tied to any booking, which meant the checkout-approval
+        # fraud check couldn't see unpaid food/drink charges at all.
+        # Prefer an active (checked-in) stay; fall back to a confirmed
+        # booking not yet checked in. A guest with neither (e.g. a
+        # walk-in restaurant customer) still gets a valid order — just
+        # with no linked booking, which is correct for that case.
+        from apps.bookings.models import Booking
+        booking = (Booking.objects
+                   .filter(guest=request.user, status="checked_in")
+                   .order_by("-actual_check_in")
+                   .first()
+                   or Booking.objects
+                   .filter(guest=request.user, status="confirmed")
+                   .order_by("-created_at")
+                   .first())
+        if booking and not room:
+            room = booking.room
 
-        total = 0
-
-        for item_data in data["items"]:
-
-            try:
-                menu_item = MenuItem.objects.get(
-                    id=item_data["menu_item"],
-                    is_available=True
+        try:
+            with transaction.atomic():
+                order = Order.objects.create(
+                    guest=request.user,
+                    booking=booking,
+                    source=data["source"],
+                    special_instructions=data.get(
+                        "special_instructions",
+                        ""
+                    ),
+                    room=room
                 )
 
-            except MenuItem.DoesNotExist:
-                order.delete()
+                total = 0
 
-                return Response(
-                    {
-                        "error": f"Menu item {item_data['menu_item']} not found or unavailable."
-                    },
-                    status=400
+                for item_data in data["items"]:
+
+                    try:
+                        menu_item = MenuItem.objects.get(
+                            id=item_data["menu_item"],
+                            is_available=True
+                        )
+
+                    except MenuItem.DoesNotExist:
+                        # Raising inside the atomic block rolls back the
+                        # whole order (and any items already created for
+                        # it) instead of leaving a broken zero-amount
+                        # record behind — the previous version's
+                        # order.delete() call here only covered THIS one
+                        # failure case; any other exception (like the tax
+                        # calculation bug that used to live below) still
+                        # left orphaned orders in the database.
+                        raise ValueError(f"Menu item {item_data['menu_item']} not found or unavailable.")
+
+                    oi = OrderItem.objects.create(
+                        order=order,
+                        menu_item=menu_item,
+                        quantity=item_data["quantity"],
+                        unit_price=menu_item.price,
+                        customizations=item_data.get(
+                            "customizations",
+                            ""
+                        )
+                    )
+
+                    total += oi.total_price
+
+                order.subtotal = total
+                order.tax = round(total * Decimal("7.5") / Decimal("100"), 2)
+                order.total_amount = (
+                    order.subtotal +
+                    order.delivery_charge +
+                    order.tax
+                )
+                order.estimated_delivery = (
+                    timezone.now() + timedelta(minutes=30)
                 )
 
-            oi = OrderItem.objects.create(
-                order=order,
-                menu_item=menu_item,
-                quantity=item_data["quantity"],
-                unit_price=menu_item.price,
-                customizations=item_data.get(
-                    "customizations",
-                    ""
+                order.save(
+                    update_fields=[
+                        "subtotal",
+                        "tax",
+                        "total_amount",
+                        "estimated_delivery"
+                    ]
                 )
-            )
-
-            total += oi.total_price
-
-        order.subtotal = total
-        order.tax = round(total * Decimal("7.5") / Decimal("100"), 2)
-        order.total_amount = (
-            order.subtotal +
-            order.delivery_charge +
-            order.tax
-        )
-        order.estimated_delivery = (
-            timezone.now() + timedelta(minutes=30)
-        )
-
-        order.save(
-            update_fields=[
-                "subtotal",
-                "tax",
-                "total_amount",
-                "estimated_delivery"
-            ]
-        )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=400)
 
         return Response(
             OrderSerializer(order).data,
