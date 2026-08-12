@@ -39,6 +39,14 @@ export interface RoomImage {
   sort_order: number
 }
 
+export interface RoomPhoto {
+  id: string
+  room: string
+  image_url: string
+  caption: string
+  uploaded_at: string
+}
+
 export interface RoomReview {
   id: string
   guest_name: string

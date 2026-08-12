@@ -5,7 +5,7 @@ import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
 import { BedDouble, DoorOpen, Plus, Pencil, Trash2, LayoutGrid, Image as ImageIcon, Upload } from 'lucide-react'
-import type { RoomCategory, Room, Amenity } from '@/types'
+import type { RoomCategory, Room, Amenity, RoomPhoto } from '@/types'
 
 const BED_TYPES = ['single','double','queen','king','twin','suite']
 const VIEW_TYPES = ['garden','city','pool','courtyard']
@@ -170,6 +170,39 @@ export default function AdminRooms() {
     setRoomModalOpen(true)
   }
 
+  // ── Individual room photo management ──
+  const [roomPhotoModalOpen, setRoomPhotoModalOpen] = useState(false)
+  const [roomPhotoTarget, setRoomPhotoTarget] = useState<Room | null>(null)
+  const [roomPhotoFiles, setRoomPhotoFiles] = useState<FileList | null>(null)
+
+  const { data: roomPhotos, isLoading: roomPhotosLoading } = useQuery<RoomPhoto[]>({
+    queryKey: ['room-photos', roomPhotoTarget?.id],
+    queryFn: () => api.get(`/rooms/list/${roomPhotoTarget!.id}/photos/`).then(r => unwrapList(r.data)),
+    enabled: roomPhotoModalOpen && !!roomPhotoTarget,
+  })
+
+  const uploadRoomPhotos = useMutation({
+    mutationFn: () => {
+      const form = new FormData()
+      if (roomPhotoFiles) Array.from(roomPhotoFiles).forEach(f => form.append('images', f))
+      return api.post(`/rooms/list/${roomPhotoTarget!.id}/photos/`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['room-photos', roomPhotoTarget?.id] })
+      toast.success(`${res.data?.uploaded ?? 0} photo(s) uploaded.`)
+      setRoomPhotoFiles(null)
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const deleteRoomPhoto = useMutation({
+    mutationFn: (photoId: string) => api.delete(`/rooms/photos/${photoId}/`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['room-photos', roomPhotoTarget?.id] }); toast.success('Photo deleted.') },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const openRoomPhotoModal = (r: Room) => { setRoomPhotoTarget(r); setRoomPhotoFiles(null); setRoomPhotoModalOpen(true) }
+
   if (catsLoading || roomsLoading) return <PageSpinner />
 
   return (
@@ -238,8 +271,9 @@ export default function AdminRooms() {
                 </div>
                 <div className="text-enayi-gold font-semibold text-sm">{formatCurrency(Number(r.current_price))}<span className="text-enayi-muted text-xs font-normal"> / night</span></div>
                 <div className="text-enayi-muted text-xs capitalize">{r.view_type} view{r.is_smoking ? ' · Smoking' : ''}{r.has_balcony ? ' · Balcony' : ''}</div>
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-2 flex-wrap">
                   <Button size="sm" variant="outline" onClick={() => openEditRoom(r)}><Pencil size={12} /> Edit</Button>
+                  <Button size="sm" variant="surface" onClick={() => openRoomPhotoModal(r)}><ImageIcon size={12} /> Photos</Button>
                   <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete Room ${r.room_number}?`)) deleteRoom.mutate(r.id) }}><Trash2 size={12} /> Delete</Button>
                 </div>
               </div>
@@ -378,6 +412,47 @@ export default function AdminRooms() {
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={() => setPhotoModalOpen(false)}>Close</Button>
               <Button variant="gold" loading={uploadPhotos.isPending} onClick={() => uploadPhotos.mutate()} disabled={!photoFiles?.length}>
+                Upload
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Individual room photo modal ── */}
+      <Modal open={roomPhotoModalOpen} onClose={() => setRoomPhotoModalOpen(false)} title={`Photos — Room ${roomPhotoTarget?.room_number ?? ''}`} size="md">
+        {roomPhotoTarget && (
+          <div className="space-y-4">
+            <p className="text-enayi-muted text-xs">
+              Photos of this specific physical room — for staff reference (condition, housekeeping notes), separate from the category's marketing photos guests see when browsing.
+            </p>
+            {roomPhotosLoading ? (
+              <div className="text-enayi-muted text-sm text-center py-6">Loading…</div>
+            ) : (roomPhotos?.length ?? 0) === 0 ? (
+              <div className="text-enayi-muted text-sm text-center py-6">No photos yet.</div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {roomPhotos!.map(photo => (
+                  <div key={photo.id} className="relative group">
+                    <img src={photo.image_url} alt={photo.caption} className="w-full aspect-square object-cover rounded-lg" />
+                    <button
+                      onClick={() => { if (confirm('Delete this photo?')) deleteRoomPhoto.mutate(photo.id) }}
+                      className="absolute top-1 right-1 bg-red-500/90 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="flex flex-col items-center justify-center gap-2 border border-dashed border-enayi-border rounded-lg p-5 cursor-pointer text-center hover:border-enayi-gold/40 transition-colors">
+              <Upload size={18} className="text-enayi-muted" />
+              <span className="text-xs text-enayi-muted">{roomPhotoFiles?.length ? `${roomPhotoFiles.length} file(s) selected` : 'Choose one or more photos'}</span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={e => setRoomPhotoFiles(e.target.files)} />
+            </label>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setRoomPhotoModalOpen(false)}>Close</Button>
+              <Button variant="gold" loading={uploadRoomPhotos.isPending} onClick={() => uploadRoomPhotos.mutate()} disabled={!roomPhotoFiles?.length}>
                 Upload
               </Button>
             </div>
