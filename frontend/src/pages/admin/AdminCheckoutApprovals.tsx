@@ -15,7 +15,7 @@ export default function AdminCheckoutApprovals() {
 
   const { data, isLoading } = useQuery<CheckoutApprovalRequest[]>({
     queryKey: ['checkout-approvals'],
-    queryFn: () => api.get('/bookings/checkout-approvals/').then(r => r.data),
+    queryFn: () => api.get('/bookings/checkout-approvals/').then(r => r.data?.results ?? r.data),
     enabled: isManagerOrAdmin,
   })
 
