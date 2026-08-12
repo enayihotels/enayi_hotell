@@ -148,6 +148,22 @@ class EventHallImageUploadView(APIView):
         )
 
 
+class EventHallImageDeleteView(APIView):
+    """DELETE /api/v1/events/halls/images/<uuid:pk>/ — staff-only."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Permission denied."}, status=403)
+        try:
+            image = EventHallImage.objects.get(id=pk)
+        except EventHallImage.DoesNotExist:
+            return Response({"error": "Not found."}, status=404)
+        image.image.delete(save=False)
+        image.delete()
+        return Response(status=204)
+
+
 class EventBookingListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 

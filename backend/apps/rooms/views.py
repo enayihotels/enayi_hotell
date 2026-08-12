@@ -161,6 +161,22 @@ class RoomImageUploadView(APIView):
             created.append(RoomImageSerializer(ri,context={"request":request}).data)
         return Response({"uploaded":len(created),"images":created},status=201)
 
+
+class RoomImageDeleteView(APIView):
+    """DELETE /api/v1/rooms/images/<uuid:pk>/ — staff-only."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Permission denied."}, status=403)
+        try:
+            image = RoomImage.objects.get(id=pk)
+        except RoomImage.DoesNotExist:
+            return Response({"error": "Not found."}, status=404)
+        image.image.delete(save=False)
+        image.delete()
+        return Response(status=204)
+
 class RoomReviewListCreateView(generics.ListCreateAPIView):
     serializer_class = RoomReviewSerializer
     def get_permissions(self): return [AllowAny()] if self.request.method=="GET" else [IsAuthenticated()]

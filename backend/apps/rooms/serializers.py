@@ -109,6 +109,8 @@ class RoomCategorySerializer(serializers.ModelSerializer):
 
 
 class RoomCategoryWriteSerializer(serializers.ModelSerializer):
+    amenities = serializers.PrimaryKeyRelatedField(many=True, queryset=Amenity.objects.all(), required=False)
+
     class Meta:
         model  = RoomCategory
         fields = [
@@ -116,7 +118,7 @@ class RoomCategoryWriteSerializer(serializers.ModelSerializer):
             "base_price", "weekend_price", "holiday_price",
             "max_adults", "max_children", "bed_type", "num_beds", "room_size_sqm",
             "num_bathrooms", "has_living_room", "has_kitchen", "has_balcony",
-            "is_active", "sort_order",
+            "is_active", "sort_order", "amenities",
         ]
 
 
