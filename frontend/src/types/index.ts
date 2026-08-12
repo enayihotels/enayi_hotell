@@ -272,6 +272,8 @@ export interface EventHall {
   has_dance_floor: boolean
   has_parking: boolean
   images: EventHallImage[]
+  is_active: boolean
+  sort_order: number
 }
 
 export type EventStatus = 'pending' | 'confirmed' | 'deposit_paid' | 'fully_paid' | 'completed' | 'cancelled'
@@ -388,7 +390,26 @@ export interface GalleryCategory {
   slug: string
   category_type: string
   description: string
+  is_active: boolean
+  sort_order: number
   image_count: number
+}
+
+export interface AdminPayment {
+  id: string
+  transaction_reference: string
+  guest_name: string
+  guest_email: string | null
+  purpose: string
+  method: PaymentMethod
+  gateway: string
+  amount: number
+  currency: string
+  status: PaymentStatus
+  narration: string
+  verified_at?: string
+  created_at: string
+  metadata: Record<string, any>
 }
 
 export interface GalleryImage {
