@@ -1,7 +1,9 @@
 from django.urls import path
 from . import views
 urlpatterns = [
-    path("amenities/", views.AmenityListCreateView.as_view(), name="amenities"),    path("categories/",                       views.RoomCategoryListView.as_view(),   name="room-categories"),
+    path("amenities/", views.AmenityListCreateView.as_view(), name="amenities"),
+    path("amenities/<uuid:pk>/", views.AmenityDetailView.as_view(), name="amenity-detail"),
+    path("categories/",                       views.RoomCategoryListView.as_view(),   name="room-categories"),
     path("categories/<slug:slug>/",           views.RoomCategoryDetailView.as_view(), name="room-category-detail"),
     path("categories/<uuid:cat_id>/images/",  views.RoomImageUploadView.as_view(),    name="room-images-upload"),
     path("images/<uuid:pk>/",  views.RoomImageDeleteView.as_view(),    name="room-image-delete"),

@@ -21,6 +21,45 @@ class AmenityListCreateView(generics.ListCreateAPIView):
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
 
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        return super().create(request, *args, **kwargs)
+
+
+class AmenityDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Public GET; staff-only PATCH/DELETE."""
+    queryset = Amenity.objects.all()
+    serializer_class = AmenitySerializer
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        instance = self.get_object()
+        from django.db.models import ProtectedError
+        try:
+            instance.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This amenity is assigned to one or more room categories. Remove it from those categories first."},
+                status=400,
+            )
+        except Exception:
+            # Amenity<->RoomCategory is a plain M2M, not a FK, so deleting an
+            # amenity that's in use just cleanly removes it from those
+            # categories automatically — no ProtectedError possible here in
+            # practice, but keep the guard for safety if that ever changes.
+            return Response({"error": "Could not delete this amenity."}, status=400)
+        return Response(status=204)
+
 class RoomCategoryListView(generics.ListCreateAPIView):
     """Public GET (guests browsing rooms); staff-only POST to add a new
     room category/type. Was list-only before — RoomCategoryWriteSerializer
