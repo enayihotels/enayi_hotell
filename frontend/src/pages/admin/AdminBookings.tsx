@@ -184,62 +184,104 @@ export default function AdminBookings() {
 
   if (isLoading) return <PageSpinner />
 
+  const BookingActions = ({ b }: { b: Booking }) => (
+    <div className="flex flex-wrap gap-1.5">
+      {!b.is_fully_paid && !NON_PAYABLE_STATUSES.includes(b.status) && (
+        <Button size="sm" variant="surface" onClick={() => openPaymentModal(b)}>
+          <Banknote size={13} /> Record Payment
+        </Button>
+      )}
+      {b.status === 'confirmed' && (
+        <Button size="sm" variant="outline" onClick={() => openCheckinModal(b)}>
+          <LogIn size={13} /> Check In
+        </Button>
+      )}
+      {b.status === 'checked_in' && (
+        <Button
+          size="sm"
+          variant={b.is_clear_to_checkout ? 'outline' : 'danger'}
+          loading={checkOut.isPending && pendingCheckout?.id === b.id}
+          onClick={() => handleCheckoutClick(b)}
+        >
+          <LogOut size={13} /> {b.is_clear_to_checkout ? 'Check Out' : 'Check Out…'}
+        </Button>
+      )}
+    </div>
+  )
+
   return (
     <div className="p-4 md:p-6 space-y-5">
       <div><h1 className="font-display text-2xl md:text-3xl text-enayi-text">All Bookings</h1><p className="text-enayi-muted text-sm">{data?.length??0} total</p></div>
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-enayi-panel border-b border-enayi-border"><tr>{['Reference','Guest','Room','Check-in','Check-out','Amount','Balance','Status','Actions'].map(h=><th key={h} className="text-left px-4 py-3 text-enayi-muted text-xs font-semibold">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-enayi-border">
-            {(data||[]).length===0 ? <tr><td colSpan={9} className="text-center py-12 text-enayi-muted"><EmptyState icon={BedDouble} title="No bookings found" /></td></tr>
-            : (data||[]).map(b=>(
-              <tr key={b.id} className="hover:bg-enayi-panel transition-colors">
-                <td className="px-4 py-3 font-mono text-xs text-enayi-gold">{b.booking_reference}</td>
-                <td className="px-4 py-3 text-enayi-text">{b.guest_name}</td>
-                <td className="px-4 py-3 text-enayi-muted">{b.room_detail?.room_number ?? '—'}</td>
-                <td className="px-4 py-3 text-enayi-muted">{formatDate(b.check_in)}</td>
-                <td className="px-4 py-3 text-enayi-muted">{formatDate(b.check_out)}</td>
-                <td className="px-4 py-3 text-enayi-gold font-semibold">{formatCurrency(b.total_amount)}</td>
-                <td className="px-4 py-3">
-                  {b.is_fully_paid
-                    ? <span className="text-green-400 text-xs">Paid</span>
-                    : <span className="text-red-400 text-xs font-semibold">{formatCurrency(b.balance_due)} due</span>}
-                  {b.unpaid_orders_total > 0 && (
-                    <div className="text-amber-400 text-[11px] mt-0.5">+{formatCurrency(b.unpaid_orders_total)} unpaid orders</div>
-                  )}
-                </td>
-                <td className="px-4 py-3"><StatusBadge status={b.status}/></td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1.5">
-                    {!b.is_fully_paid && !NON_PAYABLE_STATUSES.includes(b.status) && (
-                      <Button size="sm" variant="surface" onClick={() => openPaymentModal(b)}>
-                        <Banknote size={13} /> Record Payment
-                      </Button>
-                    )}
-                    {b.status === 'confirmed' && (
-                      <Button size="sm" variant="outline" onClick={() => openCheckinModal(b)}>
-                        <LogIn size={13} /> Check In
-                      </Button>
-                    )}
-                    {b.status === 'checked_in' && (
-                      <Button
-                        size="sm"
-                        variant={b.is_clear_to_checkout ? 'outline' : 'danger'}
-                        loading={checkOut.isPending && pendingCheckout?.id === b.id}
-                        onClick={() => handleCheckoutClick(b)}
-                      >
-                        <LogOut size={13} /> {b.is_clear_to_checkout ? 'Check Out' : 'Check Out…'}
-                      </Button>
-                    )}
+
+      {(data||[]).length===0 ? (
+        <div className="card p-12 text-center text-enayi-muted"><EmptyState icon={BedDouble} title="No bookings found" /></div>
+      ) : (
+        <>
+          {/* Mobile: stacked cards — a wide table forced to scroll sideways is a bad
+              phone experience, so below md we show each booking as a card instead. */}
+          <div className="md:hidden space-y-3">
+            {(data||[]).map(b => (
+              <div key={b.id} className="card p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="font-mono text-xs text-enayi-gold">{b.booking_reference}</div>
+                    <div className="text-enayi-text font-medium">{b.guest_name}</div>
                   </div>
-                </td>
-              </tr>
+                  <StatusBadge status={b.status} />
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                  <div><div className="text-enayi-muted text-[11px] uppercase">Room</div><div className="text-enayi-text">{b.room_detail?.room_number ?? '—'}</div></div>
+                  <div><div className="text-enayi-muted text-[11px] uppercase">Amount</div><div className="text-enayi-gold font-semibold">{formatCurrency(b.total_amount)}</div></div>
+                  <div><div className="text-enayi-muted text-[11px] uppercase">Check-in</div><div className="text-enayi-text">{formatDate(b.check_in)}</div></div>
+                  <div><div className="text-enayi-muted text-[11px] uppercase">Check-out</div><div className="text-enayi-text">{formatDate(b.check_out)}</div></div>
+                </div>
+                <div>
+                  <div className="text-enayi-muted text-[11px] uppercase">Balance</div>
+                  {b.is_fully_paid
+                    ? <span className="text-green-400 text-sm">Paid</span>
+                    : <span className="text-red-400 text-sm font-semibold">{formatCurrency(b.balance_due)} due</span>}
+                  {b.unpaid_orders_total > 0 && (
+                    <div className="text-amber-400 text-xs mt-0.5">+{formatCurrency(b.unpaid_orders_total)} unpaid orders</div>
+                  )}
+                </div>
+                <div className="pt-1 border-t border-enayi-border" />
+                <BookingActions b={b} />
+              </div>
             ))}
-          </tbody>
-        </table>
-        </div>
-      </div>
+          </div>
+
+          {/* Desktop: full table. */}
+          <div className="hidden md:block card overflow-hidden">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-enayi-panel border-b border-enayi-border"><tr>{['Reference','Guest','Room','Check-in','Check-out','Amount','Balance','Status','Actions'].map(h=><th key={h} className="text-left px-4 py-3 text-enayi-muted text-xs font-semibold">{h}</th>)}</tr></thead>
+              <tbody className="divide-y divide-enayi-border">
+                {(data||[]).map(b=>(
+                  <tr key={b.id} className="hover:bg-enayi-panel transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-enayi-gold">{b.booking_reference}</td>
+                    <td className="px-4 py-3 text-enayi-text">{b.guest_name}</td>
+                    <td className="px-4 py-3 text-enayi-muted">{b.room_detail?.room_number ?? '—'}</td>
+                    <td className="px-4 py-3 text-enayi-muted">{formatDate(b.check_in)}</td>
+                    <td className="px-4 py-3 text-enayi-muted">{formatDate(b.check_out)}</td>
+                    <td className="px-4 py-3 text-enayi-gold font-semibold">{formatCurrency(b.total_amount)}</td>
+                    <td className="px-4 py-3">
+                      {b.is_fully_paid
+                        ? <span className="text-green-400 text-xs">Paid</span>
+                        : <span className="text-red-400 text-xs font-semibold">{formatCurrency(b.balance_due)} due</span>}
+                      {b.unpaid_orders_total > 0 && (
+                        <div className="text-amber-400 text-[11px] mt-0.5">+{formatCurrency(b.unpaid_orders_total)} unpaid orders</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3"><StatusBadge status={b.status}/></td>
+                    <td className="px-4 py-3"><BookingActions b={b} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Confirmation for underpaid checkout — makes clear this won't complete instantly. */}
       <Modal open={!!pendingCheckout} onClose={() => { setPendingCheckout(null); setReason('') }} title="Outstanding balance" size="sm">
