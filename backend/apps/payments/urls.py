@@ -7,6 +7,7 @@ urlpatterns = [
     path("initiate/",               views.InitiatePaymentView.as_view(),    name="payment-initiate"),
     path("verify/<str:reference>/", views.VerifyPaymentView.as_view(),      name="payment-verify"),
     path("history/",                views.PaymentHistoryView.as_view(),     name="payment-history"),
+    path("admin/",                  views.AdminPaymentListView.as_view(),   name="payment-admin-list"),
     path("ussd-banks/",             views.USSDBanksView.as_view(),          name="ussd-banks"),
 
     # ── Webhooks (AllowAny — signature-verified inside each view) ────────────

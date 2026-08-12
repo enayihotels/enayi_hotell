@@ -30,7 +30,7 @@ class EventHallSerializer(serializers.ModelSerializer):
             "deposit_percent",
             "has_projector", "has_sound_system", "has_microphone", "has_wifi",
             "has_ac", "has_stage", "has_dance_floor", "has_parking",
-            "images",
+            "images", "is_active", "sort_order",
         ]
 
 

@@ -889,6 +889,33 @@ class PaymentHistoryView(APIView):
         return Response(PaymentSerializer(payments, many=True).data)
 
 
+class AdminPaymentListView(APIView):
+    """GET /api/v1/payments/admin/ — staff-only, all payments across all guests.
+    Optional filters: ?status=success&method=cash&purpose=booking
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+
+        from .serializers import AdminPaymentSerializer
+
+        qs = Payment.objects.select_related("guest").order_by("-created_at")
+        status_filter = request.query_params.get("status")
+        method_filter = request.query_params.get("method")
+        purpose_filter = request.query_params.get("purpose")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if method_filter:
+            qs = qs.filter(method=method_filter)
+        if purpose_filter:
+            qs = qs.filter(purpose=purpose_filter)
+
+        qs = qs[:500]  # sane upper bound for an admin dashboard list
+        return Response(AdminPaymentSerializer(qs, many=True).data)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # USSD Bank List
 # ─────────────────────────────────────────────────────────────────────────────

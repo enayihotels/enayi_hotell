@@ -17,37 +17,74 @@ from .serializers import (
 )
 
 
-class EventHallListView(generics.ListAPIView):
+class EventHallListView(generics.ListCreateAPIView):
+    """Public GET for guests browsing halls; staff-only POST to add a new hall."""
     permission_classes = [AllowAny]
-    serializer_class = EventHallSerializer
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        return EventHallSerializer
 
     def get_queryset(self):
-        return EventHall.objects.filter(
-            is_active=True
-        ).prefetch_related(
-            "images"
-        ).order_by(
-            "sort_order"
-        )
+        qs = EventHall.objects.prefetch_related("images").order_by("sort_order")
+        if self.request.method == "GET" and not (self.request.user.is_authenticated and self.request.user.is_hotel_staff):
+            qs = qs.filter(is_active=True)
+        return qs
 
-    def get_serializer_context(self):
-        return {"request": self.request}
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        from django.utils.text import slugify
+        data = request.data.copy()
+        if not data.get("slug") and data.get("name"):
+            data["slug"] = slugify(data["name"])
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        hall = serializer.save()
+        return Response(EventHallSerializer(hall).data, status=201)
 
 
-class EventHallDetailView(generics.RetrieveAPIView):
-    permission_classes = [AllowAny]
+class EventHallDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Public GET by slug; staff-only PATCH/DELETE."""
     serializer_class = EventHallSerializer
     lookup_field = "slug"
 
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
     def get_queryset(self):
-        return EventHall.objects.filter(
-            is_active=True
-        ).prefetch_related(
-            "images"
-        )
+        qs = EventHall.objects.prefetch_related("images")
+        if self.request.method == "GET" and not (self.request.user.is_authenticated and self.request.user.is_hotel_staff):
+            qs = qs.filter(is_active=True)
+        return qs
 
     def get_serializer_context(self):
         return {"request": self.request}
+
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        hall = serializer.save()
+        return Response(EventHallSerializer(hall).data)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        instance = self.get_object()
+        from django.db.models import ProtectedError
+        try:
+            instance.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This hall has bookings on record. Set it to inactive instead of deleting."},
+                status=400,
+            )
+        return Response(status=204)
 
 
 class EventHallImageUploadView(APIView):
@@ -366,6 +403,28 @@ class EventBookingDetailView(generics.RetrieveAPIView):
         ).select_related(
             "hall"
         )
+
+
+class EventBookingStatusUpdateView(APIView):
+    """PATCH /api/v1/events/bookings/<uuid:pk>/status/ — staff-only. Lets a
+    manager move a booking through PENDING -> CONFIRMED -> DEPOSIT_PAID ->
+    FULLY_PAID -> COMPLETED, or CANCELLED at any point."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+
+        from django.shortcuts import get_object_or_404
+        booking = get_object_or_404(EventBooking, pk=pk)
+        new_status = request.data.get("status")
+        valid_statuses = dict(EventBooking.STATUS_CHOICES)
+        if new_status not in valid_statuses:
+            return Response({"error": f"Invalid status. Choose from: {', '.join(valid_statuses)}"}, status=400)
+
+        booking.status = new_status
+        booking.save(update_fields=["status"])
+        return Response(EventBookingSerializer(booking).data)
 
 
 class EventAvailabilityView(APIView):

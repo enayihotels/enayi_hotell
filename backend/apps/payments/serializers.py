@@ -34,6 +34,25 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class AdminPaymentSerializer(serializers.ModelSerializer):
+    """Same as PaymentSerializer, plus who the payment belongs to — for the
+    staff-only admin payments list, which spans every guest."""
+    guest_name  = serializers.SerializerMethodField()
+    guest_email = serializers.CharField(source="guest.email", read_only=True, default=None)
+
+    class Meta:
+        model  = Payment
+        fields = [
+            "id", "transaction_reference", "guest_name", "guest_email",
+            "purpose", "method", "gateway", "amount", "currency", "status",
+            "narration", "verified_at", "created_at", "metadata",
+        ]
+        read_only_fields = fields
+
+    def get_guest_name(self, obj):
+        return obj.guest.get_full_name() if obj.guest_id else "—"
+
+
 class InitiatePaymentSerializer(serializers.Serializer):
     PURPOSE_CHOICES = [
         ("booking", "Booking"),

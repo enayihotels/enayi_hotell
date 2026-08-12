@@ -10,14 +10,65 @@ from .models import GalleryCategory, GalleryImage
 from .serializers import GalleryCategorySerializer, GalleryImageSerializer
 
 
-class GalleryCategoryListView(generics.ListAPIView):
+class GalleryCategoryListView(generics.ListCreateAPIView):
+    """Public GET; staff-only POST to add a new category."""
     permission_classes = [AllowAny]
-    serializer_class = GalleryCategorySerializer
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        return GalleryCategorySerializer
 
     def get_queryset(self):
-        return GalleryCategory.objects.filter(
-            is_active=True
-        ).order_by("sort_order")
+        qs = GalleryCategory.objects.order_by("sort_order")
+        if self.request.method == "GET" and not (self.request.user.is_authenticated and self.request.user.is_hotel_staff):
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        from django.utils.text import slugify
+        data = request.data.copy()
+        if not data.get("slug") and data.get("name"):
+            data["slug"] = slugify(data["name"])
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save()
+        return Response(GalleryCategorySerializer(category).data, status=201)
+
+
+class GalleryCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Public GET by pk; staff-only PATCH/DELETE."""
+    serializer_class = GalleryCategorySerializer
+    queryset = GalleryCategory.objects.all()
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save()
+        return Response(GalleryCategorySerializer(category).data)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        instance = self.get_object()
+        from django.db.models import ProtectedError
+        try:
+            instance.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This category has images in it. Delete or reassign those images first, or set it to inactive instead."},
+                status=400,
+            )
+        return Response(status=204)
 
 
 class GalleryImageListView(generics.ListAPIView):
