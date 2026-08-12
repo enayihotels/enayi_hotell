@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
-import { CalendarDays, Building2, Plus, Pencil, Trash2 } from 'lucide-react'
+import { CalendarDays, Building2, Plus, Pencil, Trash2, Image as ImageIcon, Upload } from 'lucide-react'
 import type { EventHall, EventBooking, EventStatus } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
@@ -67,6 +67,34 @@ export default function AdminEvents() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-event-bookings'] }); toast.success('Booking status updated.') },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
+
+  // ── Photo management modal state ──
+  const [photoModalOpen, setPhotoModalOpen] = useState(false)
+  const [photoHall, setPhotoHall] = useState<EventHall | null>(null)
+  const [photoFiles, setPhotoFiles] = useState<FileList | null>(null)
+
+  const uploadPhotos = useMutation({
+    mutationFn: () => {
+      const form = new FormData()
+      if (photoFiles) Array.from(photoFiles).forEach(f => form.append('images', f))
+      return api.post(`/events/halls/${photoHall!.id}/images/`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['admin-event-halls'] })
+      toast.success(`${res.data?.uploaded ?? 0} photo(s) uploaded.`)
+      setPhotoFiles(null)
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const deletePhoto = useMutation({
+    mutationFn: (imageId: string) => api.delete(`/events/halls/images/${imageId}/`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-event-halls'] }); toast.success('Photo deleted.') },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const openPhotoModal = (h: EventHall) => { setPhotoHall(h); setPhotoFiles(null); setPhotoModalOpen(true) }
+  const livePhotoHall = halls?.find(h => h.id === photoHall?.id) ?? photoHall
 
   const openNewHall = () => { setEditingHall(null); setHallForm(emptyHallForm); setHallModalOpen(true) }
   const openEditHall = (h: EventHall) => {
@@ -153,8 +181,9 @@ export default function AdminEvents() {
                 </div>
                 <div className="text-enayi-gold font-semibold text-sm">{formatCurrency(h.price_full_day)}<span className="text-enayi-muted text-xs font-normal"> / full day</span></div>
                 <div className="text-enayi-muted text-xs">Seated {h.capacity_seated} · Cocktail {h.capacity_cocktail} · {h.size_sqm}m²</div>
-                <div className="flex gap-2 pt-1">
+                <div className="flex gap-2 pt-1 flex-wrap">
                   <Button size="sm" variant="outline" onClick={() => openEditHall(h)}><Pencil size={12} /> Edit</Button>
+                  <Button size="sm" variant="surface" onClick={() => openPhotoModal(h)}><ImageIcon size={12} /> Photos ({h.images?.length ?? 0})</Button>
                   <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${h.name}"?`)) deleteHall.mutate(h.slug) }}><Trash2 size={12} /> Delete</Button>
                 </div>
               </div>
@@ -195,6 +224,43 @@ export default function AdminEvents() {
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* ── Photo management modal ── */}
+      <Modal open={photoModalOpen} onClose={() => setPhotoModalOpen(false)} title={`Photos — ${livePhotoHall?.name ?? ''}`} size="md">
+        {livePhotoHall && (
+          <div className="space-y-4">
+            {(livePhotoHall.images?.length ?? 0) === 0 ? (
+              <div className="text-enayi-muted text-sm text-center py-6">No photos yet.</div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {livePhotoHall.images!.map(img => (
+                  <div key={img.id} className="relative group">
+                    <img src={img.image_url} alt={img.caption} className="w-full aspect-square object-cover rounded-lg" />
+                    {img.is_primary && <span className="absolute top-1 left-1 badge-gold text-[10px] px-1.5 py-0.5">Primary</span>}
+                    <button
+                      onClick={() => { if (confirm('Delete this photo?')) deletePhoto.mutate(img.id) }}
+                      className="absolute top-1 right-1 bg-red-500/90 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="flex flex-col items-center justify-center gap-2 border border-dashed border-enayi-border rounded-lg p-5 cursor-pointer text-center hover:border-enayi-gold/40 transition-colors">
+              <Upload size={18} className="text-enayi-muted" />
+              <span className="text-xs text-enayi-muted">{photoFiles?.length ? `${photoFiles.length} file(s) selected` : 'Choose one or more photos'}</span>
+              <input type="file" accept="image/*" multiple className="hidden" onChange={e => setPhotoFiles(e.target.files)} />
+            </label>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setPhotoModalOpen(false)}>Close</Button>
+              <Button variant="gold" loading={uploadPhotos.isPending} onClick={() => uploadPhotos.mutate()} disabled={!photoFiles?.length}>
+                Upload
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )
