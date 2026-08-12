@@ -121,7 +121,7 @@ export default function EventBookingPage() {
                   <input {...register('expected_guests', { required: true, min: 1 })} type="number" className="input" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="form-group">
                   <label className="label">Event Date</label>
                   <input {...register('event_date', { required: true })} type="date" className="input" min={today()} />

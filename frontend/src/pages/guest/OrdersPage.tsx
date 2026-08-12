@@ -31,8 +31,8 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="font-display text-3xl text-enayi-text">Food & Bar</h1><p className="text-enayi-muted text-sm mt-1">Order from our kitchen and bar — delivered to you</p></div>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div><h1 className="font-display text-2xl md:text-3xl text-enayi-text">Food & Bar</h1><p className="text-enayi-muted text-sm mt-1">Order from our kitchen and bar — delivered to you</p></div>
         <div className="flex gap-2">
           <button onClick={()=>setView('menu')} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${view==='menu'?'bg-enayi-gold text-enayi-bg':'card text-enayi-muted'}`}>Menu</button>
           <button onClick={()=>setView('orders')} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${view==='orders'?'bg-enayi-gold text-enayi-bg':'card text-enayi-muted'}`}>My Orders</button>

@@ -27,8 +27,8 @@ export default function MyBookingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="font-display text-3xl text-enayi-text">My Bookings</h1><p className="text-enayi-muted text-sm mt-1">{bookings?.length ?? 0} total bookings</p></div>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div><h1 className="font-display text-2xl md:text-3xl text-enayi-text">My Bookings</h1><p className="text-enayi-muted text-sm mt-1">{bookings?.length ?? 0} total bookings</p></div>
         <Link to="/book" className="btn-gold gap-2 text-sm">New Booking <ArrowRight size={14}/></Link>
       </div>
       <div className="flex gap-2 flex-wrap">

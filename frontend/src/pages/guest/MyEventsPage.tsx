@@ -16,9 +16,9 @@ export default function MyEventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-3xl text-enayi-text">My Events</h1>
+          <h1 className="font-display text-2xl md:text-3xl text-enayi-text">My Events</h1>
           <p className="text-enayi-muted text-sm mt-1">{events?.length ?? 0} event bookings</p>
         </div>
         <Link to="/events/book" className="btn-gold gap-2 text-sm">
