@@ -1,6 +1,5 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/utils/api'
@@ -20,10 +19,7 @@ const NAV = [
 
 type UserLite = { first_name?: string; full_name?: string; role?: string } | null
 
-// IMPORTANT: defined OUTSIDE DashboardLayout on purpose — same fix as
-// AdminLayout. Declaring this inside the component body created a new
-// component type on every render, causing React to remount the sidebar
-// mid-animation and breaking the mobile drawer's backdrop tap-to-close.
+// Defined outside DashboardLayout on purpose — stable, module-level component.
 function GuestSidebarContent({ collapsed, user, onNavigate, onLogout }: {
   collapsed: boolean
   user: UserLite
@@ -74,26 +70,29 @@ export default function DashboardLayout() {
       <div className={cn('hidden md:flex flex-col flex-shrink-0 h-full transition-all duration-300', collapsed ? 'w-16' : 'w-60')}>
         <GuestSidebarContent collapsed={collapsed} user={user} onNavigate={closeDrawer} onLogout={handleLogout} />
       </div>
-      <AnimatePresence>
-        {mobileOpen && (
-          <>
-            <motion.div
-              key="guest-drawer-backdrop"
-              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-              className="fixed inset-0 z-40 bg-black/60 md:hidden"
-              onClick={closeDrawer}
-            />
-            <motion.div
-              key="guest-drawer-panel"
-              initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}}
-              transition={{type:'spring',damping:25,stiffness:300}}
-              className="fixed left-0 top-0 bottom-0 z-50 w-72 md:hidden flex flex-col"
-            >
-              <GuestSidebarContent collapsed={false} user={user} onNavigate={closeDrawer} onLogout={handleLogout} />
-            </motion.div>
-          </>
+
+      {/* Mobile drawer — always rendered below md, visibility toggled purely
+          via CSS transform/opacity (no Framer Motion mount/unmount). The
+          previous AnimatePresence-based version could have its exit
+          animation interrupted by a same-render-pass route change, leaving
+          the drawer visually stuck open even though state was correctly
+          false and the page underneath had already updated. */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/60 md:hidden transition-opacity duration-300',
+          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}
-      </AnimatePresence>
+        onClick={closeDrawer}
+      />
+      <div
+        className={cn(
+          'fixed left-0 top-0 bottom-0 z-50 w-72 md:hidden flex flex-col transition-transform duration-300 ease-out',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <GuestSidebarContent collapsed={false} user={user} onNavigate={closeDrawer} onLogout={handleLogout} />
+      </div>
+
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="flex items-center justify-between px-4 md:px-8 h-16 bg-enayi-surface border-b border-enayi-border flex-shrink-0">
           <div className="flex items-center gap-3">

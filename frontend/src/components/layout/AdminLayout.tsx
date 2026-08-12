@@ -1,6 +1,5 @@
 import { Outlet, Link, NavLink } from 'react-router-dom'
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
@@ -18,13 +17,8 @@ const ADMIN_NAV = [
   {href:'/admin/payments',icon:CreditCard,label:'Payments'},
 ]
 
-// IMPORTANT: this is defined OUTSIDE AdminLayout on purpose. Defining it
-// inside the component body (as `const SidebarContent = () => (...)`)
-// creates a brand-new component type on every render, which made React
-// remount the whole sidebar subtree constantly — including mid-animation
-// while the mobile drawer was opening/closing — and broke the backdrop's
-// tap-to-close behavior. A stable, module-level component with props
-// fixes that at the root instead of patching around the symptom.
+// Defined outside AdminLayout on purpose — a stable, module-level component
+// so React never treats it as a brand-new type on re-render.
 function AdminSidebarContent({ visibleNav, onNavigate }: {
   visibleNav: typeof ADMIN_NAV
   onNavigate: () => void
@@ -69,27 +63,30 @@ export default function AdminLayout() {
         <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} />
       </div>
 
-      {/* Mobile sidebar — slide-in drawer, only when toggled */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <>
-            <motion.div
-              key="admin-drawer-backdrop"
-              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-              className="fixed inset-0 z-40 bg-black/60 md:hidden"
-              onClick={closeDrawer}
-            />
-            <motion.div
-              key="admin-drawer-panel"
-              initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}}
-              transition={{type:'spring',damping:25,stiffness:300}}
-              className="fixed left-0 top-0 bottom-0 z-50 md:hidden"
-            >
-              <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} />
-            </motion.div>
-          </>
+      {/* Mobile sidebar — ALWAYS rendered in the DOM below md, visibility
+          toggled purely with CSS classes (no mount/unmount, no exit-animation
+          race with route changes). A previous version used Framer Motion's
+          AnimatePresence to mount/unmount this on open/close — when a route
+          change landed in the same render pass as the drawer's exit
+          animation, the animation could get interrupted and never actually
+          finish, leaving the drawer stuck open forever even though the
+          underlying page had already updated correctly. Plain CSS
+          transitions driven directly by `mobileOpen` can't race like that. */}
+      <div
+        className={cn(
+          'fixed inset-0 z-40 bg-black/60 md:hidden transition-opacity duration-300',
+          mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         )}
-      </AnimatePresence>
+        onClick={closeDrawer}
+      />
+      <div
+        className={cn(
+          'fixed left-0 top-0 bottom-0 z-50 md:hidden transition-transform duration-300 ease-out',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+      >
+        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} />
+      </div>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile-only top bar with hamburger — desktop has no header, sidebar is always visible */}
