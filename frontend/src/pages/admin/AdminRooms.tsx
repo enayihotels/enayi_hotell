@@ -47,6 +47,7 @@ const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ??
 export default function AdminRooms() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<'categories' | 'rooms'>('categories')
+  const [roomsCategoryFilter, setRoomsCategoryFilter] = useState<RoomCategory | null>(null)
 
   const { data: categories, isLoading: catsLoading } = useQuery<RoomCategory[]>({
     queryKey: ['admin-room-categories'], queryFn: () => api.get('/rooms/categories/').then(r => unwrapList(r.data)),
@@ -160,7 +161,11 @@ export default function AdminRooms() {
   const openPhotoModal = (c: RoomCategory) => { setPhotoCategory(c); setPhotoFiles(null); setPhotoModalOpen(true) }
   const livePhotoCategory = categories?.find(c => c.id === photoCategory?.id) ?? photoCategory
 
-  const openNewRoom = () => { setEditingRoom(null); setRoomForm(emptyRoomForm); setRoomModalOpen(true) }
+  const openNewRoom = () => {
+    setEditingRoom(null)
+    setRoomForm(roomsCategoryFilter ? { ...emptyRoomForm, category: roomsCategoryFilter.id } : emptyRoomForm)
+    setRoomModalOpen(true)
+  }
   const openEditRoom = (r: Room) => {
     setEditingRoom(r)
     setRoomForm({
@@ -225,8 +230,7 @@ export default function AdminRooms() {
         <button onClick={() => setTab('rooms')}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='rooms' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
           <DoorOpen size={14} className="inline mr-1.5 -mt-0.5" /> Rooms ({rooms?.length ?? 0})
-        </button>
-      </div>
+        </button>      </div>
 
       {tab === 'categories' && (
         (categories||[]).length === 0 ? (
@@ -234,7 +238,12 @@ export default function AdminRooms() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories!.map(c => (
-              <div key={c.id} className="card p-4 space-y-2">
+              <div
+                key={c.id}
+                className="card p-4 space-y-2 cursor-pointer hover:border-enayi-gold/30 transition-colors"
+                onClick={() => { setRoomsCategoryFilter(c); setTab('rooms') }}
+                title={`View all ${c.name} rooms across every branch`}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="text-enayi-text font-medium">{c.name}</div>
@@ -243,8 +252,8 @@ export default function AdminRooms() {
                   {!c.is_active && <Badge variant="gray">Inactive</Badge>}
                 </div>
                 <div className="text-enayi-gold font-semibold">{formatCurrency(c.base_price)}<span className="text-enayi-muted text-xs font-normal"> / night</span></div>
-                <div className="text-enayi-muted text-xs">{c.max_adults} adults · {c.num_beds} bed(s) · {c.num_bathrooms} bath · {c.room_size_sqm}m² · {c.available_rooms} room(s)</div>
-                <div className="flex gap-2 pt-2 flex-wrap">
+                <div className="text-enayi-muted text-xs">{c.max_adults} adults · {c.num_beds} bed(s) · {c.num_bathrooms} bath · {c.room_size_sqm}m² · {c.available_rooms} room(s) across both branches</div>
+                <div className="flex gap-2 pt-2 flex-wrap" onClick={e => e.stopPropagation()}>
                   <Button size="sm" variant="outline" onClick={() => openEditCategory(c)}><Pencil size={12} /> Edit</Button>
                   <Button size="sm" variant="surface" onClick={() => openPhotoModal(c)}><ImageIcon size={12} /> Photos ({c.images?.length ?? 0})</Button>
                   <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCategory.mutate(c.slug) }}><Trash2 size={12} /> Delete</Button>
@@ -255,32 +264,63 @@ export default function AdminRooms() {
         )
       )}
 
-      {tab === 'rooms' && (
-        (rooms||[]).length === 0 ? (
-          <div className="card p-12 text-center"><EmptyState icon={DoorOpen} title="No rooms yet" desc="Add your first room to get started." /></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rooms!.map(r => (
-              <div key={r.id} className="card p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-enayi-text font-medium">Room {r.room_number}</div>
-                    <div className="text-enayi-muted text-xs">{r.category_name} · Floor {r.floor}{r.branch_name ? ` · ${r.branch_name}` : ''}</div>
-                  </div>
-                  <Badge variant={STATUS_BADGE[r.status]}>{r.status.replace('_',' ')}</Badge>
-                </div>
-                <div className="text-enayi-gold font-semibold text-sm">{formatCurrency(Number(r.current_price))}<span className="text-enayi-muted text-xs font-normal"> / night</span></div>
-                <div className="text-enayi-muted text-xs capitalize">{r.view_type} view{r.is_smoking ? ' · Smoking' : ''}{r.has_balcony ? ' · Balcony' : ''}</div>
-                <div className="flex gap-2 pt-2 flex-wrap">
-                  <Button size="sm" variant="outline" onClick={() => openEditRoom(r)}><Pencil size={12} /> Edit</Button>
-                  <Button size="sm" variant="surface" onClick={() => openRoomPhotoModal(r)}><ImageIcon size={12} /> Photos</Button>
-                  <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete Room ${r.room_number}?`)) deleteRoom.mutate(r.id) }}><Trash2 size={12} /> Delete</Button>
-                </div>
+      {tab === 'rooms' && (() => {
+        const filteredRooms = roomsCategoryFilter ? (rooms||[]).filter(r => r.category === roomsCategoryFilter.id) : (rooms||[])
+        const branchGroups = new Map<string, Room[]>()
+        filteredRooms.forEach(r => {
+          const key = r.branch_name || 'No specific branch'
+          if (!branchGroups.has(key)) branchGroups.set(key, [])
+          branchGroups.get(key)!.push(r)
+        })
+
+        return (
+          <>
+            {roomsCategoryFilter && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-enayi-muted text-sm">Showing:</span>
+                <button
+                  onClick={() => setRoomsCategoryFilter(null)}
+                  className="flex items-center gap-1.5 bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20 rounded-full px-3 py-1 text-sm hover:bg-enayi-gold/20 transition-colors"
+                >
+                  {roomsCategoryFilter.name} rooms · all branches
+                  <span className="text-enayi-muted">✕</span>
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+            {filteredRooms.length === 0 ? (
+              <div className="card p-12 text-center"><EmptyState icon={DoorOpen} title="No rooms yet" desc={roomsCategoryFilter ? `No rooms in ${roomsCategoryFilter.name} yet.` : 'Add your first room to get started.'} /></div>
+            ) : (
+              <div className="space-y-6">
+                {Array.from(branchGroups.entries()).map(([branchName, branchRooms]) => (
+                  <div key={branchName}>
+                    <h3 className="text-enayi-gold text-sm font-semibold uppercase tracking-wide mb-3">{branchName} <span className="text-enayi-muted font-normal normal-case">({branchRooms.length} room{branchRooms.length===1?'':'s'})</span></h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {branchRooms.map(r => (
+                        <div key={r.id} className="card p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="text-enayi-text font-medium">Room {r.room_number}</div>
+                              <div className="text-enayi-muted text-xs">{r.category_name} · Floor {r.floor}</div>
+                            </div>
+                            <Badge variant={STATUS_BADGE[r.status]}>{r.status.replace('_',' ')}</Badge>
+                          </div>
+                          <div className="text-enayi-gold font-semibold text-sm">{formatCurrency(Number(r.current_price))}<span className="text-enayi-muted text-xs font-normal"> / night</span></div>
+                          <div className="text-enayi-muted text-xs capitalize">{r.view_type} view{r.is_smoking ? ' · Smoking' : ''}{r.has_balcony ? ' · Balcony' : ''}</div>
+                          <div className="flex gap-2 pt-2 flex-wrap">
+                            <Button size="sm" variant="outline" onClick={() => openEditRoom(r)}><Pencil size={12} /> Edit</Button>
+                            <Button size="sm" variant="surface" onClick={() => openRoomPhotoModal(r)}><ImageIcon size={12} /> Photos</Button>
+                            <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete Room ${r.room_number}?`)) deleteRoom.mutate(r.id) }}><Trash2 size={12} /> Delete</Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )
-      )}
+      })()}
 
       {/* ── Category modal ── */}
       <Modal open={categoryModalOpen} onClose={() => setCategoryModalOpen(false)} title={editingCategory ? 'Edit Category' : 'Add Category'} size="md">
