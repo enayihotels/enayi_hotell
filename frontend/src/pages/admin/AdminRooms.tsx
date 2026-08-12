@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
-import { BedDouble, DoorOpen, Plus, Pencil, Trash2, LayoutGrid, Image as ImageIcon, Upload } from 'lucide-react'
+import { BedDouble, DoorOpen, Plus, Pencil, Trash2, LayoutGrid, Image as ImageIcon, Upload, Sparkles } from 'lucide-react'
 import type { RoomCategory, Room, Amenity, RoomPhoto } from '@/types'
 
 const BED_TYPES = ['single','double','queen','king','twin','suite']
@@ -44,9 +44,14 @@ const emptyRoomForm: RoomForm = {
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
 
+const AMENITY_CATEGORIES = ['basic','tech','comfort','bathroom','entertainment','dining','security']
+
+type AmenityForm = { name: string; icon: string; category: string; is_premium: boolean }
+const emptyAmenityForm: AmenityForm = { name: '', icon: 'check', category: 'basic', is_premium: false }
+
 export default function AdminRooms() {
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'categories' | 'rooms'>('categories')
+  const [tab, setTab] = useState<'categories' | 'rooms' | 'amenities'>('categories')
   const [roomsCategoryFilter, setRoomsCategoryFilter] = useState<RoomCategory | null>(null)
 
   const { data: categories, isLoading: catsLoading } = useQuery<RoomCategory[]>({
@@ -120,6 +125,36 @@ export default function AdminRooms() {
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
+
+  // ── Amenities management ──
+  const [amenityModalOpen, setAmenityModalOpen] = useState(false)
+  const [editingAmenity, setEditingAmenity] = useState<Amenity | null>(null)
+  const [amenityForm, setAmenityForm] = useState<AmenityForm>(emptyAmenityForm)
+
+  const saveAmenity = useMutation({
+    mutationFn: () => editingAmenity
+      ? api.patch(`/rooms/amenities/${editingAmenity.id}/`, amenityForm)
+      : api.post('/rooms/amenities/', amenityForm),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['amenities'] })
+      toast.success(editingAmenity ? 'Amenity updated.' : 'Amenity created.')
+      setAmenityModalOpen(false)
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const deleteAmenity = useMutation({
+    mutationFn: (id: string) => api.delete(`/rooms/amenities/${id}/`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['amenities'] }); toast.success('Amenity deleted.') },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const openNewAmenity = () => { setEditingAmenity(null); setAmenityForm(emptyAmenityForm); setAmenityModalOpen(true) }
+  const openEditAmenity = (a: Amenity) => {
+    setEditingAmenity(a)
+    setAmenityForm({ name: a.name, icon: a.icon, category: a.category, is_premium: a.is_premium })
+    setAmenityModalOpen(true)
+  }
 
   const saveRoom = useMutation({
     mutationFn: () => {
@@ -217,8 +252,8 @@ export default function AdminRooms() {
           <h1 className="font-display text-2xl md:text-3xl text-enayi-text">Rooms</h1>
           <p className="text-enayi-muted text-sm">Manage room categories and individual rooms.</p>
         </div>
-        <Button variant="gold" onClick={tab === 'categories' ? openNewCategory : openNewRoom}>
-          <Plus size={14} /> {tab === 'categories' ? 'Add Category' : 'Add Room'}
+        <Button variant="gold" onClick={tab === 'categories' ? openNewCategory : tab === 'rooms' ? openNewRoom : openNewAmenity}>
+          <Plus size={14} /> {tab === 'categories' ? 'Add Category' : tab === 'rooms' ? 'Add Room' : 'Add Amenity'}
         </Button>
       </div>
 
@@ -230,7 +265,12 @@ export default function AdminRooms() {
         <button onClick={() => setTab('rooms')}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='rooms' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
           <DoorOpen size={14} className="inline mr-1.5 -mt-0.5" /> Rooms ({rooms?.length ?? 0})
-        </button>      </div>
+        </button>
+        <button onClick={() => setTab('amenities')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='amenities' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
+          <Sparkles size={14} className="inline mr-1.5 -mt-0.5" /> Amenities ({amenities?.length ?? 0})
+        </button>
+      </div>
 
       {tab === 'categories' && (
         (categories||[]).length === 0 ? (
@@ -321,6 +361,28 @@ export default function AdminRooms() {
           </>
         )
       })()}
+
+      {tab === 'amenities' && (
+        (amenities||[]).length === 0 ? (
+          <div className="card p-12 text-center"><EmptyState icon={Sparkles} title="No amenities yet" desc="Add your first one — these can then be assigned to any room category." /></div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {amenities!.map(a => (
+              <div key={a.id} className="card p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-enayi-text font-medium">{a.name}</div>
+                  {a.is_premium && <Badge variant="gold">Premium</Badge>}
+                </div>
+                <div className="text-enayi-muted text-xs capitalize">{a.category} · icon: {a.icon}</div>
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="outline" onClick={() => openEditAmenity(a)}><Pencil size={12} /> Edit</Button>
+                  <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${a.name}"? This removes it from any category it's currently assigned to.`)) deleteAmenity.mutate(a.id) }}><Trash2 size={12} /> Delete</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
 
       {/* ── Category modal ── */}
       <Modal open={categoryModalOpen} onClose={() => setCategoryModalOpen(false)} title={editingCategory ? 'Edit Category' : 'Add Category'} size="md">
@@ -498,6 +560,26 @@ export default function AdminRooms() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ── Amenity modal ── */}
+      <Modal open={amenityModalOpen} onClose={() => setAmenityModalOpen(false)} title={editingAmenity ? 'Edit Amenity' : 'Add Amenity'} size="sm">
+        <div className="space-y-4">
+          <Input label="Name" placeholder="e.g. Free WiFi" value={amenityForm.name} onChange={e => setAmenityForm({...amenityForm, name: e.target.value})} />
+          <Select label="Category" value={amenityForm.category} onChange={e => setAmenityForm({...amenityForm, category: e.target.value})}>
+            {AMENITY_CATEGORIES.map(c => <option key={c} value={c} className="capitalize">{c}</option>)}
+          </Select>
+          <Input label="Icon name" placeholder="e.g. wifi" value={amenityForm.icon} onChange={e => setAmenityForm({...amenityForm, icon: e.target.value})} />
+          <label className="flex items-center gap-2 cursor-pointer text-sm text-enayi-text">
+            <input type="checkbox" checked={amenityForm.is_premium} onChange={e => setAmenityForm({...amenityForm, is_premium: e.target.checked})} /> Premium amenity
+          </label>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="ghost" onClick={() => setAmenityModalOpen(false)}>Cancel</Button>
+            <Button variant="gold" loading={saveAmenity.isPending} onClick={() => saveAmenity.mutate()} disabled={!amenityForm.name}>
+              {editingAmenity ? 'Save changes' : 'Create amenity'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )
