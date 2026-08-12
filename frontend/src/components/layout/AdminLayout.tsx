@@ -18,13 +18,18 @@ const ADMIN_NAV = [
   {href:'/admin/payments',icon:CreditCard,label:'Payments'},
 ]
 
-export default function AdminLayout() {
-  const { user } = useAuthStore()
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
-  const visibleNav = ADMIN_NAV.filter(item => !item.managerOnly || isManagerOrAdmin)
-
-  const SidebarContent = () => (
+// IMPORTANT: this is defined OUTSIDE AdminLayout on purpose. Defining it
+// inside the component body (as `const SidebarContent = () => (...)`)
+// creates a brand-new component type on every render, which made React
+// remount the whole sidebar subtree constantly — including mid-animation
+// while the mobile drawer was opening/closing — and broke the backdrop's
+// tap-to-close behavior. A stable, module-level component with props
+// fixes that at the root instead of patching around the symptom.
+function AdminSidebarContent({ visibleNav, onNavigate }: {
+  visibleNav: typeof ADMIN_NAV
+  onNavigate: () => void
+}) {
+  return (
     <aside className="w-56 flex-shrink-0 flex flex-col h-full bg-enayi-surface border-r border-enayi-border">
       <div className="p-4 border-b border-enayi-border flex items-center gap-2.5">
         <img src="/logo.png" alt="Enayi" className="w-8 h-8 object-contain flex-shrink-0" />
@@ -35,7 +40,7 @@ export default function AdminLayout() {
       </div>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto scrollbar-hide">
         {visibleNav.map(({href,icon:Icon,label}) => (
-          <NavLink key={href} to={href} end={href === '/admin'} onClick={() => setMobileOpen(false)}
+          <NavLink key={href} to={href} end={href === '/admin'} onClick={onNavigate}
             className={({isActive}) => cn('flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all',
               isActive ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'
             )}>
@@ -48,24 +53,39 @@ export default function AdminLayout() {
       </div>
     </aside>
   )
+}
+
+export default function AdminLayout() {
+  const { user } = useAuthStore()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
+  const visibleNav = ADMIN_NAV.filter(item => !item.managerOnly || isManagerOrAdmin)
+  const closeDrawer = () => setMobileOpen(false)
 
   return (
     <div className="flex h-screen bg-enayi-bg overflow-hidden">
       {/* Desktop sidebar — always visible md and up */}
       <div className="hidden md:flex flex-shrink-0 h-full">
-        <SidebarContent />
+        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} />
       </div>
 
       {/* Mobile sidebar — slide-in drawer, only when toggled */}
       <AnimatePresence>
         {mobileOpen && (
           <>
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-              className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMobileOpen(false)} />
-            <motion.div initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}}
+            <motion.div
+              key="admin-drawer-backdrop"
+              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              className="fixed inset-0 z-40 bg-black/60 md:hidden"
+              onClick={closeDrawer}
+            />
+            <motion.div
+              key="admin-drawer-panel"
+              initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}}
               transition={{type:'spring',damping:25,stiffness:300}}
-              className="fixed left-0 top-0 bottom-0 z-50 md:hidden">
-              <SidebarContent />
+              className="fixed left-0 top-0 bottom-0 z-50 md:hidden"
+            >
+              <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} />
             </motion.div>
           </>
         )}
@@ -85,4 +105,3 @@ export default function AdminLayout() {
     </div>
   )
 }
-

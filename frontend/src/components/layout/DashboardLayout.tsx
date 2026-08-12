@@ -18,18 +18,19 @@ const NAV = [
   { href:'/profile',      icon:User,            label:'My Profile' },
 ]
 
-export default function DashboardLayout() {
-  const [collapsed, setCollapsed] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const { user, logout } = useAuthStore()
-  const navigate = useNavigate()
+type UserLite = { first_name?: string; full_name?: string; role?: string } | null
 
-  const handleLogout = async () => {
-    try { await api.post('/auth/logout/', { refresh: localStorage.getItem('refresh_token') }) } catch {}
-    logout(); toast.success('Logged out.'); navigate('/login')
-  }
-
-  const SidebarContent = () => (
+// IMPORTANT: defined OUTSIDE DashboardLayout on purpose — same fix as
+// AdminLayout. Declaring this inside the component body created a new
+// component type on every render, causing React to remount the sidebar
+// mid-animation and breaking the mobile drawer's backdrop tap-to-close.
+function GuestSidebarContent({ collapsed, user, onNavigate, onLogout }: {
+  collapsed: boolean
+  user: UserLite
+  onNavigate: () => void
+  onLogout: () => void
+}) {
+  return (
     <div className="flex flex-col h-full bg-enayi-surface border-r border-enayi-border">
       <div className="flex items-center gap-3 px-4 py-5 border-b border-enayi-border">
         <img src="/logo.png" alt="Enayi Hotels" className="w-8 h-8 object-contain flex-shrink-0" />
@@ -37,7 +38,7 @@ export default function DashboardLayout() {
       </div>
       <nav className="flex-1 py-4 px-2 flex flex-col gap-0.5 overflow-y-auto scrollbar-hide">
         {NAV.map(({href,icon:Icon,label}) => (
-          <NavLink key={href} to={href} onClick={() => setMobileOpen(false)}
+          <NavLink key={href} to={href} onClick={onNavigate}
             className={({isActive}) => cn('flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
               isActive ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel',
               collapsed && 'justify-center'
@@ -50,22 +51,45 @@ export default function DashboardLayout() {
       <div className="p-3 border-t border-enayi-border">
         {!collapsed && <div className="flex items-center gap-3 px-3 py-2 mb-1"><div className="w-8 h-8 rounded-full bg-enayi-gold/20 flex items-center justify-center flex-shrink-0"><span className="text-enayi-gold font-semibold text-sm">{user?.first_name?.[0]}</span></div><div className="overflow-hidden"><div className="text-enayi-text text-sm font-medium truncate">{user?.full_name}</div><div className="text-enayi-muted text-xs capitalize">{user?.role}</div></div></div>}
         <Link to="/" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all', collapsed && 'justify-center')}><Home size={14} />{!collapsed && 'Main Site'}</Link>
-        <button onClick={handleLogout} className={cn('w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 text-xs transition-all', collapsed && 'justify-center')}><LogOut size={14} />{!collapsed && 'Sign Out'}</button>
+        <button onClick={onLogout} className={cn('w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 text-xs transition-all', collapsed && 'justify-center')}><LogOut size={14} />{!collapsed && 'Sign Out'}</button>
       </div>
     </div>
   )
+}
+
+export default function DashboardLayout() {
+  const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const { user, logout } = useAuthStore()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    try { await api.post('/auth/logout/', { refresh: localStorage.getItem('refresh_token') }) } catch {}
+    logout(); toast.success('Logged out.'); navigate('/login')
+  }
+  const closeDrawer = () => setMobileOpen(false)
 
   return (
     <div className="flex h-screen bg-enayi-bg overflow-hidden">
       <div className={cn('hidden md:flex flex-col flex-shrink-0 h-full transition-all duration-300', collapsed ? 'w-16' : 'w-60')}>
-        <SidebarContent />
+        <GuestSidebarContent collapsed={collapsed} user={user} onNavigate={closeDrawer} onLogout={handleLogout} />
       </div>
       <AnimatePresence>
         {mobileOpen && (
           <>
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMobileOpen(false)} />
-            <motion.div initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}} transition={{type:'spring',damping:25,stiffness:300}} className="fixed left-0 top-0 bottom-0 z-50 w-72 md:hidden flex flex-col">
-              <SidebarContent />
+            <motion.div
+              key="guest-drawer-backdrop"
+              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              className="fixed inset-0 z-40 bg-black/60 md:hidden"
+              onClick={closeDrawer}
+            />
+            <motion.div
+              key="guest-drawer-panel"
+              initial={{x:'-100%'}} animate={{x:0}} exit={{x:'-100%'}}
+              transition={{type:'spring',damping:25,stiffness:300}}
+              className="fixed left-0 top-0 bottom-0 z-50 w-72 md:hidden flex flex-col"
+            >
+              <GuestSidebarContent collapsed={false} user={user} onNavigate={closeDrawer} onLogout={handleLogout} />
             </motion.div>
           </>
         )}
