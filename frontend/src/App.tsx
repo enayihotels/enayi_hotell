@@ -80,13 +80,13 @@ export default function App() {
           <Routes>
             {/* Public */}
             <Route element={<PublicLayout />}>
-              <Route path="/"         element={<LandingPage />} />
-              <Route path="/rooms"    element={<RoomsPage />} />
-              <Route path="/rooms/:slug" element={<RoomDetailPage />} />
-              <Route path="/gallery"  element={<GalleryPage />} />
-              <Route path="/events"   element={<EventsPage />} />
-              <Route path="/about"    element={<AboutPage />} />
-              <Route path="/contact"  element={<ContactPage />} />
+              <Route path="/"         element={<LandingPage key="landing" />} />
+              <Route path="/rooms"    element={<RoomsPage key="rooms" />} />
+              <Route path="/rooms/:slug" element={<RoomDetailPage key="room-detail" />} />
+              <Route path="/gallery"  element={<GalleryPage key="gallery" />} />
+              <Route path="/events"   element={<EventsPage key="events" />} />
+              <Route path="/about"    element={<AboutPage key="about" />} />
+              <Route path="/contact"  element={<ContactPage key="contact" />} />
             </Route>
 
             {/* Auth */}
@@ -98,31 +98,31 @@ export default function App() {
 
             {/* Guest Dashboard */}
             <Route element={<Guard><DashboardLayout /></Guard>}>
-              <Route path="/dashboard"       element={<DashboardPage />} />
-              <Route path="/book"            element={<BookingPage />} />
-              <Route path="/book/:slug"      element={<BookingPage />} />
-              <Route path="/my-bookings"     element={<MyBookingsPage />} />
-              <Route path="/orders"          element={<OrdersPage />} />
-              <Route path="/events/book"     element={<EventBookingPage />} />
-              <Route path="/events/my"       element={<MyEventsPage />} />
-              <Route path="/payment/:id"     element={<PaymentPage />} />
-              <Route path="/payment/callback" element={<PaymentCallback />} />
-              <Route path="/profile"         element={<ProfilePage />} />
-              <Route path="/concierge"       element={<AIConcierge />} />
+              <Route path="/dashboard"       element={<DashboardPage key="dashboard" />} />
+              <Route path="/book"            element={<BookingPage key="book" />} />
+              <Route path="/book/:slug"      element={<BookingPage key="book-slug" />} />
+              <Route path="/my-bookings"     element={<MyBookingsPage key="my-bookings" />} />
+              <Route path="/orders"          element={<OrdersPage key="orders" />} />
+              <Route path="/events/book"     element={<EventBookingPage key="events-book" />} />
+              <Route path="/events/my"       element={<MyEventsPage key="events-my" />} />
+              <Route path="/payment/:id"     element={<PaymentPage key="payment-id" />} />
+              <Route path="/payment/callback" element={<PaymentCallback key="payment-callback" />} />
+              <Route path="/profile"         element={<ProfilePage key="profile" />} />
+              <Route path="/concierge"       element={<AIConcierge key="concierge" />} />
             </Route>
 
             {/* Admin */}
             <Route element={<Guard adminOnly><AdminLayout /></Guard>}>
-              <Route path="/admin"           element={<AdminDashboard />} />
-              <Route path="/admin/rooms"     element={<AdminRooms />} />
-              <Route path="/admin/bookings"  element={<AdminBookings />} />
-              <Route path="/admin/checkout-approvals" element={<AdminCheckoutApprovals />} />
-              <Route path="/admin/fraud-reports" element={<AdminFraudReports />} />
-              <Route path="/admin/orders"    element={<AdminOrders />} />
-              <Route path="/admin/events"    element={<AdminEvents />} />
-              <Route path="/admin/gallery"   element={<AdminGallery />} />
-              <Route path="/admin/guests"    element={<AdminGuests />} />
-              <Route path="/admin/payments"  element={<AdminPayments />} />
+              <Route path="/admin"           element={<AdminDashboard key="admin-dashboard" />} />
+              <Route path="/admin/rooms"     element={<AdminRooms key="admin-rooms" />} />
+              <Route path="/admin/bookings"  element={<AdminBookings key="admin-bookings" />} />
+              <Route path="/admin/checkout-approvals" element={<AdminCheckoutApprovals key="admin-checkout-approvals" />} />
+              <Route path="/admin/fraud-reports" element={<AdminFraudReports key="admin-fraud-reports" />} />
+              <Route path="/admin/orders"    element={<AdminOrders key="admin-orders" />} />
+              <Route path="/admin/events"    element={<AdminEvents key="admin-events" />} />
+              <Route path="/admin/gallery"   element={<AdminGallery key="admin-gallery" />} />
+              <Route path="/admin/guests"    element={<AdminGuests key="admin-guests" />} />
+              <Route path="/admin/payments"  element={<AdminPayments key="admin-payments" />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
