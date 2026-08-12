@@ -4,6 +4,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
+from django.db.models import ProtectedError
+from django.utils.text import slugify
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import RoomCategory, Room, RoomImage, RoomReview, Amenity
 from .serializers import (
@@ -17,22 +19,79 @@ class AmenityListCreateView(generics.ListCreateAPIView):
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
 
-class RoomCategoryListView(generics.ListAPIView):
-    serializer_class = RoomCategorySerializer
+class RoomCategoryListView(generics.ListCreateAPIView):
+    """Public GET (guests browsing rooms); staff-only POST to add a new
+    room category/type. Was list-only before — RoomCategoryWriteSerializer
+    already existed in this file but nothing ever used it."""
     permission_classes = [AllowAny]
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        return RoomCategorySerializer if self.request.method == "GET" else RoomCategoryWriteSerializer
+
     def get_queryset(self):
-        return RoomCategory.objects.filter(is_active=True).prefetch_related("amenities","images","reviews","rooms")
+        qs = RoomCategory.objects.prefetch_related("amenities","images","reviews","rooms")
+        # Guests only ever see active categories; staff managing rooms need to see all of them.
+        if self.request.method == "GET" and not (self.request.user.is_authenticated and self.request.user.is_hotel_staff):
+            qs = qs.filter(is_active=True)
+        return qs
+
     def get_serializer_context(self): return {"request": self.request}
 
-class RoomCategoryDetailView(generics.RetrieveAPIView):
-    serializer_class = RoomCategorySerializer
-    permission_classes = [AllowAny]
+    def create(self, request, *args, **kwargs):
+        if not (request.user.is_authenticated and request.user.is_hotel_staff):
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+        data = request.data.copy()
+        if not data.get("slug") and data.get("name"):
+            data["slug"] = slugify(data["name"])
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save()
+        return Response(RoomCategorySerializer(category, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+class RoomCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Public GET by slug; staff-only PATCH/DELETE."""
     lookup_field = "slug"
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        return RoomCategorySerializer if self.request.method == "GET" else RoomCategoryWriteSerializer
+
     def get_queryset(self):
-        return RoomCategory.objects.filter(is_active=True).prefetch_related("amenities","images","reviews","rooms")
+        qs = RoomCategory.objects.prefetch_related("amenities","images","reviews","rooms")
+        if self.request.method == "GET" and not (self.request.user.is_authenticated and self.request.user.is_hotel_staff):
+            qs = qs.filter(is_active=True)
+        return qs
+
     def get_serializer_context(self): return {"request": self.request}
 
-class RoomListView(generics.ListAPIView):
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        category = serializer.save()
+        return Response(RoomCategorySerializer(category, context={"request": request}).data)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+        instance = self.get_object()
+        try:
+            instance.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This category has rooms assigned to it. Reassign or delete those rooms first, or set it to inactive instead of deleting."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+class RoomListView(generics.ListCreateAPIView):
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -42,6 +101,35 @@ class RoomListView(generics.ListAPIView):
         if self.request.user.is_hotel_staff:
             return Room.objects.select_related("category").all()
         return Room.objects.filter(status="available").select_related("category")
+
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+        return super().create(request, *args, **kwargs)
+
+class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Staff-only retrieve/update/delete for an individual room."""
+    serializer_class = RoomSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Room.objects.select_related("category")
+
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
+        instance = self.get_object()
+        try:
+            instance.delete()
+        except ProtectedError:
+            return Response(
+                {"error": "This room has booking history and can't be deleted. Set its status to 'Out of Order' instead."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class RoomAvailabilityView(APIView):
     permission_classes = [AllowAny]

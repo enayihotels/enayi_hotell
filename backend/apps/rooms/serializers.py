@@ -57,6 +57,7 @@ class RoomCategorySerializer(serializers.ModelSerializer):
             "max_adults", "max_children", "bed_type", "num_beds", "room_size_sqm",
             "num_bathrooms", "has_living_room", "has_kitchen", "has_balcony",
             "amenities", "images", "avg_rating", "available_rooms", "sort_order",
+            "is_active",
         ]
 
     def get_current_price(self, obj):
