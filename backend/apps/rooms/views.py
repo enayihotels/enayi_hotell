@@ -17,6 +17,7 @@ from .serializers import (
 class AmenityListCreateView(generics.ListCreateAPIView):
     queryset = Amenity.objects.all()
     serializer_class = AmenitySerializer
+    pagination_class = None
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
 
@@ -25,6 +26,7 @@ class RoomCategoryListView(generics.ListCreateAPIView):
     room category/type. Was list-only before — RoomCategoryWriteSerializer
     already existed in this file but nothing ever used it."""
     permission_classes = [AllowAny]
+    pagination_class = None
 
     def get_permissions(self):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
@@ -93,8 +95,17 @@ class RoomCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class RoomListView(generics.ListCreateAPIView):
+    """No pagination — this is a management list for staff (and a small
+    browsable list for guests), not a large public catalog. A hotel this
+    size (dozens of rooms) should never be silently truncated to the
+    first 20 results, which is exactly what the global PageNumberPagination
+    default was doing here — rooms sorted alphabetically past the 20th
+    (VIP/Suite rooms, or anything newly created) were invisible in the
+    admin panel even though they existed correctly in the database.
+    """
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ["status","floor","category"]
     search_fields = ["room_number"]
