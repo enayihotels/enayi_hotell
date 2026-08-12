@@ -40,18 +40,20 @@ const emptyRoomForm: RoomForm = {
   status: 'available', view_type: 'city', is_smoking: false, has_balcony: false,
 }
 
+const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
+
 export default function AdminRooms() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<'categories' | 'rooms'>('categories')
 
   const { data: categories, isLoading: catsLoading } = useQuery<RoomCategory[]>({
-    queryKey: ['admin-room-categories'], queryFn: () => api.get('/rooms/categories/').then(r => r.data),
+    queryKey: ['admin-room-categories'], queryFn: () => api.get('/rooms/categories/').then(r => unwrapList(r.data)),
   })
   const { data: rooms, isLoading: roomsLoading } = useQuery<Room[]>({
-    queryKey: ['admin-rooms'], queryFn: () => api.get('/rooms/list/').then(r => r.data),
+    queryKey: ['admin-rooms'], queryFn: () => api.get('/rooms/list/').then(r => unwrapList(r.data)),
   })
   const { data: hotels } = useQuery<{ id: string; name: string; branch: string }[]>({
-    queryKey: ['hotels'], queryFn: () => api.get('/hotels/').then(r => r.data),
+    queryKey: ['hotels'], queryFn: () => api.get('/hotels/').then(r => unwrapList(r.data)),
   })
 
   // ── Category modal state ──
