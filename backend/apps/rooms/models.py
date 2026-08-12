@@ -200,3 +200,23 @@ class RoomReview(models.Model):
         db_table = "room_reviews"
 
     def __str__(self): return f"Review by {self.guest} — {self.rating}/5"
+
+
+class RoomPhoto(models.Model):
+    """Photos of a SPECIFIC physical room (e.g. 'Room 12'), separate from
+    RoomImage which is category-level marketing photos shown to guests
+    browsing by room type. These are for staff reference — condition,
+    damage, housekeeping notes, etc — tied to the exact room number.
+    """
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    room        = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="photos")
+    image       = models.ImageField(upload_to="rooms/room_photos/%Y/%m/")
+    caption     = models.CharField(max_length=300, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "room_photos"
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return f"Photo of Room {self.room.room_number}"

@@ -1,6 +1,6 @@
 """Enayi Hotels — Rooms Serializers"""
 from rest_framework import serializers
-from .models import RoomCategory, Room, RoomImage, RoomReview, Amenity
+from .models import RoomCategory, Room, RoomImage, RoomReview, Amenity, RoomPhoto
 
 
 class AmenitySerializer(serializers.ModelSerializer):
@@ -156,3 +156,16 @@ class AvailabilityCheckSerializer(serializers.Serializer):
         if data["check_in"] < timezone.now().date():
             raise serializers.ValidationError("Check-in cannot be in the past.")
         return data
+
+
+class RoomPhotoSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = RoomPhoto
+        fields = ["id", "room", "image_url", "caption", "uploaded_at"]
+        read_only_fields = ["id", "room", "image_url", "uploaded_at"]
+
+    def get_image_url(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url

@@ -7,10 +7,11 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import ProtectedError
 from django.utils.text import slugify
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import RoomCategory, Room, RoomImage, RoomReview, Amenity
+from .models import RoomCategory, Room, RoomImage, RoomReview, Amenity, RoomPhoto
 from .serializers import (
     RoomCategorySerializer, RoomCategoryWriteSerializer, RoomSerializer,
     RoomImageSerializer, RoomReviewSerializer, AmenitySerializer, AvailabilityCheckSerializer,
+    RoomPhotoSerializer,
 )
 
 class AmenityListCreateView(generics.ListCreateAPIView):
@@ -285,3 +286,52 @@ class BranchRoomsView(APIView):
             "free_rooms":  free,
             "categories":  categories,
         })
+
+
+class RoomPhotoListUploadView(APIView):
+    """GET/POST /api/v1/rooms/list/<uuid:room_id>/photos/ — staff-only both ways.
+    Photos of the specific physical room, not the category."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get(self, request, room_id):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        try:
+            room = Room.objects.get(id=room_id)
+        except Room.DoesNotExist:
+            return Response({"error": "Room not found."}, status=404)
+        photos = room.photos.all()
+        return Response(RoomPhotoSerializer(photos, many=True, context={"request": request}).data)
+
+    def post(self, request, room_id):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+        try:
+            room = Room.objects.get(id=room_id)
+        except Room.DoesNotExist:
+            return Response({"error": "Room not found."}, status=404)
+        images = request.FILES.getlist("images")
+        if not images:
+            return Response({"error": "No images."}, status=400)
+        created = []
+        for img in images:
+            rp = RoomPhoto.objects.create(room=room, image=img, caption=request.data.get("caption", ""))
+            created.append(RoomPhotoSerializer(rp, context={"request": request}).data)
+        return Response({"uploaded": len(created), "photos": created}, status=201)
+
+
+class RoomPhotoDeleteView(APIView):
+    """DELETE /api/v1/rooms/photos/<uuid:pk>/ — staff-only."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Permission denied."}, status=403)
+        try:
+            photo = RoomPhoto.objects.get(id=pk)
+        except RoomPhoto.DoesNotExist:
+            return Response({"error": "Not found."}, status=404)
+        photo.image.delete(save=False)
+        photo.delete()
+        return Response(status=204)
