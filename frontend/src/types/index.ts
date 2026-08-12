@@ -76,11 +76,15 @@ export interface RoomCategory {
   avg_rating?: number
   available_rooms: number
   sort_order: number
+  is_active: boolean
 }
 
 export interface Room {
   id: string
   room_number: string
+  hotel: string
+  branch: string | null
+  branch_name: string | null
   category: string
   category_name: string
   floor: number
