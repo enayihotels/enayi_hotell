@@ -55,23 +55,23 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      # SECURITY: email credentials are NOT committed here (sync:false) —
+      # a previous version of this file had the real Gmail App Password
+      # in plaintext, checked into git. That password has been rotated —
+      # see the note in the delivery README. Set the real values once in
+      # the Render dashboard instead; they'll never appear in git history
+      # again from this point forward.
       - key: EMAIL_HOST_USER
-        value: enayihotels@gmail.com
-        value: enayihotels@gmail.com
+        sync: false
       - key: EMAIL_HOST_PASSWORD
-        value: rbgeeqcfdbkjxhwi
-        value: rbgeeqcfdbkjxhwi
+        sync: false
       - key: DEFAULT_FROM_EMAIL
-        value: "Enayi Hotels & Suites <enayihotels@gmail.com>"
         value: "Enayi Hotels & Suites <enayihotels@gmail.com>"
       - key: EMAIL_HOST
         value: smtp.gmail.com
-        value: smtp.gmail.com
       - key: EMAIL_PORT
         value: "587"
-        value: "587"
       - key: EMAIL_USE_TLS
-        value: "True"
         value: "True"
 
   # ── React Frontend (Static Site) ─────────────────────────────────
@@ -93,3 +93,46 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # ── Nightly Fraud Audit (Cron Job) ────────────────────────────────
+  # No Celery worker runs in this deployment (see note at the top of this
+  # file), so the fraud audit can't fire on a Celery Beat schedule. This
+  # is the actual mechanism: Render runs the same management command on
+  # its own schedule, on a small dedicated container, independent of the
+  # always-on web service. Small additional cost — check current Render
+  # cron pricing before relying on this being free.
+  - type: cron
+    name: enayi-fraud-audit
+    runtime: python
+    plan: starter
+    rootDir: backend
+    schedule: "0 1 * * *"    # 1:00 AM UTC = 2:00 AM Africa/Lagos, daily
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python manage.py run_fraud_audit"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true    # this cron job never needs to match enayi-backend's key — it only queries the DB and sends email, nothing signed/verified across services
+      - key: DATABASE_URL
+        fromDatabase:
+          name: enayi-db
+          property: connectionString
+      - key: DB_SSL_REQUIRE
+        value: "True"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        value: "Enayi Hotels & Suites <enayihotels@gmail.com>"
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
