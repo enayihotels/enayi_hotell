@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
-import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
+import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge, Alert } from '@/components/ui'
 import { Image as ImageIcon, LayoutGrid, Plus, Pencil, Trash2, Upload, Star } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
 import type { GalleryCategory, GalleryImage } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
@@ -14,6 +15,8 @@ type CategoryForm = { name: string; category_type: string; description: string; 
 const emptyCategoryForm: CategoryForm = { name: '', category_type: 'lobby', description: '', is_active: true }
 
 export default function AdminGallery() {
+  const { user } = useAuthStore()
+  const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const qc = useQueryClient()
   const [tab, setTab] = useState<'images' | 'categories'>('images')
 
@@ -86,6 +89,14 @@ export default function AdminGallery() {
     setUploadFiles(null)
     setUploadTitle('')
     setUploadModalOpen(true)
+  }
+
+  if (!isManagerOrAdmin) {
+    return (
+      <div className="p-4 md:p-6">
+        <Alert type="error">This page is restricted to managers and owners.</Alert>
+      </div>
+    )
   }
 
   if (catsLoading || imagesLoading) return <PageSpinner />

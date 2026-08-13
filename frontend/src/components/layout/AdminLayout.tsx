@@ -13,8 +13,8 @@ const ADMIN_NAV = [
   {href:'/admin/orders',icon:Utensils,label:'Orders'},
   {href:'/admin/events',icon:Calendar,label:'Events'},
   {href:'/admin/guests',icon:Users,label:'Guests'},
-  {href:'/admin/gallery',icon:Image,label:'Gallery'},
-  {href:'/admin/payments',icon:CreditCard,label:'Payments'},
+  {href:'/admin/gallery',icon:Image,label:'Gallery',managerOnly:true},
+  {href:'/admin/payments',icon:CreditCard,label:'Payments',managerOnly:true},
 ]
 
 // Defined outside AdminLayout on purpose — a stable, module-level component

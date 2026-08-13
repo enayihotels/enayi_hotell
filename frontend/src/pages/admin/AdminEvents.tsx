@@ -6,6 +6,7 @@ import { formatCurrency, formatDate } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
 import { CalendarDays, Building2, Plus, Pencil, Trash2, Image as ImageIcon, Upload } from 'lucide-react'
 import type { EventHall, EventBooking, EventStatus } from '@/types'
+import { useAuthStore } from '@/store/authStore'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
 
@@ -30,6 +31,8 @@ const emptyHallForm: HallForm = {
 }
 
 export default function AdminEvents() {
+  const { user } = useAuthStore()
+  const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const qc = useQueryClient()
   const [tab, setTab] = useState<'halls' | 'bookings'>('bookings')
 
@@ -116,9 +119,9 @@ export default function AdminEvents() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl md:text-3xl text-enayi-text">Events</h1>
-          <p className="text-enayi-muted text-sm">Manage event halls and bookings.</p>
+          <p className="text-enayi-muted text-sm">{isManagerOrAdmin ? 'Manage event halls and bookings.' : 'View event halls and bookings.'}</p>
         </div>
-        {tab === 'halls' && (
+        {tab === 'halls' && isManagerOrAdmin && (
           <Button variant="gold" onClick={openNewHall}><Plus size={14} /> Add Hall</Button>
         )}
       </div>
@@ -155,13 +158,15 @@ export default function AdminEvents() {
                     {b.balance_due > 0 && <div className="text-red-400 text-xs">{formatCurrency(b.balance_due)} due</div>}
                   </div>
                 </div>
-                <Select
-                  value={b.status}
-                  onChange={e => updateBookingStatus.mutate({ id: b.id, status: e.target.value as EventStatus })}
-                  className="max-w-[220px]"
-                >
-                  {STATUS_OPTIONS.map(s => <option key={s} value={s} className="capitalize">{s.replace('_',' ')}</option>)}
-                </Select>
+                {isManagerOrAdmin && (
+                  <Select
+                    value={b.status}
+                    onChange={e => updateBookingStatus.mutate({ id: b.id, status: e.target.value as EventStatus })}
+                    className="max-w-[220px]"
+                  >
+                    {STATUS_OPTIONS.map(s => <option key={s} value={s} className="capitalize">{s.replace('_',' ')}</option>)}
+                  </Select>
+                )}
               </div>
             ))}
           </div>
@@ -182,9 +187,15 @@ export default function AdminEvents() {
                 <div className="text-enayi-gold font-semibold text-sm">{formatCurrency(h.price_full_day)}<span className="text-enayi-muted text-xs font-normal"> / full day</span></div>
                 <div className="text-enayi-muted text-xs">Seated {h.capacity_seated} · Cocktail {h.capacity_cocktail} · {h.size_sqm}m²</div>
                 <div className="flex gap-2 pt-1 flex-wrap">
-                  <Button size="sm" variant="outline" onClick={() => openEditHall(h)}><Pencil size={12} /> Edit</Button>
-                  <Button size="sm" variant="surface" onClick={() => openPhotoModal(h)}><ImageIcon size={12} /> Photos ({h.images?.length ?? 0})</Button>
-                  <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${h.name}"?`)) deleteHall.mutate(h.slug) }}><Trash2 size={12} /> Delete</Button>
+                  {isManagerOrAdmin ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => openEditHall(h)}><Pencil size={12} /> Edit</Button>
+                      <Button size="sm" variant="surface" onClick={() => openPhotoModal(h)}><ImageIcon size={12} /> Photos ({h.images?.length ?? 0})</Button>
+                      <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${h.name}"?`)) deleteHall.mutate(h.slug) }}><Trash2 size={12} /> Delete</Button>
+                    </>
+                  ) : (
+                    <span className="text-enayi-muted text-xs italic">View only</span>
+                  )}
                 </div>
               </div>
             ))}

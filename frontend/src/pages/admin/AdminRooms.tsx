@@ -6,6 +6,7 @@ import { formatCurrency } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
 import { BedDouble, DoorOpen, Plus, Pencil, Trash2, LayoutGrid, Image as ImageIcon, Upload, Sparkles } from 'lucide-react'
 import type { RoomCategory, Room, Amenity, RoomPhoto } from '@/types'
+import { useAuthStore } from '@/store/authStore'
 
 const BED_TYPES = ['single','double','queen','king','twin','suite']
 const VIEW_TYPES = ['garden','city','pool','courtyard']
@@ -50,6 +51,8 @@ type AmenityForm = { name: string; icon: string; category: string; is_premium: b
 const emptyAmenityForm: AmenityForm = { name: '', icon: 'check', category: 'basic', is_premium: false }
 
 export default function AdminRooms() {
+  const { user } = useAuthStore()
+  const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const qc = useQueryClient()
   const [tab, setTab] = useState<'categories' | 'rooms' | 'amenities'>('categories')
   const [roomsCategoryFilter, setRoomsCategoryFilter] = useState<RoomCategory | null>(null)
@@ -250,11 +253,13 @@ export default function AdminRooms() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-display text-2xl md:text-3xl text-enayi-text">Rooms</h1>
-          <p className="text-enayi-muted text-sm">Manage room categories and individual rooms.</p>
+          <p className="text-enayi-muted text-sm">{isManagerOrAdmin ? 'Manage room categories and individual rooms.' : 'View room categories, individual rooms, and status.'}</p>
         </div>
-        <Button variant="gold" onClick={tab === 'categories' ? openNewCategory : tab === 'rooms' ? openNewRoom : openNewAmenity}>
-          <Plus size={14} /> {tab === 'categories' ? 'Add Category' : tab === 'rooms' ? 'Add Room' : 'Add Amenity'}
-        </Button>
+        {isManagerOrAdmin && (
+          <Button variant="gold" onClick={tab === 'categories' ? openNewCategory : tab === 'rooms' ? openNewRoom : openNewAmenity}>
+            <Plus size={14} /> {tab === 'categories' ? 'Add Category' : tab === 'rooms' ? 'Add Room' : 'Add Amenity'}
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-2">
@@ -266,10 +271,12 @@ export default function AdminRooms() {
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='rooms' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
           <DoorOpen size={14} className="inline mr-1.5 -mt-0.5" /> Rooms ({rooms?.length ?? 0})
         </button>
-        <button onClick={() => setTab('amenities')}
-          className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='amenities' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
-          <Sparkles size={14} className="inline mr-1.5 -mt-0.5" /> Amenities ({amenities?.length ?? 0})
-        </button>
+        {isManagerOrAdmin && (
+          <button onClick={() => setTab('amenities')}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='amenities' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
+            <Sparkles size={14} className="inline mr-1.5 -mt-0.5" /> Amenities ({amenities?.length ?? 0})
+          </button>
+        )}
       </div>
 
       {tab === 'categories' && (
@@ -294,9 +301,15 @@ export default function AdminRooms() {
                 <div className="text-enayi-gold font-semibold">{formatCurrency(c.base_price)}<span className="text-enayi-muted text-xs font-normal"> / night</span></div>
                 <div className="text-enayi-muted text-xs">{c.max_adults} adults · {c.num_beds} bed(s) · {c.num_bathrooms} bath · {c.room_size_sqm}m² · {c.available_rooms} room(s) across both branches</div>
                 <div className="flex gap-2 pt-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                  <Button size="sm" variant="outline" onClick={() => openEditCategory(c)}><Pencil size={12} /> Edit</Button>
-                  <Button size="sm" variant="surface" onClick={() => openPhotoModal(c)}><ImageIcon size={12} /> Photos ({c.images?.length ?? 0})</Button>
-                  <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCategory.mutate(c.slug) }}><Trash2 size={12} /> Delete</Button>
+                  {isManagerOrAdmin ? (
+                    <>
+                      <Button size="sm" variant="outline" onClick={() => openEditCategory(c)}><Pencil size={12} /> Edit</Button>
+                      <Button size="sm" variant="surface" onClick={() => openPhotoModal(c)}><ImageIcon size={12} /> Photos ({c.images?.length ?? 0})</Button>
+                      <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCategory.mutate(c.slug) }}><Trash2 size={12} /> Delete</Button>
+                    </>
+                  ) : (
+                    <span className="text-enayi-muted text-xs italic">View only</span>
+                  )}
                 </div>
               </div>
             ))}
@@ -347,9 +360,15 @@ export default function AdminRooms() {
                           <div className="text-enayi-gold font-semibold text-sm">{formatCurrency(Number(r.current_price))}<span className="text-enayi-muted text-xs font-normal"> / night</span></div>
                           <div className="text-enayi-muted text-xs capitalize">{r.view_type} view{r.is_smoking ? ' · Smoking' : ''}{r.has_balcony ? ' · Balcony' : ''}</div>
                           <div className="flex gap-2 pt-2 flex-wrap">
-                            <Button size="sm" variant="outline" onClick={() => openEditRoom(r)}><Pencil size={12} /> Edit</Button>
-                            <Button size="sm" variant="surface" onClick={() => openRoomPhotoModal(r)}><ImageIcon size={12} /> Photos</Button>
-                            <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete Room ${r.room_number}?`)) deleteRoom.mutate(r.id) }}><Trash2 size={12} /> Delete</Button>
+                            {isManagerOrAdmin ? (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => openEditRoom(r)}><Pencil size={12} /> Edit</Button>
+                                <Button size="sm" variant="surface" onClick={() => openRoomPhotoModal(r)}><ImageIcon size={12} /> Photos</Button>
+                                <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete Room ${r.room_number}?`)) deleteRoom.mutate(r.id) }}><Trash2 size={12} /> Delete</Button>
+                              </>
+                            ) : (
+                              <span className="text-enayi-muted text-xs italic">View only</span>
+                            )}
                           </div>
                         </div>
                       ))}

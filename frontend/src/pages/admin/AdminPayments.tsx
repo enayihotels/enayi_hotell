@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/utils/api'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
-import { PageSpinner, EmptyState, Badge, Select } from '@/components/ui'
+import { PageSpinner, EmptyState, Badge, Select, Alert } from '@/components/ui'
 import { CreditCard } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
 import type { AdminPayment, PaymentStatus, PaymentMethod } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
@@ -13,6 +14,8 @@ const STATUS_BADGE: Record<PaymentStatus, 'green'|'red'|'gold'|'blue'|'gray'> = 
 }
 
 export default function AdminPayments() {
+  const { user } = useAuthStore()
+  const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const [statusFilter, setStatusFilter] = useState('')
   const [methodFilter, setMethodFilter] = useState('')
 
@@ -27,6 +30,14 @@ export default function AdminPayments() {
   })
 
   const totalSuccess = (data || []).filter(p => p.status === 'success').reduce((s, p) => s + Number(p.amount), 0)
+
+  if (!isManagerOrAdmin) {
+    return (
+      <div className="p-4 md:p-6">
+        <Alert type="error">This page is restricted to managers and owners.</Alert>
+      </div>
+    )
+  }
 
   if (isLoading) return <PageSpinner />
 
