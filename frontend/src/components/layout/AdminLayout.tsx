@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu } from 'lucide-react'
+import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
 
@@ -42,7 +42,10 @@ function AdminSidebarContent({ visibleNav, onNavigate }: {
           </NavLink>
         ))}
       </nav>
-      <div className="p-3 border-t border-enayi-border">
+      <div className="p-3 border-t border-enayi-border space-y-1.5">
+        <Link to="/dashboard" className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-gold hover:bg-enayi-gold/10 text-xs font-medium transition-all">
+          <User size={14} /> My Account
+        </Link>
         <Link to="/" className="btn-ghost w-full text-xs">← Main Website</Link>
       </div>
     </aside>

@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard } from 'lucide-react'
+import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard, ShieldCheck } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/utils/api'
 import toast from 'react-hot-toast'
@@ -46,6 +46,11 @@ function GuestSidebarContent({ collapsed, user, onNavigate, onLogout }: {
       </nav>
       <div className="p-3 border-t border-enayi-border">
         {!collapsed && <div className="flex items-center gap-3 px-3 py-2 mb-1"><div className="w-8 h-8 rounded-full bg-enayi-gold/20 flex items-center justify-center flex-shrink-0"><span className="text-enayi-gold font-semibold text-sm">{user?.first_name?.[0]}</span></div><div className="overflow-hidden"><div className="text-enayi-text text-sm font-medium truncate">{user?.full_name}</div><div className="text-enayi-muted text-xs capitalize">{user?.role}</div></div></div>}
+        {(user?.role === 'staff' || user?.role === 'manager' || user?.role === 'admin') && (
+          <Link to="/admin" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-gold hover:bg-enayi-gold/10 text-xs font-medium transition-all mb-1', collapsed && 'justify-center')}>
+            <ShieldCheck size={14} />{!collapsed && 'Admin Panel'}
+          </Link>
+        )}
         <Link to="/" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all', collapsed && 'justify-center')}><Home size={14} />{!collapsed && 'Main Site'}</Link>
         <button onClick={onLogout} className={cn('w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 text-xs transition-all', collapsed && 'justify-center')}><LogOut size={14} />{!collapsed && 'Sign Out'}</button>
       </div>
