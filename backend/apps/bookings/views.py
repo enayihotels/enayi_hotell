@@ -197,6 +197,7 @@ class CheckOutView(APIView):
         booking.status            = "checked_out"
         booking.actual_check_out  = timezone.now()
         booking.room.status       = "cleaning"
+        booking.room.cleaning_started_at = timezone.now()
         booking.room.save()
         booking.save()
         booking.guest.add_loyalty_points(100, f"Stay at Room {booking.room.room_number}")
@@ -265,6 +266,7 @@ class ApproveCheckoutView(APIView):
             booking.status           = "checked_out"
             booking.actual_check_out = timezone.now()
             booking.room.status      = "cleaning"
+            booking.room.cleaning_started_at = timezone.now()
             booking.room.save()
             booking.save()
             booking.guest.add_loyalty_points(100, f"Stay at Room {booking.room.room_number}")

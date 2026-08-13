@@ -27,6 +27,8 @@ class DashboardStatsView(APIView):
         from apps.accounts.models import User
         from apps.rooms.models import Room
 
+        Room.release_stale_cleaning_rooms()
+
         today = timezone.now().date()
 
         this_month_start = today.replace(day=1)

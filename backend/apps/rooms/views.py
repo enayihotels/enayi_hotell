@@ -22,7 +22,7 @@ class AmenityListCreateView(generics.ListCreateAPIView):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
 
     def create(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         return super().create(request, *args, **kwargs)
 
@@ -36,12 +36,12 @@ class AmenityDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
 
     def update(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         instance = self.get_object()
         from django.db.models import ProtectedError
@@ -83,7 +83,7 @@ class RoomCategoryListView(generics.ListCreateAPIView):
     def get_serializer_context(self): return {"request": self.request}
 
     def create(self, request, *args, **kwargs):
-        if not (request.user.is_authenticated and request.user.is_hotel_staff):
+        if not (request.user.is_authenticated and request.user.role in ["manager","admin"]):
             return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
         data = request.data.copy()
         if not data.get("slug") and data.get("name"):
@@ -112,7 +112,7 @@ class RoomCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_serializer_context(self): return {"request": self.request}
 
     def update(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
@@ -121,7 +121,7 @@ class RoomCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(RoomCategorySerializer(category, context={"request": request}).data)
 
     def destroy(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
         instance = self.get_object()
         try:
@@ -149,12 +149,13 @@ class RoomListView(generics.ListCreateAPIView):
     filterset_fields = ["status","floor","category"]
     search_fields = ["room_number"]
     def get_queryset(self):
+        Room.release_stale_cleaning_rooms()
         if self.request.user.is_hotel_staff:
             return Room.objects.select_related("category").all()
         return Room.objects.filter(status="available").select_related("category")
 
     def create(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
         return super().create(request, *args, **kwargs)
 
@@ -165,12 +166,12 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Room.objects.select_related("category")
 
     def update(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
         return super().update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=status.HTTP_403_FORBIDDEN)
         instance = self.get_object()
         try:
@@ -201,7 +202,7 @@ class RoomImageUploadView(APIView):
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
     def post(self, request, cat_id):
-        if not request.user.is_hotel_staff: return Response({"error":"Permission denied."},status=403)
+        if request.user.role not in ["manager","admin"]: return Response({"error":"Permission denied."},status=403)
         try: category = RoomCategory.objects.get(id=cat_id)
         except RoomCategory.DoesNotExist: return Response({"error":"Not found."},status=404)
         images = request.FILES.getlist("images")
@@ -220,7 +221,7 @@ class RoomImageDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Permission denied."}, status=403)
         try:
             image = RoomImage.objects.get(id=pk)
@@ -253,6 +254,8 @@ class BranchRoomsView(APIView):
         from django.db.models import Q
         from django.utils import timezone
         from apps.bookings.models import Booking
+
+        Room.release_stale_cleaning_rooms()
 
         key = request.query_params.get("hotel") or request.query_params.get("branch")
         if not key:
@@ -357,7 +360,7 @@ class RoomPhotoListUploadView(APIView):
         return Response(RoomPhotoSerializer(photos, many=True, context={"request": request}).data)
 
     def post(self, request, room_id):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         try:
             room = Room.objects.get(id=room_id)
@@ -380,7 +383,7 @@ class RoomPhotoDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Permission denied."}, status=403)
         try:
             photo = RoomPhoto.objects.get(id=pk)

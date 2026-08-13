@@ -890,14 +890,17 @@ class PaymentHistoryView(APIView):
 
 
 class AdminPaymentListView(APIView):
-    """GET /api/v1/payments/admin/ — staff-only, all payments across all guests.
+    """GET /api/v1/payments/admin/ — manager/owner only, all payments across
+    all guests. Deliberately NOT open to staff — this is the full financial
+    log across every guest, not the single-booking payment recording staff
+    already does from the Bookings screen.
     Optional filters: ?status=success&method=cash&purpose=booking
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not request.user.is_hotel_staff:
-            return Response({"error": "Staff only."}, status=403)
+        if request.user.role not in ["manager", "admin"]:
+            return Response({"error": "Manager/Owner only."}, status=403)
 
         from .serializers import AdminPaymentSerializer
 

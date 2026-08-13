@@ -34,7 +34,7 @@ class EventHallListView(generics.ListCreateAPIView):
         return qs
 
     def create(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         from django.utils.text import slugify
         data = request.data.copy()
@@ -64,7 +64,7 @@ class EventHallDetailView(generics.RetrieveUpdateDestroyAPIView):
         return {"request": self.request}
 
     def update(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
@@ -73,7 +73,7 @@ class EventHallDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(EventHallSerializer(hall).data)
 
     def destroy(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         instance = self.get_object()
         from django.db.models import ProtectedError
@@ -93,7 +93,7 @@ class EventHallImageUploadView(APIView):
 
     def post(self, request, hall_id):
 
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response(
                 {"error": "Permission denied."},
                 status=403
@@ -156,7 +156,7 @@ class EventHallImageDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Permission denied."}, status=403)
         try:
             image = EventHallImage.objects.get(id=pk)
@@ -431,7 +431,7 @@ class EventBookingStatusUpdateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def patch(self, request, pk):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
 
         from django.shortcuts import get_object_or_404

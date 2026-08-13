@@ -27,7 +27,7 @@ class GalleryCategoryListView(generics.ListCreateAPIView):
         return qs
 
     def create(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         from django.utils.text import slugify
         data = request.data.copy()
@@ -48,7 +48,7 @@ class GalleryCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         return [AllowAny()] if self.request.method == "GET" else [IsAuthenticated()]
 
     def update(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
@@ -57,7 +57,7 @@ class GalleryCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(GalleryCategorySerializer(category).data)
 
     def destroy(self, request, *args, **kwargs):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response({"error": "Staff only."}, status=403)
         instance = self.get_object()
         from django.db.models import ProtectedError
@@ -136,7 +136,7 @@ class GalleryImageDetailView(generics.RetrieveDestroyAPIView):
         return {"request": self.request}
 
     def perform_destroy(self, instance):
-        if not self.request.user.is_hotel_staff:
+        if self.request.user.role not in ["manager","admin"]:
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Only staff can delete images.")
 
@@ -149,7 +149,7 @@ class GalleryImageUploadView(APIView):
     parser_classes = [MultiPartParser, FormParser]
 
     def post(self, request):
-        if not request.user.is_hotel_staff:
+        if request.user.role not in ["manager","admin"]:
             return Response(
                 {"error": "Permission denied."},
                 status=403

@@ -154,6 +154,7 @@ class Room(models.Model):
     ], default="city")
     notes       = models.TextField(blank=True)
     last_cleaned= models.DateTimeField(blank=True, null=True)
+    cleaning_started_at = models.DateTimeField(blank=True, null=True, help_text="When this room entered 'cleaning' status at checkout — used to auto-release it back to 'available' after CLEANING_BUFFER_MINUTES.")
     created_at  = models.DateTimeField(auto_now_add=True)
     updated_at  = models.DateTimeField(auto_now=True)
 
@@ -162,6 +163,31 @@ class Room(models.Model):
         ordering = ["floor", "room_number"]
 
     def __str__(self): return f"Room {self.room_number} ({self.category.name})"
+
+    # How long a room stays in "Cleaning" after checkout before it's
+    # automatically released back to "Available". No Celery worker runs
+    # in this deployment, so this can't be a scheduled task that fires
+    # at exactly T+30min — instead, release_stale_cleaning_rooms() below
+    # is called at the top of the views that actually display room
+    # status (the admin Rooms list and the guest-facing availability
+    # check), so status is always correct by the time anyone looks at
+    # it, without needing a dedicated always-on worker or an extra paid
+    # Render Cron Job for something this lightweight.
+    CLEANING_BUFFER_MINUTES = 30
+
+    @classmethod
+    def release_stale_cleaning_rooms(cls):
+        """Flip any room that's been in 'cleaning' status longer than
+        CLEANING_BUFFER_MINUTES back to 'available'. Safe to call as
+        often as needed — a no-op if nothing has aged out yet."""
+        from django.utils import timezone
+        from datetime import timedelta
+        cutoff = timezone.now() - timedelta(minutes=cls.CLEANING_BUFFER_MINUTES)
+        return cls.objects.filter(
+            status="cleaning",
+            cleaning_started_at__isnull=False,
+            cleaning_started_at__lte=cutoff,
+        ).update(status="available", cleaning_started_at=None)
 
     def get_current_price(self):
         """Branch-aware nightly rate for this physical room."""
