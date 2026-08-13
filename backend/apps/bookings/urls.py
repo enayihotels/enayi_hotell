@@ -13,4 +13,5 @@ urlpatterns = [
     path("ref/<str:ref>/",        views.BookingByReferenceView.as_view(),name="booking-by-ref"),
     path("checkout-approvals/",              views.PendingCheckoutApprovalsView.as_view(), name="checkout-approvals-pending"),
     path("checkout-approvals/<uuid:pk>/decide/", views.ApproveCheckoutView.as_view(),       name="checkout-approval-decide"),
+    path("manager-activity/",                views.ManagerActivityView.as_view(),          name="manager-activity"),
 ]

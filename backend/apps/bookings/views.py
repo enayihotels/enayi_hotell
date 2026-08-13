@@ -484,3 +484,76 @@ def _run_identity_vision_check(selfie_bytes: bytes, reference_bytes: bytes):
         import logging
         logging.getLogger("apps.bookings").warning(f"Identity vision check failed: {exc}")
         return CheckinIdentityCheck.ERROR, "Could not complete the AI check right now — proceed using the check-in code and your own judgment."
+
+
+class ManagerActivityView(APIView):
+    """GET /api/v1/bookings/manager-activity/ — OWNER-ONLY.
+
+    This exists to close a real gap: CheckoutApprovalRequest has always
+    recorded `decided_by` (which manager approved or rejected a request),
+    but nothing ever surfaced that history anywhere — the Checkout
+    Approvals screen only ever showed requests still PENDING, so once a
+    manager decided one, it simply vanished from view. There was no way
+    for the owner to look back and see a manager's track record: how
+    many requests they've handled, how often they approve vs reject, or
+    review the specific decisions and amounts involved.
+
+    Deliberately admin-only (not manager-visible) — this is oversight OF
+    managers, not a tool for managers to review each other.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != "admin":
+            return Response({"error": "Owner/Admin only."}, status=status.HTTP_403_FORBIDDEN)
+
+        from django.db.models import Count, Q, Sum
+        from apps.accounts.models import User
+
+        decided = (CheckoutApprovalRequest.objects
+                   .exclude(decided_by__isnull=True)
+                   .select_related("booking", "booking__guest", "decided_by", "requested_by")
+                   .order_by("-decided_at"))
+
+        # Per-manager summary — approve/reject counts and total value waved through.
+        # IMPORTANT: .order_by() with no args before .values().annotate() —
+        # without it, Django silently folds the model's default Meta
+        # ordering field (created_at) into the GROUP BY, splitting each
+        # manager's decisions into one group per distinct timestamp
+        # instead of aggregating them together. Confirmed with a real
+        # test: without this, a manager with 2 decisions a second apart
+        # showed up as 1 total instead of 2.
+        by_manager = {}
+        for row in (decided.order_by()
+                    .values("decided_by__id", "decided_by__first_name", "decided_by__last_name")
+                    .annotate(
+                        total=Count("id"),
+                        approved=Count("id", filter=Q(status="approved")),
+                        rejected=Count("id", filter=Q(status="rejected")),
+                        amount_approved=Sum("balance_due_at_request", filter=Q(status="approved")),
+                    )):
+            name = f"{row['decided_by__first_name']} {row['decided_by__last_name']}".strip()
+            by_manager[name] = {
+                "total_decisions": row["total"],
+                "approved": row["approved"],
+                "rejected": row["rejected"],
+                "amount_waved_through": float(row["amount_approved"] or 0),
+            }
+
+        history = [{
+            "id": str(r.id),
+            "booking_reference": r.booking.booking_reference,
+            "guest_name": r.booking.guest.get_full_name() if r.booking.guest_id else "—",
+            "requested_by_name": r.requested_by.get_full_name() if r.requested_by_id else "—",
+            "decided_by_name": r.decided_by.get_full_name() if r.decided_by_id else "—",
+            "status": r.status,
+            "balance_due": float(r.balance_due_at_request),
+            "reason": r.reason,
+            "decision_note": r.decision_note,
+            "decided_at": r.decided_at.isoformat() if r.decided_at else None,
+        } for r in decided[:200]]
+
+        return Response({
+            "by_manager": by_manager,
+            "history": history,
+        })
