@@ -8,6 +8,7 @@ import { lazy, Suspense } from 'react'
 import PublicLayout    from '@/components/layout/PublicLayout'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AdminLayout     from '@/components/layout/AdminLayout'
+import InstallPrompt   from '@/components/InstallPrompt'
 
 // Public Pages
 const LandingPage    =lazy(() => import("@/pages/public/LandingPage"));
@@ -76,6 +77,7 @@ export default function App() {
           success: { iconTheme: { primary:'#C9A84C', secondary:'#09090E' } },
           error:   { iconTheme: { primary:'#f87171', secondary:'#EAE6DC' } },
         }} />
+        <InstallPrompt />
         <Suspense fallback={<Spinner />}>
           <Routes>
             {/* Public */}
