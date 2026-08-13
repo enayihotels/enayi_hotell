@@ -175,7 +175,7 @@ export default function AdminEvents() {
 
       {tab === 'halls' && (
         (halls||[]).length === 0 ? (
-          <div className="card p-12 text-center"><EmptyState icon={Building2} title="No event halls yet" desc="Add your first one." /></div>
+          <div className="card p-12 text-center"><EmptyState icon={Building2} title="No event halls yet" desc={isManagerOrAdmin ? "Add your first one." : "None have been added yet."} /></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {halls!.map(h => (

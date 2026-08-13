@@ -281,7 +281,7 @@ export default function AdminRooms() {
 
       {tab === 'categories' && (
         (categories||[]).length === 0 ? (
-          <div className="card p-12 text-center"><EmptyState icon={BedDouble} title="No room categories yet" desc="Add your first one to get started." /></div>
+          <div className="card p-12 text-center"><EmptyState icon={BedDouble} title="No room categories yet" desc={isManagerOrAdmin ? "Add your first one to get started." : "None have been added yet."} /></div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories!.map(c => (
@@ -341,7 +341,7 @@ export default function AdminRooms() {
               </div>
             )}
             {filteredRooms.length === 0 ? (
-              <div className="card p-12 text-center"><EmptyState icon={DoorOpen} title="No rooms yet" desc={roomsCategoryFilter ? `No rooms in ${roomsCategoryFilter.name} yet.` : 'Add your first room to get started.'} /></div>
+              <div className="card p-12 text-center"><EmptyState icon={DoorOpen} title="No rooms yet" desc={roomsCategoryFilter ? `No rooms in ${roomsCategoryFilter.name} yet.` : isManagerOrAdmin ? 'Add your first room to get started.' : 'None have been added yet.'} /></div>
             ) : (
               <div className="space-y-6">
                 {Array.from(branchGroups.entries()).map(([branchName, branchRooms]) => (
