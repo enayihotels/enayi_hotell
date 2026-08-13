@@ -26,6 +26,32 @@
   ::-webkit-scrollbar-track { background: #0B1120; }
   ::-webkit-scrollbar-thumb { background: #C9A227; border-radius: 999px; }
   ::selection { background: rgba(201,162,39,0.25); color: #F5F0E8; }
+
+  /* Chrome/Edge/Safari autofill (e.g. a saved email/password) silently
+     replaces an input's background with its own light default, ignoring
+     our dark theme entirely — this is why selected autofilled text was
+     unreadable (ivory-on-white) even though every other input on the
+     page looks correct. Force the real theme colors back in, using the
+     long-transition trick since -webkit-autofill ignores background
+     directly. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-text-fill-color: #F5F0E8 !important;
+    -webkit-box-shadow: 0 0 0 1000px #111827 inset !important;
+    box-shadow: 0 0 0 1000px #111827 inset !important;
+    caret-color: #F5F0E8;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
+  /* Belt-and-suspenders: even if a browser's autofill background still
+     slips through some other way, selected text inside any input stays
+     legible against either a light or dark surface. */
+  input::selection, textarea::selection {
+    background: rgba(201,162,39,0.55);
+    color: #0B1120;
+  }
 }
 
 @layer components {
