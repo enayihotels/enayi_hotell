@@ -258,13 +258,15 @@ class UpdateOrderStatusView(APIView):
             )
 
         # Front desk/manager/admin can update any order. Bar Staff and
-        # Kitchen Staff are scoped to their own department's orders only
-        # — a bar staffer marking a kitchen order "delivered" (or vice
-        # versa) doesn't make sense and would break the stock-linkage
-        # below, which infers Bar vs Kitchen from the order itself.
+        # Kitchen Staff are scoped to orders matching what they can
+        # actually SEE on their Orders screen — this must stay in sync
+        # with BarOrdersView/KitchenOrdersView's own source filters
+        # below, or exactly this happens: an order shows up on screen
+        # but clicking its status button 403s, because the two checks
+        # quietly drifted out of sync with each other.
         user = request.user
         can_update = user.is_hotel_staff or user.role in ["manager", "admin"]
-        if not can_update and user.role == "bar_staff" and order.source == "bar":
+        if not can_update and user.role == "bar_staff" and order.source in ["bar", "room_service"]:
             can_update = True
         if not can_update and user.role == "kitchen_staff" and order.source in ["kitchen", "room_service"]:
             can_update = True
