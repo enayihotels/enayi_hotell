@@ -53,6 +53,7 @@ const AdminGallery      = lazy(() => import('@/pages/admin/AdminGallery'))
 const AdminGuests       = lazy(() => import('@/pages/admin/AdminGuests'))
 const AdminPayments     = lazy(() => import('@/pages/admin/AdminPayments'))
 const AdminInventory    = lazy(() => import('@/pages/admin/AdminInventory'))
+const AdminAssets       = lazy(() => import('@/pages/admin/AdminAssets'))
 
 const Spinner = () => (
   <div className="flex items-center justify-center h-screen bg-enayi-bg">
@@ -133,6 +134,7 @@ export default function App() {
               <Route path="/admin/guests"    element={<AdminGuests key="admin-guests" />} />
               <Route path="/admin/payments"  element={<AdminPayments key="admin-payments" />} />
               <Route path="/admin/inventory" element={<AdminInventory key="admin-inventory" />} />
+              <Route path="/admin/assets"    element={<AdminAssets key="admin-assets" />} />
             </Route>
 
             {/* Store / Bar / Kitchen — a separate, lightweight shell so

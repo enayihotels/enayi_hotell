@@ -596,3 +596,35 @@ export interface ApiError {
   message?: string
   [key: string]: unknown
 }
+
+// ── Property Assets ──────────────────────────────────────
+export interface AssetIssueReport {
+  id: string
+  asset: string
+  issue_description: string
+  status: 'reported' | 'in_progress' | 'fixed'
+  reported_by: string | null
+  reported_by_name: string | null
+  reported_at: string
+  fixed_by: string | null
+  fixed_by_name: string | null
+  fixed_at: string | null
+  fix_notes: string
+}
+
+export interface PropertyAsset {
+  id: string
+  name: string
+  category: 'appliance' | 'electrical' | 'plumbing' | 'furniture' | 'fixture' | 'other'
+  room: string | null
+  room_number: string | null
+  location_note: string
+  where: string
+  status: 'working' | 'broken' | 'under_repair' | 'decommissioned'
+  serial_number: string
+  notes: string
+  open_issue: AssetIssueReport | null
+  issue_reports: AssetIssueReport[]
+  created_at: string
+  updated_at: string
+}
