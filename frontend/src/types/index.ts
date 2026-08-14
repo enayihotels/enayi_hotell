@@ -558,7 +558,30 @@ export interface InventoryItem {
   updated_at: string
 }
 
-// ── API helpers ─────────────────────────────────────────
+// ── Inventory: Phase 2 requisitions ────────────────────────
+export interface StockRequisition {
+  id: string
+  item: string
+  item_name: string
+  item_unit: string
+  item_sku: string
+  destination: StockLocation
+  destination_display: string
+  quantity_requested: number
+  quantity_fulfilled: number | null
+  status: 'pending' | 'fulfilled' | 'rejected' | 'cancelled'
+  status_display: string
+  requested_by: string
+  requested_by_name: string
+  note_from_requester: string
+  decided_by: string | null
+  decided_by_name: string | null
+  note_from_fulfiller: string
+  decided_at: string | null
+  store_available: number
+  created_at: string
+}
+
 export interface PaginatedResponse<T> {
   count: number
   next?: string

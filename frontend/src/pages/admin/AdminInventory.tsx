@@ -4,9 +4,9 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
-import { Package, Plus, Pencil, Trash2, LayoutGrid, AlertTriangle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
+import { Package, Plus, Pencil, Trash2, LayoutGrid, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ClipboardList, Check, X } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import type { InventoryCategory, InventoryItem, StockLocation } from '@/types'
+import type { InventoryCategory, InventoryItem, StockLocation, StockRequisition } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
 
@@ -32,8 +32,10 @@ export default function AdminInventory() {
 
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const canManageCatalog = user?.role === 'store_keeper' || isManagerOrAdmin
+  const canRequest = user?.role === 'bar_staff' || user?.role === 'kitchen_staff'
+  const canFulfill = user?.role === 'store_keeper' || isManagerOrAdmin
 
-  const [tab, setTab] = useState<'stock' | 'categories'>('stock')
+  const [tab, setTab] = useState<'stock' | 'categories' | 'requests'>('stock')
   const [locationFilter, setLocationFilter] = useState<StockLocation | 'all'>(ownLocation ?? 'all')
 
   const { data: categories, isLoading: catsLoading } = useQuery<InventoryCategory[]>({
@@ -43,6 +45,44 @@ export default function AdminInventory() {
   const { data: items, isLoading: itemsLoading } = useQuery<InventoryItem[]>({
     queryKey: ['inventory-items'],
     queryFn: () => api.get('/inventory/items/').then(r => unwrapList(r.data)),
+  })
+  const { data: requisitions, isLoading: reqLoading } = useQuery<StockRequisition[]>({
+    queryKey: ['inventory-requisitions'],
+    queryFn: () => api.get('/inventory/requisitions/').then(r => unwrapList(r.data)),
+    enabled: canRequest || canFulfill,
+  })
+
+  // ── Requisitions: request + fulfill/reject ──
+  const [reqModalOpen, setReqModalOpen] = useState(false)
+  const [reqItem, setReqItem] = useState('')
+  const [reqQty, setReqQty] = useState('')
+  const [reqNote, setReqNote] = useState('')
+
+  const createRequisition = useMutation({
+    mutationFn: () => api.post('/inventory/requisitions/', { item: reqItem, quantity_requested: parseFloat(reqQty), note_from_requester: reqNote }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['inventory-requisitions'] })
+      toast.success('Request sent to the Store Keeper.')
+      setReqModalOpen(false); setReqItem(''); setReqQty(''); setReqNote('')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const [decideTarget, setDecideTarget] = useState<StockRequisition | null>(null)
+  const [decideQty, setDecideQty] = useState('')
+  const [decideNote, setDecideNote] = useState('')
+
+  const decideRequisition = useMutation({
+    mutationFn: (action: 'fulfill' | 'reject') => api.post(`/inventory/requisitions/${decideTarget!.id}/decide/`, {
+      action, quantity_fulfilled: action === 'fulfill' ? parseFloat(decideQty) : undefined, note: decideNote,
+    }),
+    onSuccess: (_, action) => {
+      qc.invalidateQueries({ queryKey: ['inventory-requisitions'] })
+      qc.invalidateQueries({ queryKey: ['inventory-items'] })
+      toast.success(action === 'fulfill' ? 'Marked as fulfilled — stock moved.' : 'Request rejected.')
+      setDecideTarget(null); setDecideQty(''); setDecideNote('')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
   })
 
   // ── Category CRUD ──
@@ -143,6 +183,9 @@ export default function AdminInventory() {
           {tab === 'stock' && canManageCatalog && (
             <Button variant="gold" onClick={openNewItem}><Plus size={14} /> Add Item</Button>
           )}
+          {tab === 'requests' && canRequest && (
+            <Button variant="gold" onClick={() => setReqModalOpen(true)}><Plus size={14} /> Request Items</Button>
+          )}
         </div>
       </div>
 
@@ -155,6 +198,12 @@ export default function AdminInventory() {
           <button onClick={() => setTab('categories')}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='categories' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
             <LayoutGrid size={14} className="inline mr-1.5 -mt-0.5" /> Categories ({categories?.length ?? 0})
+          </button>
+        )}
+        {(canRequest || canFulfill) && (
+          <button onClick={() => setTab('requests')}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='requests' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
+            <ClipboardList size={14} className="inline mr-1.5 -mt-0.5" /> Requests ({(requisitions||[]).filter(r=>r.status==='pending').length} pending)
           </button>
         )}
         {!ownLocation && tab === 'stock' && (
@@ -242,6 +291,40 @@ export default function AdminInventory() {
         )
       )}
 
+      {tab === 'requests' && (
+        reqLoading ? <PageSpinner /> : (requisitions || []).length === 0 ? (
+          <div className="card p-12 text-center"><EmptyState icon={ClipboardList} title="No requests yet" desc={canRequest ? 'Request items from the Store when you need to restock.' : 'Nothing pending from Bar or Kitchen right now.'} /></div>
+        ) : (
+          <div className="space-y-3">
+            {requisitions!.map(r => (
+              <div key={r.id} className="card p-4 flex flex-col md:flex-row md:items-center gap-3 justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-enayi-text font-medium">{r.item_name}</span>
+                    <span className="text-enayi-muted text-xs">→ {r.destination_display}</span>
+                    <Badge variant={r.status === 'fulfilled' ? 'green' : r.status === 'rejected' ? 'red' : 'gold'}>{r.status_display}</Badge>
+                  </div>
+                  <div className="text-enayi-muted text-xs">
+                    Requested {r.quantity_requested} {r.item_unit}(s) by {r.requested_by_name}
+                    {r.status === 'fulfilled' && ` · Fulfilled ${r.quantity_fulfilled} ${r.item_unit}(s) by ${r.decided_by_name}`}
+                    {r.status === 'rejected' && ` · Rejected by ${r.decided_by_name}`}
+                  </div>
+                  {r.note_from_requester && <div className="text-enayi-muted text-xs italic">"{r.note_from_requester}"</div>}
+                  {r.note_from_fulfiller && <div className="text-enayi-gold text-xs italic">Store note: "{r.note_from_fulfiller}"</div>}
+                  {r.status === 'pending' && <div className="text-enayi-muted text-xs">Store currently has {r.store_available} {r.item_unit}(s)</div>}
+                </div>
+                {r.status === 'pending' && canFulfill && (
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button size="sm" variant="outline" onClick={() => { setDecideTarget(r); setDecideQty(String(r.quantity_requested)) }}><Check size={12} /> Fulfill</Button>
+                    <Button size="sm" variant="danger" onClick={() => { setDecideTarget(r); setDecideQty('') }}><X size={12} /> Reject</Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
       {/* Category modal */}
       <Modal open={catModalOpen} onClose={() => setCatModalOpen(false)} title={editingCat ? 'Edit Category' : 'Add Category'} size="sm">
         <div className="space-y-4">
@@ -296,6 +379,46 @@ export default function AdminInventory() {
               </Button>
               <Button variant="gold" loading={adjustStock.isPending} onClick={() => adjustStock.mutate(Math.abs(parseFloat(adjustAmount) || 0))} disabled={!adjustAmount}>
                 <ArrowUpCircle size={14} /> Add
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Request Items modal (Bar/Kitchen) */}
+      <Modal open={reqModalOpen} onClose={() => setReqModalOpen(false)} title="Request Items from Store" size="sm">
+        <div className="space-y-4">
+          <Select label="Item" value={reqItem} onChange={e => setReqItem(e.target.value)}>
+            <option value="">Select an item</option>
+            {(items || []).map(it => <option key={it.id} value={it.id}>{it.name}</option>)}
+          </Select>
+          <Input label="Quantity needed" type="number" placeholder="e.g. 20" value={reqQty} onChange={e => setReqQty(e.target.value)} />
+          <Textarea label="Note (optional)" placeholder="e.g. Need for tonight's event" value={reqNote} onChange={e => setReqNote(e.target.value)} />
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="ghost" onClick={() => setReqModalOpen(false)}>Cancel</Button>
+            <Button variant="gold" loading={createRequisition.isPending} onClick={() => createRequisition.mutate()} disabled={!reqItem || !reqQty}>
+              Send Request
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Fulfill / Reject modal (Store Keeper / Manager / Owner) */}
+      <Modal open={!!decideTarget} onClose={() => setDecideTarget(null)} title={decideTarget ? `${decideTarget.item_name} — ${decideTarget.destination_display} Request` : ''} size="sm">
+        {decideTarget && (
+          <div className="space-y-4">
+            <div className="text-enayi-text text-sm">
+              {decideTarget.requested_by_name} requested <span className="font-semibold">{decideTarget.quantity_requested} {decideTarget.item_unit}(s)</span>.
+              Store currently has <span className="font-semibold">{decideTarget.store_available} {decideTarget.item_unit}(s)</span>.
+            </div>
+            <Input label="Quantity to hand over" type="number" value={decideQty} onChange={e => setDecideQty(e.target.value)} />
+            <Textarea label="Note (optional)" placeholder="e.g. Only had 15 cold ones ready" value={decideNote} onChange={e => setDecideNote(e.target.value)} />
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="danger" loading={decideRequisition.isPending} onClick={() => decideRequisition.mutate('reject')}>
+                <X size={14} /> Reject
+              </Button>
+              <Button variant="gold" loading={decideRequisition.isPending} onClick={() => decideRequisition.mutate('fulfill')} disabled={!decideQty || parseFloat(decideQty) <= 0}>
+                <Check size={14} /> Confirm Fulfilled
               </Button>
             </div>
           </div>
