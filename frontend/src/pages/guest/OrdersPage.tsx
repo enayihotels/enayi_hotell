@@ -48,7 +48,7 @@ export default function OrdersPage() {
               {(cats||[]).map(c=><button key={c.id} onClick={()=>setActiveCategory(c.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all capitalize ${activeCategory===c.id?'bg-enayi-gold text-enayi-bg':'card text-enayi-muted'}`}>{c.name}</button>)}
             </div>
             {/* Source */}
-            <div className="card p-4 flex items-center gap-4">
+            <div className="card p-4 flex items-center gap-3 flex-wrap">
               <span className="text-enayi-muted text-sm">Order from:</span>
               {['room_service','kitchen','bar','restaurant'].map(s=>(
                 <button key={s} onClick={()=>setSource(s)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize ${source===s?'bg-enayi-gold text-enayi-bg':'card text-enayi-muted hover:text-enayi-gold'}`}>{s.replace('_',' ')}</button>
