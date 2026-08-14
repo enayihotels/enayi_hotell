@@ -29,6 +29,26 @@ type ManagerActivityHistoryItem = {
 type ManagerActivity = {
   by_manager: Record<string, ManagerStats>
   history: ManagerActivityHistoryItem[]
+  by_store_keeper: Record<string, StoreKeeperStats>
+  requisition_history: RequisitionHistoryItem[]
+}
+type StoreKeeperStats = {
+  total_decisions: number
+  fulfilled: number
+  rejected: number
+  value_released: number
+}
+type RequisitionHistoryItem = {
+  id: string
+  item_name: string
+  destination: string
+  requested_by_name: string
+  decided_by_name: string
+  status: 'fulfilled' | 'rejected'
+  quantity_requested: number
+  quantity_fulfilled: number | null
+  note_from_fulfiller: string
+  decided_at: string
 }
 
 export default function AdminCheckoutApprovals() {
@@ -178,6 +198,57 @@ export default function AdminCheckoutApprovals() {
                           Requested by {item.requested_by_name} · Decided by <span className="text-enayi-gold">{item.decided_by_name}</span> · {item.decided_at ? formatDateTime(item.decided_at) : '—'}
                         </div>
                         {item.decision_note && <div className="text-enayi-muted text-xs italic">"{item.decision_note}"</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-enayi-muted text-xs font-semibold uppercase tracking-wide mb-3">Store Keeper summary</div>
+              {Object.keys(managerActivity?.by_store_keeper || {}).length === 0 ? (
+                <EmptyState icon={Users} title="No decisions recorded yet" desc="Once a Store Keeper fulfills or rejects a request, their activity shows up here." />
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(managerActivity!.by_store_keeper).map(([name, stats]) => (
+                    <div key={name} className="card p-4 space-y-2">
+                      <div className="text-enayi-text font-medium">{name}</div>
+                      <div className="flex gap-3 text-sm">
+                        <span className="text-green-400 font-semibold">{stats.fulfilled} fulfilled</span>
+                        <span className="text-red-400 font-semibold">{stats.rejected} rejected</span>
+                      </div>
+                      <div className="text-enayi-muted text-xs">{stats.total_decisions} decision(s) total</div>
+                      <div className="text-enayi-gold text-sm font-semibold pt-1 border-t border-enayi-border">
+                        {formatCurrency(stats.value_released)} in stock released
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-enayi-muted text-xs font-semibold uppercase tracking-wide mb-3">Requisition decision history</div>
+              {(managerActivity?.requisition_history || []).length === 0 ? (
+                <div className="text-enayi-muted text-sm">Nothing decided yet.</div>
+              ) : (
+                <div className="space-y-2.5">
+                  {managerActivity!.requisition_history.map(item => (
+                    <div key={item.id} className="card p-4 flex flex-col md:flex-row md:items-center gap-3 justify-between">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-enayi-text font-medium">{item.item_name}</span>
+                          <span className="text-enayi-muted text-xs">→ {item.destination}</span>
+                          <Badge variant={item.status === 'fulfilled' ? 'green' : 'red'}>{item.status}</Badge>
+                        </div>
+                        <div className="text-enayi-text text-sm">
+                          Requested {item.quantity_requested}{item.quantity_fulfilled !== null && item.quantity_fulfilled !== item.quantity_requested ? ` · Fulfilled ${item.quantity_fulfilled}` : ''}
+                        </div>
+                        <div className="text-enayi-muted text-xs">
+                          Requested by {item.requested_by_name} · Decided by <span className="text-enayi-gold">{item.decided_by_name}</span> · {item.decided_at ? formatDateTime(item.decided_at) : '—'}
+                        </div>
+                        {item.note_from_fulfiller && <div className="text-enayi-muted text-xs italic">"{item.note_from_fulfiller}"</div>}
                       </div>
                     </div>
                   ))}
