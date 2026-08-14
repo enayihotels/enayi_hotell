@@ -1,14 +1,16 @@
 """Enayi Hotels — Store & Inventory Views (Phase 1: catalog + balances)"""
+from django.db import transaction
+from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from .models import InventoryCategory, InventoryItem, StockBalance
+from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisition
 from .serializers import (
     InventoryCategorySerializer, InventoryItemSerializer,
-    InventoryItemWriteSerializer, StockBalanceSerializer,
+    InventoryItemWriteSerializer, StockBalanceSerializer, StockRequisitionSerializer,
 )
 
 # Anyone in the inventory system (any department, or manager/admin) can
@@ -189,3 +191,117 @@ class AdjustStockView(APIView):
         balance.quantity = new_qty
         balance.save()
         return Response(StockBalanceSerializer(balance).data)
+
+
+class StockRequisitionListCreateView(generics.ListCreateAPIView):
+    """Phase 2: the request side. Bar/Kitchen staff request items from
+    the Store; everyone on the same team sees the same pending list
+    (not just their own requests), so anyone can follow up. Store
+    Keeper sees every pending request across both departments, since
+    they're the one fulfilling them. Manager/Owner see everything.
+    """
+    serializer_class = StockRequisitionSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = StockRequisition.objects.select_related("item", "requested_by", "decided_by")
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        if user.role in ["manager", "admin"]:
+            return qs
+        if user.role == "store_keeper":
+            return qs
+        if user.role == "bar_staff":
+            return qs.filter(destination=StockBalance.BAR)
+        if user.role == "kitchen_staff":
+            return qs.filter(destination=StockBalance.KITCHEN)
+        return StockRequisition.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        destination = {"bar_staff": StockBalance.BAR, "kitchen_staff": StockBalance.KITCHEN}.get(user.role)
+        if not destination:
+            return Response({"error": "Only Bar Staff or Kitchen Staff can request items from the Store."}, status=403)
+
+        data = request.data.copy()
+        data["destination"] = destination
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(requested_by=user, status=StockRequisition.PENDING)
+        return Response(serializer.data, status=201)
+
+
+class StockRequisitionDecideView(APIView):
+    """POST /api/v1/inventory/requisitions/<id>/decide/
+    Body: {action: 'fulfill'|'reject', quantity_fulfilled (if fulfilling), note}
+
+    Fulfilling is the moment stock actually moves — Store goes down,
+    the requesting department goes up, both by the SAME confirmed
+    amount, inside one transaction so it's never possible to end up
+    with one side updated and not the other.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.role not in ["store_keeper", "manager", "admin"]:
+            return Response({"error": "Only the Store Keeper, Manager, or Owner can fulfill or reject requests."}, status=403)
+
+        try:
+            req = StockRequisition.objects.select_related("item").get(id=pk)
+        except StockRequisition.DoesNotExist:
+            return Response({"error": "Request not found."}, status=404)
+
+        if req.status != StockRequisition.PENDING:
+            return Response({"error": f"This request was already {req.status}."}, status=400)
+
+        action = request.data.get("action")
+        note = request.data.get("note", "")
+
+        if action == "reject":
+            req.status = StockRequisition.REJECTED
+            req.decided_by = request.user
+            req.note_from_fulfiller = note
+            req.decided_at = timezone.now()
+            req.save()
+            return Response(StockRequisitionSerializer(req).data)
+
+        if action == "fulfill":
+            qty = request.data.get("quantity_fulfilled", req.quantity_requested)
+            try:
+                qty = float(qty)
+            except (TypeError, ValueError):
+                return Response({"error": "quantity_fulfilled must be a number."}, status=400)
+            if qty <= 0:
+                return Response({"error": "quantity_fulfilled must be greater than zero."}, status=400)
+
+            with transaction.atomic():
+                store_balance = StockBalance.objects.select_for_update().get_or_create(
+                    item=req.item, location=StockBalance.STORE)[0]
+                if float(store_balance.quantity) < qty:
+                    return Response({
+                        "error": f"Store only has {store_balance.quantity} {req.item.unit}(s) of {req.item.name} — can't fulfill {qty}."
+                    }, status=400)
+
+                dest_balance = StockBalance.objects.select_for_update().get_or_create(
+                    item=req.item, location=req.destination)[0]
+
+                store_balance.quantity = float(store_balance.quantity) - qty
+                store_balance.save()
+                dest_balance.quantity = float(dest_balance.quantity) + qty
+                dest_balance.save()
+
+                req.status = StockRequisition.FULFILLED
+                req.quantity_fulfilled = qty
+                req.decided_by = request.user
+                req.note_from_fulfiller = note
+                req.decided_at = timezone.now()
+                req.save()
+
+            return Response(StockRequisitionSerializer(req).data)
+
+        return Response({"error": "action must be 'fulfill' or 'reject'."}, status=400)

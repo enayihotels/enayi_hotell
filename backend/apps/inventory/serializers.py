@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import InventoryCategory, InventoryItem, StockBalance
+from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisition
 
 
 class InventoryCategorySerializer(serializers.ModelSerializer):
@@ -49,3 +49,32 @@ class InventoryItemWriteSerializer(serializers.ModelSerializer):
             "id", "name", "category", "unit", "cost_price", "sale_price",
             "reorder_threshold", "expiry_tracked", "is_active",
         ]
+
+
+class StockRequisitionSerializer(serializers.ModelSerializer):
+    item_name = serializers.CharField(source="item.name", read_only=True)
+    item_unit = serializers.CharField(source="item.unit", read_only=True)
+    item_sku = serializers.CharField(source="item.sku", read_only=True)
+    destination_display = serializers.CharField(source="get_destination_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    requested_by_name = serializers.CharField(source="requested_by.get_full_name", read_only=True)
+    decided_by_name = serializers.SerializerMethodField()
+    store_available = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StockRequisition
+        fields = [
+            "id", "item", "item_name", "item_unit", "item_sku", "destination", "destination_display",
+            "quantity_requested", "quantity_fulfilled", "status", "status_display",
+            "requested_by", "requested_by_name", "note_from_requester",
+            "decided_by", "decided_by_name", "note_from_fulfiller", "decided_at",
+            "store_available", "created_at",
+        ]
+        read_only_fields = ["status", "quantity_fulfilled", "decided_by", "note_from_fulfiller", "decided_at", "requested_by"]
+
+    def get_decided_by_name(self, obj):
+        return obj.decided_by.get_full_name() if obj.decided_by_id else None
+
+    def get_store_available(self, obj):
+        bal = obj.item.balances.filter(location=StockBalance.STORE).first()
+        return float(bal.quantity) if bal else 0

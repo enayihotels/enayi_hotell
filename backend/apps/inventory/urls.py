@@ -8,4 +8,6 @@ urlpatterns = [
     path("items/<uuid:pk>/",             views.InventoryItemDetailView.as_view(),     name="inventory-item-detail"),
     path("balances/",                    views.StockBalanceListView.as_view(),        name="inventory-balances"),
     path("balances/adjust/",             views.AdjustStockView.as_view(),             name="inventory-adjust"),
+    path("requisitions/",                views.StockRequisitionListCreateView.as_view(), name="inventory-requisitions"),
+    path("requisitions/<uuid:pk>/decide/", views.StockRequisitionDecideView.as_view(), name="inventory-requisition-decide"),
 ]

@@ -118,3 +118,56 @@ class StockBalance(models.Model):
     @property
     def is_low(self):
         return self.quantity <= self.item.reorder_threshold
+
+
+class StockRequisition(models.Model):
+    """Phase 2: the actual Store -> Bar/Kitchen movement mechanism.
+
+    Bar Staff or Kitchen Staff requests what they need; the Store Keeper
+    (or a manager/owner) fulfills it, confirming the real quantity handed
+    over — which might differ from what was requested if the Store
+    doesn't have enough. Stock only actually moves at fulfillment time,
+    not at request time. This is the "two-person handoff" accountability
+    model agreed on: both the requester's and the fulfiller's names are
+    on every transfer, without needing a slower manager-approval step
+    for something as routine as restocking the bar.
+    """
+    PENDING   = "pending"
+    FULFILLED = "fulfilled"
+    REJECTED  = "rejected"
+    CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (PENDING,   "Pending"),
+        (FULFILLED, "Fulfilled"),
+        (REJECTED,  "Rejected"),
+        (CANCELLED, "Cancelled"),
+    ]
+
+    DESTINATION_CHOICES = [
+        (StockBalance.BAR,     "Bar"),
+        (StockBalance.KITCHEN, "Kitchen"),
+    ]
+
+    id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item                = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="requisitions")
+    destination         = models.CharField(max_length=20, choices=DESTINATION_CHOICES)
+    quantity_requested  = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
+    quantity_fulfilled  = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                                               validators=[MinValueValidator(0)])
+    status              = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING)
+
+    requested_by        = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="stock_requests_made")
+    note_from_requester  = models.CharField(max_length=255, blank=True)
+
+    decided_by          = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="stock_requests_decided")
+    note_from_fulfiller = models.CharField(max_length=255, blank=True)
+    decided_at          = models.DateTimeField(null=True, blank=True)
+
+    created_at          = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "inventory_stock_requisitions"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.item.name} x{self.quantity_requested} -> {self.get_destination_display()} ({self.status})"
