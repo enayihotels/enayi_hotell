@@ -10,6 +10,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import AdminLayout     from '@/components/layout/AdminLayout'
 import InventoryLayout from '@/components/layout/InventoryLayout'
 import InstallPrompt   from '@/components/InstallPrompt'
+import UpdatePrompt    from '@/components/UpdatePrompt'
 
 // Public Pages
 const LandingPage    =lazy(() => import("@/pages/public/LandingPage"));
@@ -86,6 +87,7 @@ export default function App() {
           error:   { iconTheme: { primary:'#f87171', secondary:'#EAE6DC' } },
         }} />
         <InstallPrompt />
+        <UpdatePrompt />
         <Suspense fallback={<Spinner />}>
           <Routes>
             {/* Public */}

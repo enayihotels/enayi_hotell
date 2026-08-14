@@ -7,7 +7,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
+      injectRegister: false, // registered manually below via the React hook, so I can show a proper "update available" banner instead of updating silently and unpredictably
       // Only precache the built app shell (JS/CSS/fonts/icons) — never the
       // API. This app's data (room status, bookings, payments) changes
       // constantly; caching API responses would show staff and guests
