@@ -8,6 +8,7 @@ import { lazy, Suspense } from 'react'
 import PublicLayout    from '@/components/layout/PublicLayout'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import AdminLayout     from '@/components/layout/AdminLayout'
+import InventoryLayout from '@/components/layout/InventoryLayout'
 import InstallPrompt   from '@/components/InstallPrompt'
 
 // Public Pages
@@ -49,6 +50,7 @@ const AdminEvents       = lazy(() => import('@/pages/admin/AdminEvents'))
 const AdminGallery      = lazy(() => import('@/pages/admin/AdminGallery'))
 const AdminGuests       = lazy(() => import('@/pages/admin/AdminGuests'))
 const AdminPayments     = lazy(() => import('@/pages/admin/AdminPayments'))
+const AdminInventory    = lazy(() => import('@/pages/admin/AdminInventory'))
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 1000 * 60 * 5 } }
@@ -60,10 +62,16 @@ const Spinner = () => (
   </div>
 )
 
-function Guard({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
+function Guard({ children, adminOnly = false, inventoryOnly = false }: { children: React.ReactNode; adminOnly?: boolean; inventoryOnly?: boolean }) {
   const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (adminOnly && !['admin', 'manager', 'staff'].includes(user?.role ?? ''))
+    return <Navigate to="/dashboard" replace />
+  // Separate from adminOnly on purpose — inventory roles (Store Keeper,
+  // Bar Staff, Kitchen Staff) should only ever reach the Inventory
+  // screen, not Bookings/Rooms/Guests/etc., so this never gets folded
+  // into the broader adminOnly role list above.
+  if (inventoryOnly && !['store_keeper', 'bar_staff', 'kitchen_staff', 'manager', 'admin'].includes(user?.role ?? ''))
     return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
@@ -125,6 +133,14 @@ export default function App() {
               <Route path="/admin/gallery"   element={<AdminGallery key="admin-gallery" />} />
               <Route path="/admin/guests"    element={<AdminGuests key="admin-guests" />} />
               <Route path="/admin/payments"  element={<AdminPayments key="admin-payments" />} />
+              <Route path="/admin/inventory" element={<AdminInventory key="admin-inventory" />} />
+            </Route>
+
+            {/* Store / Bar / Kitchen — a separate, lightweight shell so
+                these roles only ever see Inventory, not the full admin
+                panel with Bookings/Rooms/Guests/etc. that isn't their job. */}
+            <Route element={<Guard inventoryOnly><InventoryLayout /></Guard>}>
+              <Route path="/inventory" element={<AdminInventory key="inventory" />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard, ShieldCheck, Package } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/utils/api'
 import toast from 'react-hot-toast'
@@ -49,6 +49,11 @@ function GuestSidebarContent({ collapsed, user, onNavigate, onLogout }: {
         {(user?.role === 'staff' || user?.role === 'manager' || user?.role === 'admin') && (
           <Link to="/admin" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-gold hover:bg-enayi-gold/10 text-xs font-medium transition-all mb-1', collapsed && 'justify-center')}>
             <ShieldCheck size={14} />{!collapsed && 'Admin Panel'}
+          </Link>
+        )}
+        {(user?.role === 'store_keeper' || user?.role === 'bar_staff' || user?.role === 'kitchen_staff') && (
+          <Link to="/inventory" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-gold hover:bg-enayi-gold/10 text-xs font-medium transition-all mb-1', collapsed && 'justify-center')}>
+            <Package size={14} />{!collapsed && 'Inventory'}
           </Link>
         )}
         <Link to="/" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all', collapsed && 'justify-center')}><Home size={14} />{!collapsed && 'Main Site'}</Link>

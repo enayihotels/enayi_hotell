@@ -514,6 +514,50 @@ export interface FraudAuditReport {
   created_at: string
 }
 
+// ── Inventory ────────────────────────────────────────────
+export interface InventoryCategory {
+  id: string
+  name: string
+  slug: string
+  description: string
+  is_active: boolean
+  item_count: number
+}
+
+export type StockLocation = 'store' | 'bar' | 'kitchen'
+
+export interface StockBalance {
+  id: string
+  location: StockLocation
+  location_display: string
+  quantity: number
+  is_low: boolean
+  updated_at: string
+  item_id?: string
+  item_name?: string
+  item_sku?: string
+  item_unit?: string
+  category_name?: string
+}
+
+export interface InventoryItem {
+  id: string
+  name: string
+  sku: string
+  category: string
+  category_name: string
+  unit: string
+  cost_price: number
+  sale_price: number | null
+  reorder_threshold: number
+  expiry_tracked: boolean
+  is_active: boolean
+  balances: StockBalance[]
+  total_quantity: number
+  created_at: string
+  updated_at: string
+}
+
 // ── API helpers ─────────────────────────────────────────
 export interface PaginatedResponse<T> {
   count: number

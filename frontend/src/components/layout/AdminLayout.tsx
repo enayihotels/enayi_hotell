@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User } from 'lucide-react'
+import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User, Package } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
 
@@ -15,6 +15,7 @@ const ADMIN_NAV = [
   {href:'/admin/guests',icon:Users,label:'Guests'},
   {href:'/admin/gallery',icon:Image,label:'Gallery',managerOnly:true},
   {href:'/admin/payments',icon:CreditCard,label:'Payments',managerOnly:true},
+  {href:'/admin/inventory',icon:Package,label:'Inventory',managerOnly:true},
 ]
 
 // Defined outside AdminLayout on purpose — a stable, module-level component
