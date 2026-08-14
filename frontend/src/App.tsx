@@ -143,6 +143,7 @@ export default function App() {
                 panel with Bookings/Rooms/Guests/etc. that isn't their job. */}
             <Route element={<Guard inventoryOnly><InventoryLayout /></Guard>}>
               <Route path="/inventory" element={<AdminInventory key="inventory" />} />
+              <Route path="/inventory/orders" element={<AdminOrders key="inventory-orders" />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

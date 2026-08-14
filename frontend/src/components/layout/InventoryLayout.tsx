@@ -1,6 +1,6 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { Package, User, LogOut, Menu } from 'lucide-react'
+import { Package, User, LogOut, Menu, Utensils } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/utils/api'
 import { useAuthStore } from '@/store/authStore'
@@ -25,10 +25,15 @@ function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullNam
           </div>
         </div>
       </div>
-      <nav className="flex-1 p-3">
-        <Link to="/inventory" onClick={onNavigate} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-enayi-gold/10 text-enayi-gold text-sm font-medium">
+      <nav className="flex-1 p-3 space-y-1">
+        <NavLink to="/inventory" end onClick={onNavigate}
+          className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
           <Package size={16} /> Inventory
-        </Link>
+        </NavLink>
+        <NavLink to="/inventory/orders" onClick={onNavigate}
+          className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
+          <Utensils size={16} /> Orders
+        </NavLink>
       </nav>
       <div className="p-3 border-t border-enayi-border space-y-1.5">
         <div className="flex items-center gap-3 px-3 py-2">
