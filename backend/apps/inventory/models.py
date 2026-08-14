@@ -1,0 +1,120 @@
+"""Enayi Hotels — Store & Inventory Models
+
+Phase 1 of the inventory system: the item catalog and how much of each
+item currently sits in each location (Store, Bar, Kitchen). Movement
+BETWEEN locations (Store -> Bar/Kitchen requisitions) is Phase 2 and
+lives in its own model once that's built — this file deliberately only
+covers "what exists and where," not yet "how it got there."
+"""
+import uuid
+from django.db import models
+from django.core.validators import MinValueValidator
+
+
+class InventoryCategory(models.Model):
+    """Groups items for display — e.g. 'Soft Drinks', 'Spirits',
+    'Kitchen Ingredients', 'Cleaning Supplies'."""
+    id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name        = models.CharField(max_length=100, unique=True)
+    slug        = models.SlugField(max_length=120, unique=True)
+    description = models.CharField(max_length=255, blank=True)
+    is_active   = models.BooleanField(default=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "inventory_categories"
+        verbose_name_plural = "Inventory categories"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class InventoryItem(models.Model):
+    """A single stock-keeping item in the catalog — e.g. 'Coca-Cola 50cl',
+    'Rice 50kg bag', 'Detergent 1L'. This is the master record; how much
+    of it sits in each location is tracked separately in StockBalance,
+    since the same item can exist in the Store, the Bar, and the Kitchen
+    simultaneously with different quantities in each.
+    """
+    UNIT_CHOICES = [
+        ("bottle", "Bottle"), ("can", "Can"), ("crate", "Crate"),
+        ("carton", "Carton"), ("bag", "Bag"), ("kg", "Kilogram"),
+        ("litre", "Litre"), ("piece", "Piece"), ("pack", "Pack"),
+        ("roll", "Roll"), ("bunch", "Bunch"), ("box", "Box"),
+    ]
+
+    id                 = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name               = models.CharField(max_length=150)
+    sku                = models.CharField(max_length=50, unique=True, blank=True,
+                                           help_text="Optional internal code. Auto-generated if left blank.")
+    category           = models.ForeignKey(InventoryCategory, on_delete=models.PROTECT, related_name="items")
+    unit               = models.CharField(max_length=20, choices=UNIT_CHOICES, default="piece")
+    cost_price         = models.DecimalField(max_digits=10, decimal_places=2, default=0,
+                                              validators=[MinValueValidator(0)],
+                                              help_text="What the hotel pays to acquire one unit.")
+    sale_price         = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                              validators=[MinValueValidator(0)],
+                                              help_text="What a guest is charged for one unit — set for drinks sold at the Bar; leave blank for items that are only consumed, like kitchen ingredients.")
+    reorder_threshold  = models.PositiveIntegerField(default=5,
+                                              help_text="Flag this item as low-stock at this location when its quantity falls to or below this number.")
+    expiry_tracked     = models.BooleanField(default=False,
+                                              help_text="Whether individual batches of this item should track an expiry date.")
+    is_active          = models.BooleanField(default=True)
+    created_at         = models.DateTimeField(auto_now_add=True)
+    updated_at         = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "inventory_items"
+        ordering = ["name"]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_unit_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self.sku:
+            # Simple, readable auto-SKU — first 3 letters of the category
+            # slug + a short random suffix, unique-checked before saving.
+            import random, string
+            prefix = (self.category.slug[:3] if self.category_id else "itm").upper()
+            for _ in range(10):
+                candidate = f"{prefix}-{''.join(random.choices(string.digits, k=5))}"
+                if not InventoryItem.objects.filter(sku=candidate).exists():
+                    self.sku = candidate
+                    break
+        super().save(*args, **kwargs)
+
+
+class StockBalance(models.Model):
+    """How much of a given item currently sits in a given location.
+    One row per (item, location) pair — created on first use, updated
+    from then on. This is the live "what do we have, where" table that
+    every stock-related screen reads from.
+    """
+    STORE   = "store"
+    BAR     = "bar"
+    KITCHEN = "kitchen"
+    LOCATION_CHOICES = [
+        (STORE,   "Store"),
+        (BAR,     "Bar"),
+        (KITCHEN, "Kitchen"),
+    ]
+
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item       = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name="balances")
+    location   = models.CharField(max_length=20, choices=LOCATION_CHOICES)
+    quantity   = models.DecimalField(max_digits=12, decimal_places=2, default=0,
+                                      validators=[MinValueValidator(0)])
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "inventory_stock_balances"
+        unique_together = [("item", "location")]
+        ordering = ["item__name", "location"]
+
+    def __str__(self):
+        return f"{self.item.name} @ {self.get_location_display()}: {self.quantity}"
+
+    @property
+    def is_low(self):
+        return self.quantity <= self.item.reorder_threshold

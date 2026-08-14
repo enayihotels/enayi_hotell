@@ -55,6 +55,7 @@ urlpatterns = [
     path("api/v1/gallery/",   include("apps.gallery.urls")),
     path("api/v1/ai/",        include("apps.ai_assistant.urls")),
     path("api/v1/dashboard/", include("apps.dashboard.urls")),
+    path("api/v1/inventory/", include("apps.inventory.urls")),
 ]
 
 # ── Static & Media ─────────────────────────────────────

@@ -25,16 +25,23 @@ class UserManager(BaseUserManager):
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    GUEST   = "guest"
-    STAFF   = "staff"
-    MANAGER = "manager"
-    ADMIN   = "admin"
+    GUEST         = "guest"
+    STAFF         = "staff"          # kept as "staff" internally (no data migration needed
+                                      # for existing accounts) — now labeled "Front Desk Staff"
+    STORE_KEEPER  = "store_keeper"
+    BAR_STAFF     = "bar_staff"
+    KITCHEN_STAFF = "kitchen_staff"
+    MANAGER       = "manager"
+    ADMIN         = "admin"
 
     ROLE_CHOICES = [
-        (GUEST,   "Guest"),
-        (STAFF,   "Staff"),
-        (MANAGER, "Manager"),
-        (ADMIN,   "Admin"),
+        (GUEST,         "Guest"),
+        (STAFF,         "Front Desk Staff"),
+        (STORE_KEEPER,  "Store Keeper"),
+        (BAR_STAFF,     "Bar Staff"),
+        (KITCHEN_STAFF, "Kitchen Staff"),
+        (MANAGER,       "Manager"),
+        (ADMIN,         "Admin"),
     ]
 
     ID_TYPES = [
@@ -96,7 +103,29 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def is_hotel_staff(self):
+        # Deliberately unchanged — front desk, manager, admin only. Store
+        # Keeper / Bar Staff / Kitchen Staff are real hotel employees but
+        # a different department; broadening this check would silently
+        # hand them access to every existing is_hotel_staff-gated view
+        # across Bookings, Rooms, Events, Payments, etc. — all of which
+        # were built and tested against exactly this set of three roles.
         return self.role in [self.STAFF, self.MANAGER, self.ADMIN]
+
+    @property
+    def is_inventory_staff(self):
+        """Store Keeper, Bar Staff, or Kitchen Staff — the three new
+        department roles introduced for the Store/Inventory system."""
+        return self.role in [self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF]
+
+    @property
+    def inventory_department(self):
+        """Which single inventory department this user belongs to, or
+        None. Managers/Admins aren't tied to one — they see all of them."""
+        return {
+            self.STORE_KEEPER:  "store",
+            self.BAR_STAFF:     "bar",
+            self.KITCHEN_STAFF: "kitchen",
+        }.get(self.role)
 
     def add_loyalty_points(self, points: int, reason: str = ""):
         self.loyalty_points += points
