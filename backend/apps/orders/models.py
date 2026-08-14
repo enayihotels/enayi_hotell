@@ -44,6 +44,15 @@ class MenuItem(models.Model):
     calories         = models.PositiveIntegerField(blank=True, null=True)
     preparation_time = models.PositiveIntegerField(default=20, help_text="Minutes")
     sort_order       = models.PositiveIntegerField(default=0)
+    inventory_item   = models.ForeignKey(
+        "inventory.InventoryItem", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="menu_items",
+        help_text="Optional — link this menu item to a tracked stock item (e.g. a specific "
+                   "bottled drink). When an order for it is marked Delivered, that item's "
+                   "stock is automatically decremented at Bar or Kitchen (inferred from this "
+                   "menu item's category type). Leave blank for dishes that don't map to a "
+                   "single stock-keeping unit.",
+    )
     created_at       = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -86,6 +95,7 @@ class Order(models.Model):
     estimated_delivery  = models.DateTimeField(blank=True, null=True)
     delivered_at        = models.DateTimeField(blank=True, null=True)
     prepared_by         = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="prepared_orders")
+    stock_deducted      = models.BooleanField(default=False, help_text="Whether linked inventory items have already been decremented for this order — prevents double-deducting if status is changed more than once.")
     created_at          = models.DateTimeField(auto_now_add=True)
     updated_at          = models.DateTimeField(auto_now=True)
 

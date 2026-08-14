@@ -248,12 +248,6 @@ class UpdateOrderStatusView(APIView):
 
     def patch(self, request, pk):
 
-        if not request.user.is_hotel_staff:
-            return Response(
-                {"error": "Staff only."},
-                status=403
-            )
-
         try:
             order = Order.objects.get(id=pk)
 
@@ -261,6 +255,23 @@ class UpdateOrderStatusView(APIView):
             return Response(
                 {"error": "Order not found."},
                 status=404
+            )
+
+        # Front desk/manager/admin can update any order. Bar Staff and
+        # Kitchen Staff are scoped to their own department's orders only
+        # — a bar staffer marking a kitchen order "delivered" (or vice
+        # versa) doesn't make sense and would break the stock-linkage
+        # below, which infers Bar vs Kitchen from the order itself.
+        user = request.user
+        can_update = user.is_hotel_staff or user.role in ["manager", "admin"]
+        if not can_update and user.role == "bar_staff" and order.source == "bar":
+            can_update = True
+        if not can_update and user.role == "kitchen_staff" and order.source in ["kitchen", "room_service"]:
+            can_update = True
+        if not can_update:
+            return Response(
+                {"error": "You don't have permission to update this order."},
+                status=403
             )
 
         s = UpdateOrderStatusSerializer(data=request.data)
@@ -272,20 +283,73 @@ class UpdateOrderStatusView(APIView):
 
         order.status = new_status
 
+        stock_note = None
         if new_status == "delivered":
             order.delivered_at = timezone.now()
+            if not order.stock_deducted:
+                stock_note = _deduct_linked_stock(order)
+                order.stock_deducted = True
 
         order.save(
             update_fields=[
                 "status",
-                "delivered_at"
+                "delivered_at",
+                "stock_deducted",
             ] if new_status == "delivered" else ["status"]
         )
 
-        return Response({
+        response_data = {
             "message": f"Order status updated to '{new_status}'.",
             "order": OrderSerializer(order).data
-        })
+        }
+        if stock_note:
+            response_data["stock_note"] = stock_note
+        return Response(response_data)
+
+
+def _deduct_linked_stock(order):
+    """Phase 3: when an order is marked Delivered, automatically decrement
+    the Bar or Kitchen stock for any items on it that are linked to a
+    tracked InventoryItem. Which location to decrement is inferred from
+    the linked menu item's category type (drinks/cocktails/mocktails/wine
+    -> Bar, everything else -> Kitchen) rather than a separate field to
+    keep this simple to set up.
+
+    Deliberately never blocks the order over a stock mismatch — the
+    drink or dish has already been served to the guest by the time this
+    runs, so refusing to mark it Delivered because the stock count looks
+    wrong would be actively unhelpful. Instead it's allowed to go
+    negative on purpose: a negative number here is a genuine, visible
+    signal that something doesn't add up (a missed requisition, a
+    miscount, or worse) — silently floor-clamping it at zero would just
+    hide that signal.
+
+    Returns a short human-readable note if anything unusual happened
+    (no link, or it went negative), so the person marking it delivered
+    gets a heads-up without it being a hard error.
+    """
+    from apps.inventory.models import StockBalance
+
+    DRINK_TYPES = {"drink", "cocktail", "mocktail", "wine"}
+    notes = []
+
+    for item in order.items.select_related("menu_item", "menu_item__category", "menu_item__inventory_item"):
+        inv_item = item.menu_item.inventory_item
+        if not inv_item:
+            continue
+
+        location = StockBalance.BAR if item.menu_item.category.type in DRINK_TYPES else StockBalance.KITCHEN
+        balance, _ = StockBalance.objects.get_or_create(item=inv_item, location=location)
+        before = balance.quantity
+        balance.quantity = float(balance.quantity) - item.quantity
+        balance.save()
+
+        if float(balance.quantity) < 0:
+            notes.append(
+                f"{inv_item.name} at {location.title()} went negative ({before} - {item.quantity} = {balance.quantity}) — worth checking against recent requisitions."
+            )
+
+    return " ".join(notes) if notes else None
 
 
 class KitchenOrdersView(generics.ListAPIView):
@@ -293,7 +357,8 @@ class KitchenOrdersView(generics.ListAPIView):
     serializer_class = OrderSerializer
 
     def get_queryset(self):
-        if not self.request.user.is_hotel_staff:
+        user = self.request.user
+        if not (user.is_hotel_staff or user.role in ["manager", "admin", "kitchen_staff"]):
             return Order.objects.none()
 
         return Order.objects.filter(
@@ -301,7 +366,10 @@ class KitchenOrdersView(generics.ListAPIView):
             status__in=[
                 "pending",
                 "confirmed",
-                "preparing"
+                "preparing",
+                "ready",   # was missing — without it, an order that reached
+                           # "ready" vanished from this list entirely, with
+                           # no way for staff to ever mark it Delivered.
             ]
         ).prefetch_related(
             "items__menu_item"
@@ -315,7 +383,8 @@ class BarOrdersView(generics.ListAPIView):
     serializer_class = OrderSerializer
 
     def get_queryset(self):
-        if not self.request.user.is_hotel_staff:
+        user = self.request.user
+        if not (user.is_hotel_staff or user.role in ["manager", "admin", "bar_staff"]):
             return Order.objects.none()
 
         return Order.objects.filter(
@@ -323,7 +392,8 @@ class BarOrdersView(generics.ListAPIView):
             status__in=[
                 "pending",
                 "confirmed",
-                "preparing"
+                "preparing",
+                "ready",   # was missing — same fix as KitchenOrdersView above.
             ]
         ).prefetch_related(
             "items__menu_item"

@@ -13,7 +13,7 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ["name","category","price","is_available","is_halal","is_vegetarian","preparation_time"]
+    list_display = ["name","category","price","inventory_item","is_available","is_halal","is_vegetarian","preparation_time"]
     list_filter  = ["category","is_available","is_halal","is_vegetarian","is_vegan","is_spicy"]
     search_fields= ["name","description"]
 
