@@ -554,6 +554,7 @@ export interface InventoryItem {
   is_active: boolean
   balances: StockBalance[]
   total_quantity: number
+  on_guest_menu: boolean
   created_at: string
   updated_at: string
 }

@@ -4,9 +4,9 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
-import { Package, Plus, Pencil, Trash2, LayoutGrid, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ClipboardList, Check, X } from 'lucide-react'
+import { Package, Plus, Pencil, Trash2, LayoutGrid, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ClipboardList, Check, X, UtensilsCrossed } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import type { InventoryCategory, InventoryItem, StockLocation, StockRequisition } from '@/types'
+import type { InventoryCategory, InventoryItem, StockLocation, StockRequisition, MenuCategory } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
 
@@ -51,6 +51,47 @@ export default function AdminInventory() {
     queryFn: () => api.get('/inventory/requisitions/').then(r => unwrapList(r.data)),
     enabled: canRequest || canFulfill,
   })
+  const { data: menuCategories } = useQuery<MenuCategory[]>({
+    queryKey: ['menu-categories-for-listing'],
+    queryFn: () => api.get('/orders/menu/categories/').then(r => unwrapList(r.data)),
+    enabled: canManageCatalog,
+  })
+
+  // ── List on Guest Menu ──
+  const [listTarget, setListTarget] = useState<InventoryItem | null>(null)
+  const [listCategoryMode, setListCategoryMode] = useState<'existing' | 'new'>('existing')
+  const [listCategoryId, setListCategoryId] = useState('')
+  const [listNewCategoryName, setListNewCategoryName] = useState('')
+  const [listNewCategoryType, setListNewCategoryType] = useState('drink')
+  const [listPrice, setListPrice] = useState('')
+  const [listDescription, setListDescription] = useState('')
+
+  const listOnMenu = useMutation({
+    mutationFn: () => api.post(`/inventory/items/${listTarget!.id}/list-on-menu/`, {
+      ...(listCategoryMode === 'existing'
+        ? { menu_category_id: listCategoryId }
+        : { new_category_name: listNewCategoryName, new_category_type: listNewCategoryType }),
+      guest_price: parseFloat(listPrice),
+      description: listDescription,
+    }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['inventory-items'] })
+      qc.invalidateQueries({ queryKey: ['menu-categories-for-listing'] })
+      toast.success(res.data?.message || 'Listed on the guest menu.')
+      setListTarget(null); setListCategoryId(''); setListNewCategoryName(''); setListPrice(''); setListDescription('')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const openListOnMenu = (it: InventoryItem) => {
+    setListTarget(it)
+    setListCategoryMode('existing')
+    setListCategoryId('')
+    setListNewCategoryName('')
+    setListNewCategoryType('drink')
+    setListPrice(it.sale_price !== null ? String(it.sale_price) : '')
+    setListDescription(it.name)
+  }
 
   // ── Requisitions: request + fulfill/reject ──
   const [reqModalOpen, setReqModalOpen] = useState(false)
@@ -258,9 +299,14 @@ export default function AdminInventory() {
                   })}
                 </div>
                 {canManageCatalog && (
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-2 pt-1 flex-wrap items-center">
                     <Button size="sm" variant="outline" onClick={() => openEditItem(it)}><Pencil size={12} /> Edit</Button>
                     <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${it.name}"?`)) deleteItem.mutate(it.id) }}><Trash2 size={12} /> Delete</Button>
+                    {it.on_guest_menu ? (
+                      <span className="text-xs text-green-400 flex items-center gap-1"><UtensilsCrossed size={12} /> On guest menu</span>
+                    ) : (
+                      <Button size="sm" variant="surface" onClick={() => openListOnMenu(it)}><UtensilsCrossed size={12} /> List on Guest Menu</Button>
+                    )}
                   </div>
                 )}
               </div>
@@ -419,6 +465,55 @@ export default function AdminInventory() {
               </Button>
               <Button variant="gold" loading={decideRequisition.isPending} onClick={() => decideRequisition.mutate('fulfill')} disabled={!decideQty || parseFloat(decideQty) <= 0}>
                 <Check size={14} /> Confirm Fulfilled
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* List on Guest Menu modal (Store Keeper / Manager / Owner) */}
+      <Modal open={!!listTarget} onClose={() => setListTarget(null)} title={listTarget ? `List "${listTarget.name}" on the Guest Menu` : ''} size="sm">
+        {listTarget && (
+          <div className="space-y-4">
+            <p className="text-enayi-muted text-xs">
+              This creates a real, orderable item on the guest Food & Bar page, linked back to this
+              stock item — so a completed order for it automatically moves Bar/Kitchen stock.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => setListCategoryMode('existing')} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${listCategoryMode==='existing' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted'}`}>Existing category</button>
+              <button onClick={() => setListCategoryMode('new')} className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all ${listCategoryMode==='new' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted'}`}>New category</button>
+            </div>
+            {listCategoryMode === 'existing' ? (
+              <Select label="Guest menu category" value={listCategoryId} onChange={e => setListCategoryId(e.target.value)}>
+                <option value="">Select a category</option>
+                {(menuCategories || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            ) : (
+              <>
+                <Input label="New category name" placeholder="e.g. Beer & Spirits" value={listNewCategoryName} onChange={e => setListNewCategoryName(e.target.value)} />
+                <Select label="Category type" value={listNewCategoryType} onChange={e => setListNewCategoryType(e.target.value)}>
+                  <option value="drink">Drink / Beverage</option>
+                  <option value="cocktail">Cocktail & Bar</option>
+                  <option value="mocktail">Mocktail</option>
+                  <option value="wine">Wine & Spirits</option>
+                  <option value="food">Food / Kitchen</option>
+                  <option value="breakfast">Breakfast</option>
+                  <option value="dessert">Dessert</option>
+                  <option value="snack">Snacks & Sides</option>
+                </Select>
+              </>
+            )}
+            <Input label="Guest price (₦)" type="number" value={listPrice} onChange={e => setListPrice(e.target.value)} />
+            <Textarea label="Description guests will see" value={listDescription} onChange={e => setListDescription(e.target.value)} />
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="ghost" onClick={() => setListTarget(null)}>Cancel</Button>
+              <Button
+                variant="gold"
+                loading={listOnMenu.isPending}
+                onClick={() => listOnMenu.mutate()}
+                disabled={!listPrice || (listCategoryMode === 'existing' ? !listCategoryId : !listNewCategoryName)}
+              >
+                List on Menu
               </Button>
             </div>
           </div>
