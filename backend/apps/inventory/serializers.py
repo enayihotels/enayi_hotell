@@ -28,18 +28,22 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     # Convenience: total across every location, for a quick "how much do
     # we have of this, anywhere" figure on list views.
     total_quantity = serializers.SerializerMethodField()
+    on_guest_menu = serializers.SerializerMethodField()
 
     class Meta:
         model = InventoryItem
         fields = [
             "id", "name", "sku", "category", "category_name", "unit", "cost_price",
             "sale_price", "reorder_threshold", "expiry_tracked", "is_active",
-            "balances", "total_quantity", "created_at", "updated_at",
+            "balances", "total_quantity", "on_guest_menu", "created_at", "updated_at",
         ]
         read_only_fields = ["sku"]
 
     def get_total_quantity(self, obj):
         return sum(float(b.quantity) for b in obj.balances.all())
+
+    def get_on_guest_menu(self, obj):
+        return obj.menu_items.exists()
 
 
 class InventoryItemWriteSerializer(serializers.ModelSerializer):

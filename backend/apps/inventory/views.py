@@ -123,6 +123,79 @@ class InventoryItemDetailView(generics.RetrieveUpdateDestroyAPIView):
         return super().destroy(request, *args, **kwargs)
 
 
+class ListOnGuestMenuView(APIView):
+    """POST /api/v1/inventory/items/<id>/list-on-menu/
+
+    The bridge between the Store's internal catalog and what guests
+    actually see on the Food & Bar ordering page. These were always two
+    separate systems on purpose (not every stock item should be
+    guest-orderable, and not every menu item maps to a single tracked
+    item) — but setting one up from the other by hand in Django admin
+    was needless duplicate work for the common case of "this bottled
+    drink should just be orderable." This does it in one step instead.
+
+    Body: { menu_category_id? | (new_category_name & new_category_type),
+            guest_price, description? }
+    Creates a MenuItem linked back to this InventoryItem via its
+    existing `inventory_item` FK, so Phase 3's auto stock-deduction on
+    delivery works immediately with zero extra setup.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if not _can_manage_catalog(request.user):
+            return Response({"error": "Only the Store Keeper, Manager, or Owner can list items on the guest menu."}, status=403)
+
+        try:
+            item = InventoryItem.objects.get(id=pk)
+        except InventoryItem.DoesNotExist:
+            return Response({"error": "Item not found."}, status=404)
+
+        if item.menu_items.exists():
+            return Response({"error": f"{item.name} is already listed on the guest menu."}, status=400)
+
+        from apps.orders.models import MenuCategory, MenuItem
+
+        category_id = request.data.get("menu_category_id")
+        if category_id:
+            try:
+                category = MenuCategory.objects.get(id=category_id)
+            except MenuCategory.DoesNotExist:
+                return Response({"error": "Menu category not found."}, status=404)
+        else:
+            new_name = request.data.get("new_category_name")
+            new_type = request.data.get("new_category_type")
+            if not new_name or not new_type:
+                return Response({"error": "Provide either menu_category_id or both new_category_name and new_category_type."}, status=400)
+            category, _ = MenuCategory.objects.get_or_create(
+                name=new_name, defaults={"type": new_type}
+            )
+
+        guest_price = request.data.get("guest_price")
+        if guest_price is None:
+            return Response({"error": "guest_price is required."}, status=400)
+        try:
+            guest_price = float(guest_price)
+        except (TypeError, ValueError):
+            return Response({"error": "guest_price must be a number."}, status=400)
+
+        menu_item = MenuItem.objects.create(
+            name=item.name,
+            category=category,
+            description=request.data.get("description") or item.name,
+            price=guest_price,
+            inventory_item=item,
+            is_available=True,
+        )
+
+        return Response({
+            "message": f"{item.name} is now on the guest menu under {category.name}.",
+            "menu_item_id": str(menu_item.id),
+            "menu_category_id": str(category.id),
+            "menu_category_name": category.name,
+        }, status=201)
+
+
 class StockBalanceListView(APIView):
     """GET /api/v1/inventory/balances/?location=store — every item's
     stock at a given location (or every location, if omitted)."""
