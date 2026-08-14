@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisition
+from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisition, StockAdjustmentLog
 
 
 @admin.register(InventoryCategory)
@@ -35,3 +35,10 @@ class StockRequisitionAdmin(admin.ModelAdmin):
     list_display = ["item", "destination", "quantity_requested", "quantity_fulfilled", "status", "requested_by", "decided_by", "created_at"]
     list_filter = ["status", "destination"]
     search_fields = ["item__name", "requested_by__email"]
+
+
+@admin.register(StockAdjustmentLog)
+class StockAdjustmentLogAdmin(admin.ModelAdmin):
+    list_display = ["item", "location", "delta", "resulting_quantity", "adjusted_by", "reason", "created_at"]
+    list_filter = ["location"]
+    search_fields = ["item__name", "reason", "adjusted_by__email"]

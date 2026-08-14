@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisition
+from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisition, StockAdjustmentLog
 from .serializers import (
     InventoryCategorySerializer, InventoryItemSerializer,
     InventoryItemWriteSerializer, StockBalanceSerializer, StockRequisitionSerializer,
@@ -263,6 +263,12 @@ class AdjustStockView(APIView):
 
         balance.quantity = new_qty
         balance.save()
+
+        StockAdjustmentLog.objects.create(
+            item=item, location=location, delta=delta, resulting_quantity=new_qty,
+            reason=reason, adjusted_by=request.user,
+        )
+
         return Response(StockBalanceSerializer(balance).data)
 
 

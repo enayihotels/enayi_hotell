@@ -555,7 +555,57 @@ class ManagerActivityView(APIView):
             "decided_at": r.decided_at.isoformat() if r.decided_at else None,
         } for r in decided[:200]]
 
+        # Phase 5: the same oversight, extended to Store Keepers — how many
+        # requisitions each one has fulfilled or rejected, and the real Naira
+        # value of stock they've released from the Store. Same .order_by()
+        # fix as above applies here for the same reason.
+        from django.db.models import F, DecimalField
+        from django.db.models.functions import Coalesce
+        from apps.inventory.models import StockRequisition
+
+        req_decided = (StockRequisition.objects
+                       .exclude(decided_by__isnull=True)
+                       .select_related("item", "decided_by", "requested_by")
+                       .order_by("-decided_at"))
+
+        by_store_keeper = {}
+        for row in (req_decided.order_by()
+                    .values("decided_by__id", "decided_by__first_name", "decided_by__last_name")
+                    .annotate(
+                        total=Count("id"),
+                        fulfilled=Count("id", filter=Q(status="fulfilled")),
+                        rejected=Count("id", filter=Q(status="rejected")),
+                        value_released=Coalesce(
+                            Sum(F("quantity_fulfilled") * F("item__cost_price"),
+                                filter=Q(status="fulfilled"),
+                                output_field=DecimalField()),
+                            0, output_field=DecimalField(),
+                        ),
+                    )):
+            name = f"{row['decided_by__first_name']} {row['decided_by__last_name']}".strip()
+            by_store_keeper[name] = {
+                "total_decisions": row["total"],
+                "fulfilled": row["fulfilled"],
+                "rejected": row["rejected"],
+                "value_released": float(row["value_released"] or 0),
+            }
+
+        requisition_history = [{
+            "id": str(r.id),
+            "item_name": r.item.name,
+            "destination": r.destination,
+            "requested_by_name": r.requested_by.get_full_name() if r.requested_by_id else "—",
+            "decided_by_name": r.decided_by.get_full_name() if r.decided_by_id else "—",
+            "status": r.status,
+            "quantity_requested": float(r.quantity_requested),
+            "quantity_fulfilled": float(r.quantity_fulfilled) if r.quantity_fulfilled is not None else None,
+            "note_from_fulfiller": r.note_from_fulfiller,
+            "decided_at": r.decided_at.isoformat() if r.decided_at else None,
+        } for r in req_decided[:200]]
+
         return Response({
             "by_manager": by_manager,
             "history": history,
+            "by_store_keeper": by_store_keeper,
+            "requisition_history": requisition_history,
         })

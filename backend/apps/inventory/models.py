@@ -120,6 +120,33 @@ class StockBalance(models.Model):
         return self.quantity <= self.item.reorder_threshold
 
 
+class StockAdjustmentLog(models.Model):
+    """Phase 5: every direct stock adjustment (deliveries, corrections,
+    spoilage — anything through AdjustStockView) now leaves a permanent
+    record of who did it, when, and why. Requisitions (Store -> Bar/
+    Kitchen) already had this via StockRequisition; direct adjustments
+    at your OWN location never did, which was a real gap for something
+    that can move real value with a single API call and no second
+    person involved. This feeds the nightly Fraud Audit.
+    """
+    id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item                = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name="adjustment_logs")
+    location            = models.CharField(max_length=20, choices=StockBalance.LOCATION_CHOICES)
+    delta               = models.DecimalField(max_digits=12, decimal_places=2)
+    resulting_quantity  = models.DecimalField(max_digits=12, decimal_places=2)
+    reason              = models.CharField(max_length=255, blank=True)
+    adjusted_by         = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, related_name="stock_adjustments_made")
+    created_at          = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "inventory_stock_adjustment_logs"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        sign = "+" if self.delta >= 0 else ""
+        return f"{self.item.name} @ {self.get_location_display()}: {sign}{self.delta} by {self.adjusted_by}"
+
+
 class StockRequisition(models.Model):
     """Phase 2: the actual Store -> Bar/Kitchen movement mechanism.
 
