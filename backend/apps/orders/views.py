@@ -388,7 +388,12 @@ class BarOrdersView(generics.ListAPIView):
             return Order.objects.none()
 
         return Order.objects.filter(
-            source="bar",
+            source__in=["bar", "room_service"],   # room_service orders can contain
+                                                    # drinks too, and "Room Service" is
+                                                    # the default channel guests see —
+                                                    # without this, Bar Staff had zero
+                                                    # visibility into any drink ordered
+                                                    # through the default channel.
             status__in=[
                 "pending",
                 "confirmed",
