@@ -235,10 +235,20 @@ export default function AdminInventory() {
     <div className="p-4 md:p-6 space-y-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl text-enayi-text">Inventory</h1>
+          <h1 className="font-display text-2xl md:text-3xl text-enayi-text flex items-center gap-2">
+            Inventory
+            {!isAdmin && user?.hotel_name && (
+              <span className="text-xs font-normal bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20 rounded-full px-2.5 py-1 flex items-center gap-1">
+                <Building2 size={11} /> {user.hotel_name}
+              </span>
+            )}
+          </h1>
           <p className="text-enayi-muted text-sm">
             {ownLocation ? `${LOCATION_LABEL[ownLocation]} stock and the shared item catalog.` : isAdmin && currentHotelName ? `Store, Bar, and Kitchen stock at ${currentHotelName}.` : 'Store, Bar, and Kitchen stock across the hotel.'}
           </p>
+          {(ownLocation || user?.role === 'manager') && !user?.hotel_name && (
+            <p className="text-red-400 text-xs mt-1">No branch assigned to your account yet — ask the Owner to set one in Django admin.</p>
+          )}
         </div>
         <div className="flex gap-2">
           {tab === 'categories' && canManageCatalog && (

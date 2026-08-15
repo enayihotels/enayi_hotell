@@ -8,6 +8,7 @@ interface User {
   full_name: string; phone?: string; role: string; is_verified: boolean;
   date_joined: string; loyalty_points: number; newsletter: boolean;
   avatar?: string; nationality?: string; date_of_birth?: string;
+  hotel?: string | null; hotel_name?: string | null; hotel_branch?: string | null;
 }
 
 interface AuthState {
