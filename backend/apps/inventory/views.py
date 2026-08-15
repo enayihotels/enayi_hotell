@@ -123,7 +123,7 @@ class InventoryItemListView(generics.ListCreateAPIView):
         for hotel in Hotel.objects.all():
             for loc, _ in StockBalance.LOCATION_CHOICES:
                 StockBalance.objects.get_or_create(item=item, hotel=hotel, location=loc)
-        return Response(InventoryItemSerializer(item).data, status=201)
+        return Response(InventoryItemSerializer(item, context={"request": request}).data, status=201)
 
 
 class InventoryItemDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -138,7 +138,7 @@ class InventoryItemDetailView(generics.RetrieveUpdateDestroyAPIView):
         if not _can_manage_catalog(request.user):
             return Response({"error": "Only the Store Keeper, Manager, or Owner can edit items."}, status=403)
         response = super().update(request, *args, **kwargs)
-        return Response(InventoryItemSerializer(self.get_object()).data, status=response.status_code)
+        return Response(InventoryItemSerializer(self.get_object(), context={"request": request}).data, status=response.status_code)
 
     def destroy(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):
