@@ -102,6 +102,11 @@ class StockBalance(models.Model):
 
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     item       = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name="balances")
+    hotel      = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="stock_balances", null=True,
+                                    help_text="Which branch this stock count belongs to. The same item has "
+                                              "an independent quantity at each branch — Coca-Cola at "
+                                              "Fwavwei's Bar is a completely different number from "
+                                              "Coca-Cola at Zarmaganda's Bar.")
     location   = models.CharField(max_length=20, choices=LOCATION_CHOICES)
     quantity   = models.DecimalField(max_digits=12, decimal_places=2, default=0,
                                       validators=[MinValueValidator(0)])
@@ -109,11 +114,11 @@ class StockBalance(models.Model):
 
     class Meta:
         db_table = "inventory_stock_balances"
-        unique_together = [("item", "location")]
-        ordering = ["item__name", "location"]
+        unique_together = [("item", "hotel", "location")]
+        ordering = ["item__name", "hotel__branch", "location"]
 
     def __str__(self):
-        return f"{self.item.name} @ {self.get_location_display()}: {self.quantity}"
+        return f"{self.item.name} @ {self.hotel.get_branch_display()} {self.get_location_display()}: {self.quantity}"
 
     @property
     def is_low(self):
@@ -131,6 +136,7 @@ class StockAdjustmentLog(models.Model):
     """
     id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     item                = models.ForeignKey(InventoryItem, on_delete=models.CASCADE, related_name="adjustment_logs")
+    hotel               = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="stock_adjustment_logs", null=True)
     location            = models.CharField(max_length=20, choices=StockBalance.LOCATION_CHOICES)
     delta               = models.DecimalField(max_digits=12, decimal_places=2)
     resulting_quantity  = models.DecimalField(max_digits=12, decimal_places=2)
@@ -177,6 +183,10 @@ class StockRequisition(models.Model):
 
     id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     item                = models.ForeignKey(InventoryItem, on_delete=models.PROTECT, related_name="requisitions")
+    hotel               = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="stock_requisitions", null=True,
+                                             help_text="Which branch this request and fulfillment moves stock within — a "
+                                                       "Bar Staff at Fwavwei can only request from, and be fulfilled by, "
+                                                       "Fwavwei's own Store.")
     destination         = models.CharField(max_length=20, choices=DESTINATION_CHOICES)
     quantity_requested  = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
     quantity_fulfilled  = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
