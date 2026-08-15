@@ -69,8 +69,8 @@ export default function AdminInventory() {
     enabled: canRequest || canFulfill,
   })
   const { data: menuCategories } = useQuery<MenuCategory[]>({
-    queryKey: ['menu-categories-for-listing'],
-    queryFn: () => api.get('/orders/menu/categories/').then(r => unwrapList(r.data)),
+    queryKey: ['menu-categories-for-listing', hotelFilter, user?.hotel],
+    queryFn: () => api.get('/orders/menu/categories/', { params: { hotel: isAdmin ? hotelFilter : user?.hotel } }).then(r => unwrapList(r.data)),
     enabled: canManageCatalog,
   })
 
