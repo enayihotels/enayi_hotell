@@ -46,7 +46,7 @@ class InventoryItem(models.Model):
     tracked separately in StockBalance (Store/Bar/Kitchen).
     """
     UNIT_CHOICES = [
-        ("bottle", "Bottle"), ("can", "Can"), ("crate", "Crate"),
+        ("bottle", "Bottle"), ("can", "Can"), ("plastic", "Plastic"), ("crate", "Crate"),
         ("carton", "Carton"), ("bag", "Bag"), ("kg", "Kilogram"),
         ("litre", "Litre"), ("piece", "Piece"), ("pack", "Pack"),
         ("roll", "Roll"), ("bunch", "Bunch"), ("box", "Box"),
