@@ -5,11 +5,14 @@ from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    hotel_name = serializers.CharField(source="hotel.name", read_only=True, default=None)
+    hotel_branch = serializers.CharField(source="hotel.branch", read_only=True, default=None)
 
     class Meta:
         model  = User
         fields = [
             "id","email","first_name","last_name","full_name","phone","role",
+            "hotel","hotel_name","hotel_branch",
             "date_of_birth","nationality","is_verified","date_joined","loyalty_points","newsletter",
         ]
         read_only_fields = ["id","role","date_joined","loyalty_points","is_verified"]
