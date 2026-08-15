@@ -56,8 +56,8 @@ export default function AdminInventory() {
   }, [isAdmin, hotelFilter, hotels])
 
   const { data: categories, isLoading: catsLoading } = useQuery<InventoryCategory[]>({
-    queryKey: ['inventory-categories'],
-    queryFn: () => api.get('/inventory/categories/').then(r => unwrapList(r.data)),
+    queryKey: ['inventory-categories', hotelFilter],
+    queryFn: () => api.get('/inventory/categories/', { params: hotelFilter ? { hotel: hotelFilter } : {} }).then(r => unwrapList(r.data)),
   })
   const { data: items, isLoading: itemsLoading } = useQuery<InventoryItem[]>({
     queryKey: ['inventory-items', hotelFilter],
@@ -154,13 +154,13 @@ export default function AdminInventory() {
   const saveCat = useMutation({
     mutationFn: () => editingCat
       ? api.patch(`/inventory/categories/${editingCat.slug}/`, catForm)
-      : api.post('/inventory/categories/', { ...catForm, slug: catForm.slug || catForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory-categories'] }); toast.success(editingCat ? 'Category updated.' : 'Category created.'); setCatModalOpen(false) },
+      : api.post('/inventory/categories/', { ...catForm, slug: catForm.slug || catForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ...(isAdmin ? { hotel: hotelFilter } : {}) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory-categories'], exact: false }); toast.success(editingCat ? 'Category updated.' : 'Category created.'); setCatModalOpen(false) },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
   const deleteCat = useMutation({
     mutationFn: (slug: string) => api.delete(`/inventory/categories/${slug}/`),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory-categories'] }); toast.success('Category deleted.') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory-categories'], exact: false }); toast.success('Category deleted.') },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
@@ -187,6 +187,7 @@ export default function AdminInventory() {
         cost_price: parseFloat(itemForm.cost_price) || 0,
         sale_price: itemForm.sale_price ? parseFloat(itemForm.sale_price) : null,
         reorder_threshold: parseInt(itemForm.reorder_threshold) || 0,
+        ...(isAdmin && !editingItem ? { hotel: hotelFilter } : {}),
       }
       return editingItem ? api.patch(`/inventory/items/${editingItem.id}/`, payload) : api.post('/inventory/items/', payload)
     },
