@@ -21,14 +21,45 @@ from .serializers import (
 )
 
 
+def _guest_branch(user):
+    """Same inference OrderListCreateView.post() already uses for which
+    branch an order belongs to — pulled out here so the menu-browsing
+    views (which need to decide which branch's menu to even show,
+    before any order exists) use the exact same logic rather than a
+    second, potentially-drifting copy of it. Prefers an active
+    (checked-in) stay, falls back to a confirmed upcoming booking, and
+    finally the hotel's featured/primary branch for a guest with
+    neither — always returns SOME real branch, never None, since every
+    menu item now belongs to exactly one."""
+    from apps.bookings.models import Booking
+    from apps.hotels.models import Hotel
+
+    if user and user.is_authenticated:
+        booking = (Booking.objects
+                   .filter(guest=user, status="checked_in")
+                   .order_by("-actual_check_in")
+                   .first()
+                   or Booking.objects
+                   .filter(guest=user, status="confirmed")
+                   .order_by("-created_at")
+                   .first())
+        if booking and booking.hotel_id:
+            return booking.hotel_id
+
+    primary = Hotel.objects.filter(is_primary=True).first() or Hotel.objects.first()
+    return primary.id if primary else None
+
+
 class MenuCategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = MenuCategorySerializer
 
     def get_queryset(self):
-        return MenuCategory.objects.filter(
-            is_active=True
-        ).order_by("sort_order")
+        hotel_id = self.request.query_params.get("hotel") or _guest_branch(self.request.user)
+        qs = MenuCategory.objects.filter(is_active=True)
+        if hotel_id:
+            qs = qs.filter(hotel_id=hotel_id)
+        return qs.order_by("sort_order")
 
 
 class MenuItemListView(generics.ListAPIView):
@@ -45,11 +76,11 @@ class MenuItemListView(generics.ListAPIView):
     search_fields = ["name", "description"]
 
     def get_queryset(self):
-        return MenuItem.objects.filter(
-            is_available=True
-        ).select_related(
-            "category"
-        ).order_by(
+        hotel_id = self.request.query_params.get("hotel") or _guest_branch(self.request.user)
+        qs = MenuItem.objects.filter(is_available=True).select_related("category")
+        if hotel_id:
+            qs = qs.filter(hotel_id=hotel_id)
+        return qs.order_by(
             "category__sort_order",
             "sort_order",
             "name"
@@ -137,6 +168,19 @@ class OrderListCreateView(APIView):
         if booking and not room:
             room = booking.room
 
+        # Which branch this order belongs to — always the room's branch
+        # when we have one (from the booking, or a direct room_id on a
+        # non-room-service order). A guest with genuinely no room and no
+        # booking (a walk-in restaurant customer with no stay at all)
+        # falls back to the hotel's featured/primary branch rather than
+        # leaving the order unlinked to any branch — Kitchen/Bar staff
+        # need a real branch to see it under, and it has to be some
+        # single, predictable choice rather than guesswork.
+        order_hotel = room.hotel if room else None
+        if not order_hotel:
+            from apps.hotels.models import Hotel
+            order_hotel = Hotel.objects.filter(is_primary=True).first() or Hotel.objects.first()
+
         try:
             with transaction.atomic():
                 order = Order.objects.create(
@@ -147,7 +191,8 @@ class OrderListCreateView(APIView):
                         "special_instructions",
                         ""
                     ),
-                    room=room
+                    room=room,
+                    hotel=order_hotel
                 )
 
                 total = 0
@@ -257,18 +302,20 @@ class UpdateOrderStatusView(APIView):
                 status=404
             )
 
-        # Front desk/manager/admin can update any order. Bar Staff and
-        # Kitchen Staff are scoped to orders matching what they can
-        # actually SEE on their Orders screen — this must stay in sync
-        # with BarOrdersView/KitchenOrdersView's own source filters
-        # below, or exactly this happens: an order shows up on screen
-        # but clicking its status button 403s, because the two checks
-        # quietly drifted out of sync with each other.
+        # Front desk/manager can update any order AT THEIR OWN BRANCH.
+        # Bar Staff and Kitchen Staff are further scoped to orders
+        # matching what they can actually SEE on their Orders screen —
+        # this must stay in sync with BarOrdersView/KitchenOrdersView's
+        # own source filters below, or exactly this happens: an order
+        # shows up on screen but clicking its status button 403s,
+        # because the two checks quietly drifted out of sync with each
+        # other. Only Admin/Owner bypasses the branch check entirely.
         user = request.user
-        can_update = user.is_hotel_staff or user.role in ["manager", "admin"]
-        if not can_update and user.role == "bar_staff" and order.source in ["bar", "room_service"]:
+        same_branch = user.role == "admin" or (user.hotel_id and str(user.hotel_id) == str(order.hotel_id))
+        can_update = same_branch and (user.is_hotel_staff or user.role in ["manager", "admin"])
+        if not can_update and same_branch and user.role == "bar_staff" and order.source in ["bar", "room_service"]:
             can_update = True
-        if not can_update and user.role == "kitchen_staff" and order.source in ["kitchen", "room_service"]:
+        if not can_update and same_branch and user.role == "kitchen_staff" and order.source in ["kitchen", "room_service"]:
             can_update = True
         if not can_update:
             return Response(
@@ -341,7 +388,12 @@ def _deduct_linked_stock(order):
             continue
 
         location = StockBalance.BAR if item.menu_item.category.type in DRINK_TYPES else StockBalance.KITCHEN
-        balance, _ = StockBalance.objects.get_or_create(item=inv_item, location=location)
+        # inv_item now belongs to exactly one branch (its own .hotel),
+        # so the balance to touch is always that same branch's — using
+        # the item's own hotel rather than the order's keeps this
+        # correct even in the rare case an order's inferred branch and
+        # a linked item's branch don't line up.
+        balance, _ = StockBalance.objects.get_or_create(item=inv_item, hotel_id=inv_item.hotel_id, location=location)
         before = balance.quantity
         balance.quantity = float(balance.quantity) - item.quantity
         balance.save()
@@ -363,7 +415,12 @@ class KitchenOrdersView(generics.ListAPIView):
         if not (user.is_hotel_staff or user.role in ["manager", "admin", "kitchen_staff"]):
             return Order.objects.none()
 
-        return Order.objects.filter(
+        from apps.inventory.views import _effective_hotel
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return Order.objects.none()
+
+        qs = Order.objects.filter(
             source__in=["kitchen", "room_service"],
             status__in=[
                 "pending",
@@ -373,7 +430,10 @@ class KitchenOrdersView(generics.ListAPIView):
                            # "ready" vanished from this list entirely, with
                            # no way for staff to ever mark it Delivered.
             ]
-        ).prefetch_related(
+        )
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs.prefetch_related(
             "items__menu_item"
         ).order_by(
             "created_at"
@@ -389,7 +449,12 @@ class BarOrdersView(generics.ListAPIView):
         if not (user.is_hotel_staff or user.role in ["manager", "admin", "bar_staff"]):
             return Order.objects.none()
 
-        return Order.objects.filter(
+        from apps.inventory.views import _effective_hotel
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return Order.objects.none()
+
+        qs = Order.objects.filter(
             source__in=["bar", "room_service"],   # room_service orders can contain
                                                     # drinks too, and "Room Service" is
                                                     # the default channel guests see —
@@ -402,7 +467,10 @@ class BarOrdersView(generics.ListAPIView):
                 "preparing",
                 "ready",   # was missing — same fix as KitchenOrdersView above.
             ]
-        ).prefetch_related(
+        )
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs.prefetch_related(
             "items__menu_item"
         ).order_by(
             "created_at"

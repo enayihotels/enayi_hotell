@@ -6,7 +6,8 @@ from .models import MenuCategory, MenuItem, Order, OrderItem
 class MenuCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model  = MenuCategory
-        fields = ["id", "name", "type", "icon", "description", "is_active", "sort_order"]
+        fields = ["id", "hotel", "name", "type", "icon", "description", "is_active", "sort_order"]
+        read_only_fields = ["hotel"]
 
 
 class MenuItemSerializer(serializers.ModelSerializer):
@@ -17,12 +18,13 @@ class MenuItemSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MenuItem
         fields = [
-            "id", "category", "category_name", "category_type",
+            "id", "hotel", "category", "category_name", "category_type",
             "name", "description", "price", "image_url",
             "is_available", "is_vegetarian", "is_vegan", "is_halal",
             "is_gluten_free", "is_spicy", "allergens", "calories",
             "preparation_time", "sort_order",
         ]
+        read_only_fields = ["hotel"]
 
     def get_image_url(self, obj):
         request = self.context.get("request")

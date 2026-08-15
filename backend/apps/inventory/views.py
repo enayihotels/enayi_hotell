@@ -248,16 +248,16 @@ class ListOnGuestMenuView(APIView):
         category_id = request.data.get("menu_category_id")
         if category_id:
             try:
-                category = MenuCategory.objects.get(id=category_id)
+                category = MenuCategory.objects.get(id=category_id, hotel_id=item.hotel_id)
             except MenuCategory.DoesNotExist:
-                return Response({"error": "Menu category not found."}, status=404)
+                return Response({"error": "Menu category not found for this branch."}, status=404)
         else:
             new_name = request.data.get("new_category_name")
             new_type = request.data.get("new_category_type")
             if not new_name or not new_type:
                 return Response({"error": "Provide either menu_category_id or both new_category_name and new_category_type."}, status=400)
             category, _ = MenuCategory.objects.get_or_create(
-                name=new_name, defaults={"type": new_type}
+                name=new_name, hotel_id=item.hotel_id, defaults={"type": new_type}
             )
 
         guest_price = request.data.get("guest_price")
@@ -270,6 +270,7 @@ class ListOnGuestMenuView(APIView):
 
         menu_item = MenuItem.objects.create(
             name=item.name,
+            hotel_id=item.hotel_id,
             category=category,
             description=request.data.get("description") or item.name,
             price=guest_price,

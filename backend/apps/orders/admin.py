@@ -3,8 +3,8 @@ from .models import MenuCategory, MenuItem, Order, OrderItem
 
 @admin.register(MenuCategory)
 class MenuCategoryAdmin(admin.ModelAdmin):
-    list_display = ["name","type","is_active","sort_order"]
-    list_filter  = ["type","is_active"]
+    list_display = ["name","hotel","type","is_active","sort_order"]
+    list_filter  = ["hotel","type","is_active"]
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -13,14 +13,14 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ["name","category","price","inventory_item","is_available","is_halal","is_vegetarian","preparation_time"]
-    list_filter  = ["category","is_available","is_halal","is_vegetarian","is_vegan","is_spicy"]
+    list_display = ["name","hotel","category","price","inventory_item","is_available","is_halal","is_vegetarian","preparation_time"]
+    list_filter  = ["hotel","category","is_available","is_halal","is_vegetarian","is_vegan","is_spicy"]
     search_fields= ["name","description"]
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ["order_number","guest","source","status","total_amount","is_paid","created_at"]
-    list_filter  = ["status","source","is_paid"]
+    list_display = ["order_number","guest","hotel","source","status","total_amount","is_paid","created_at"]
+    list_filter  = ["hotel","status","source","is_paid"]
     search_fields= ["order_number","guest__email","guest__first_name"]
     readonly_fields = ["order_number","subtotal","tax","total_amount","created_at"]
     inlines = [OrderItemInline]

@@ -12,6 +12,10 @@ class MenuCategory(models.Model):
         ("breakfast","Breakfast"),("snack","Snacks & Sides"),
     ]
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    hotel      = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="menu_categories",
+                                    help_text="Each branch runs its own menu, mirroring how inventory is fully "
+                                              "separate per branch — a category at one branch has nothing to "
+                                              "do with a same-named one at the other.")
     name       = models.CharField(max_length=100)
     type       = models.CharField(max_length=20, choices=TYPES)
     icon       = models.CharField(max_length=100, blank=True)
@@ -22,13 +26,17 @@ class MenuCategory(models.Model):
     class Meta:
         db_table = "menu_categories"
         verbose_name_plural = "Menu Categories"
-        ordering = ["sort_order", "name"]
+        ordering = ["hotel__branch", "sort_order", "name"]
 
-    def __str__(self): return f"{self.name} ({self.get_type_display()})"
+    def __str__(self): return f"{self.name} ({self.get_type_display()}) — {self.hotel.get_branch_display()}"
 
 
 class MenuItem(models.Model):
     id               = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    hotel            = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="menu_items",
+                                          help_text="Which branch actually offers this item. Kept naturally "
+                                                    "consistent with its linked inventory_item's own branch "
+                                                    "when listed via 'List on Guest Menu'.")
     category         = models.ForeignKey(MenuCategory, on_delete=models.PROTECT, related_name="items")
     name             = models.CharField(max_length=200)
     description      = models.TextField()
@@ -84,6 +92,11 @@ class Order(models.Model):
     guest               = models.ForeignKey("accounts.User", on_delete=models.PROTECT, related_name="orders")
     booking             = models.ForeignKey("bookings.Booking", on_delete=models.SET_NULL, null=True, blank=True, related_name="orders")
     room                = models.ForeignKey("rooms.Room", on_delete=models.SET_NULL, null=True, blank=True)
+    hotel               = models.ForeignKey("hotels.Hotel", on_delete=models.SET_NULL, null=True, blank=True, related_name="orders",
+                                              help_text="Which branch this order belongs to — inferred automatically from the "
+                                                        "guest's room/booking at creation time (see CreateOrderView), so guests "
+                                                        "never have to pick a branch themselves. Determines which branch's Kitchen/"
+                                                        "Bar staff see this order, and which branch's stock gets decremented on delivery.")
     source              = models.CharField(max_length=20, choices=SOURCE_CHOICES, default="room_service")
     status              = models.CharField(max_length=20, choices=STATUS_CHOICES, default=PENDING, db_index=True)
     special_instructions= models.TextField(blank=True)
