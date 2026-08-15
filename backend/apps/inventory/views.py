@@ -62,25 +62,57 @@ class InventoryCategoryListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return InventoryCategory.objects.all() if _can_view_inventory(self.request.user) else InventoryCategory.objects.none()
+        user = self.request.user
+        if not _can_view_inventory(user):
+            return InventoryCategory.objects.none()
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return InventoryCategory.objects.none()
+        qs = InventoryCategory.objects.all()
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs
 
     def create(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):
             return Response({"error": "Only the Store Keeper, Manager, or Owner can add categories."}, status=403)
+        if request.user.role == "admin":
+            hotel_id = request.data.get("hotel")
+            if not hotel_id:
+                return Response({"error": "hotel is required."}, status=400)
+        else:
+            if not request.user.hotel_id:
+                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can add categories."}, status=403)
+            hotel_id = request.user.hotel_id
         data = request.data.copy()
         if not data.get("slug") and data.get("name"):
             data["slug"] = slugify(data["name"])
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(hotel_id=hotel_id)
         return Response(serializer.data, status=201)
 
 
 class InventoryCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = InventoryCategory.objects.all()
     serializer_class = InventoryCategorySerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "slug"
+
+    def get_queryset(self):
+        # Scoping by branch BEFORE the slug lookup happens matters here:
+        # slug is only unique WITHIN one branch now (two branches can
+        # both have "soft-drinks"), so an unscoped lookup could grab the
+        # wrong branch's category, or crash on finding two matches.
+        user = self.request.user
+        if not _can_view_inventory(user):
+            return InventoryCategory.objects.none()
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return InventoryCategory.objects.none()
+        qs = InventoryCategory.objects.all()
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs
 
     def update(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):
@@ -102,9 +134,15 @@ class InventoryItemListView(generics.ListCreateAPIView):
     pagination_class = None
 
     def get_queryset(self):
-        if not _can_view_inventory(self.request.user):
+        user = self.request.user
+        if not _can_view_inventory(user):
             return InventoryItem.objects.none()
-        qs = InventoryItem.objects.select_related("category").prefetch_related("balances")
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return InventoryItem.objects.none()
+        qs = InventoryItem.objects.select_related("category", "hotel").prefetch_related("balances")
+        if effective:
+            qs = qs.filter(hotel_id=effective)
         category = self.request.query_params.get("category")
         if category:
             qs = qs.filter(category__slug=category)
@@ -113,23 +151,48 @@ class InventoryItemListView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):
             return Response({"error": "Only the Store Keeper, Manager, or Owner can add items."}, status=403)
+        if request.user.role == "admin":
+            hotel_id = request.data.get("hotel")
+            if not hotel_id:
+                return Response({"error": "hotel is required."}, status=400)
+        else:
+            if not request.user.hotel_id:
+                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can add items."}, status=403)
+            hotel_id = request.user.hotel_id
+
+        # The category picked also needs to belong to this same branch —
+        # otherwise an item could end up pointing at another branch's
+        # category, which would be a quiet way for branch data to bleed
+        # into each other despite everything else here being scoped.
+        category_id = request.data.get("category")
+        if category_id and not InventoryCategory.objects.filter(id=category_id, hotel_id=hotel_id).exists():
+            return Response({"error": "That category doesn't belong to this branch."}, status=400)
+
         serializer = InventoryItemWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = serializer.save()
-        # New items start with a zero balance at every location AT EVERY
-        # BRANCH, so they immediately show up correctly everywhere rather
-        # than needing a separate first-time setup step per branch.
-        from apps.hotels.models import Hotel
-        for hotel in Hotel.objects.all():
-            for loc, _ in StockBalance.LOCATION_CHOICES:
-                StockBalance.objects.get_or_create(item=item, hotel=hotel, location=loc)
+        item = serializer.save(hotel_id=hotel_id)
+        # New items start with a zero balance at every location WITHIN
+        # THEIR OWN BRANCH ONLY — items no longer span branches at all,
+        # so there's nothing to create anywhere else.
+        for loc, _ in StockBalance.LOCATION_CHOICES:
+            StockBalance.objects.get_or_create(item=item, hotel_id=hotel_id, location=loc)
         return Response(InventoryItemSerializer(item, context={"request": request}).data, status=201)
 
 
 class InventoryItemDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = InventoryItem.objects.all()
-    serializer_class = InventoryItemSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if not _can_view_inventory(user):
+            return InventoryItem.objects.none()
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return InventoryItem.objects.none()
+        qs = InventoryItem.objects.select_related("category", "hotel").prefetch_related("balances")
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs
 
     def get_serializer_class(self):
         return InventoryItemWriteSerializer if self.request.method in ["PUT", "PATCH"] else InventoryItemSerializer
@@ -173,6 +236,9 @@ class ListOnGuestMenuView(APIView):
             item = InventoryItem.objects.get(id=pk)
         except InventoryItem.DoesNotExist:
             return Response({"error": "Item not found."}, status=404)
+
+        if request.user.role != "admin" and str(item.hotel_id) != str(request.user.hotel_id):
+            return Response({"error": "That item belongs to a different branch than your account."}, status=403)
 
         if item.menu_items.exists():
             return Response({"error": f"{item.name} is already listed on the guest menu."}, status=400)

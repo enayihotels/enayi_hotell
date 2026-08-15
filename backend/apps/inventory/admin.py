@@ -4,9 +4,9 @@ from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisi
 
 @admin.register(InventoryCategory)
 class InventoryCategoryAdmin(admin.ModelAdmin):
-    list_display = ["name", "slug", "is_active", "created_at"]
+    list_display = ["name", "hotel", "slug", "is_active", "created_at"]
     search_fields = ["name", "slug"]
-    list_filter = ["is_active"]
+    list_filter = ["hotel", "is_active"]
 
 
 class StockBalanceInline(admin.TabularInline):
@@ -17,9 +17,9 @@ class StockBalanceInline(admin.TabularInline):
 
 @admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
-    list_display = ["name", "sku", "category", "unit", "cost_price", "sale_price", "reorder_threshold", "is_active"]
+    list_display = ["name", "hotel", "sku", "category", "unit", "cost_price", "sale_price", "reorder_threshold", "is_active"]
     search_fields = ["name", "sku"]
-    list_filter = ["category", "is_active", "expiry_tracked"]
+    list_filter = ["hotel", "category", "is_active", "expiry_tracked"]
     inlines = [StockBalanceInline]
 
 

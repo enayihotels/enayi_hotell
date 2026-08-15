@@ -13,10 +13,17 @@ from django.core.validators import MinValueValidator
 
 class InventoryCategory(models.Model):
     """Groups items for display — e.g. 'Soft Drinks', 'Spirits',
-    'Kitchen Ingredients', 'Cleaning Supplies'."""
+    'Kitchen Ingredients', 'Cleaning Supplies'. Branch-specific: each
+    branch manages its own separate list, so two branches can both have
+    a 'Soft Drinks' category without colliding — this used to be a
+    single shared catalog across both branches, but that turned out to
+    be confusing in practice (a Store Keeper at one branch seeing every
+    item name the other branch had ever created), so items and
+    categories were made fully separate per branch instead."""
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name        = models.CharField(max_length=100, unique=True)
-    slug        = models.SlugField(max_length=120, unique=True)
+    hotel       = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="inventory_categories")
+    name        = models.CharField(max_length=100)
+    slug        = models.SlugField(max_length=120)
     description = models.CharField(max_length=255, blank=True)
     is_active   = models.BooleanField(default=True)
     created_at  = models.DateTimeField(auto_now_add=True)
@@ -24,18 +31,19 @@ class InventoryCategory(models.Model):
     class Meta:
         db_table = "inventory_categories"
         verbose_name_plural = "Inventory categories"
-        ordering = ["name"]
+        unique_together = [("hotel", "slug")]
+        ordering = ["hotel__branch", "name"]
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.hotel.get_branch_display()})"
 
 
 class InventoryItem(models.Model):
     """A single stock-keeping item in the catalog — e.g. 'Coca-Cola 50cl',
-    'Rice 50kg bag', 'Detergent 1L'. This is the master record; how much
-    of it sits in each location is tracked separately in StockBalance,
-    since the same item can exist in the Store, the Bar, and the Kitchen
-    simultaneously with different quantities in each.
+    'Rice 50kg bag', 'Detergent 1L'. Branch-specific, same reasoning as
+    InventoryCategory above: each branch manages its own item list.
+    How much of it sits in each location within that one branch is
+    tracked separately in StockBalance (Store/Bar/Kitchen).
     """
     UNIT_CHOICES = [
         ("bottle", "Bottle"), ("can", "Can"), ("crate", "Crate"),
@@ -45,6 +53,7 @@ class InventoryItem(models.Model):
     ]
 
     id                 = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    hotel              = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="inventory_items")
     name               = models.CharField(max_length=150)
     sku                = models.CharField(max_length=50, unique=True, blank=True,
                                            help_text="Optional internal code. Auto-generated if left blank.")
@@ -66,10 +75,10 @@ class InventoryItem(models.Model):
 
     class Meta:
         db_table = "inventory_items"
-        ordering = ["name"]
+        ordering = ["hotel__branch", "name"]
 
     def __str__(self):
-        return f"{self.name} ({self.get_unit_display()})"
+        return f"{self.name} ({self.get_unit_display()}) — {self.hotel.get_branch_display()}"
 
     def save(self, *args, **kwargs):
         if not self.sku:

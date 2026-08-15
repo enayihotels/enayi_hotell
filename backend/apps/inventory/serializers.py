@@ -4,10 +4,12 @@ from .models import InventoryCategory, InventoryItem, StockBalance, StockRequisi
 
 class InventoryCategorySerializer(serializers.ModelSerializer):
     item_count = serializers.SerializerMethodField()
+    hotel_name = serializers.CharField(source="hotel.name", read_only=True)
 
     class Meta:
         model = InventoryCategory
-        fields = ["id", "name", "slug", "description", "is_active", "item_count"]
+        fields = ["id", "hotel", "hotel_name", "name", "slug", "description", "is_active", "item_count"]
+        read_only_fields = ["hotel"]
 
     def get_item_count(self, obj):
         return obj.items.filter(is_active=True).count()
@@ -26,6 +28,7 @@ class StockBalanceSerializer(serializers.ModelSerializer):
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
+    hotel_name = serializers.CharField(source="hotel.name", read_only=True)
     balances = serializers.SerializerMethodField()
     # Convenience: total across every location AT THE VISIBLE BRANCH(ES)
     # ONLY — a branch-scoped user must never see a number that secretly
@@ -36,11 +39,11 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryItem
         fields = [
-            "id", "name", "sku", "category", "category_name", "unit", "cost_price",
+            "id", "hotel", "hotel_name", "name", "sku", "category", "category_name", "unit", "cost_price",
             "sale_price", "reorder_threshold", "expiry_tracked", "is_active",
             "balances", "total_quantity", "on_guest_menu", "created_at", "updated_at",
         ]
-        read_only_fields = ["sku"]
+        read_only_fields = ["sku", "hotel"]
 
     def _visible_balances(self, obj):
         from .views import _effective_hotel
