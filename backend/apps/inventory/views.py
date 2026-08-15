@@ -26,7 +26,8 @@ def _can_manage_catalog(user):
 def _can_adjust_location(user, location):
     """Who's allowed to directly adjust the stock balance at a given
     location. Store Keeper owns 'store', Bar Staff owns 'bar', Kitchen
-    Staff owns 'kitchen' — manager/admin can adjust any of them."""
+    Staff owns 'kitchen' — manager/admin can adjust any of them (at
+    their own branch; Admin at any branch)."""
     if user.role in ["manager", "admin"]:
         return True
     return {
@@ -34,6 +35,26 @@ def _can_adjust_location(user, location):
         "bar_staff":     StockBalance.BAR,
         "kitchen_staff": StockBalance.KITCHEN,
     }.get(user.role) == location
+
+def _effective_hotel(user, requested_hotel_id=None):
+    """The single most important rule in this file: which branch's data
+    a request is allowed to touch.
+
+    - Owner/Admin sees every branch — can optionally narrow to one via
+      a `?hotel=`/`hotel` param, but isn't required to.
+    - Everyone else (Manager, Front Desk Staff, Store Keeper, Bar
+      Staff, Kitchen Staff) is locked to their OWN account's `hotel`,
+      full stop — a requested_hotel_id from the client is deliberately
+      ignored for them, so there's no way to pass a different branch's
+      ID and touch its stock. An account of a branch-requiring role
+      with no branch assigned yet gets None back, which every caller
+      here treats as "show/do nothing" rather than "show everything".
+    """
+    if user.role == "admin":
+        return requested_hotel_id or None
+    if user.requires_branch:
+        return str(user.hotel_id) if user.hotel_id else False  # False = blocked, not "no filter"
+    return None
 
 
 class InventoryCategoryListView(generics.ListCreateAPIView):
@@ -95,11 +116,13 @@ class InventoryItemListView(generics.ListCreateAPIView):
         serializer = InventoryItemWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         item = serializer.save()
-        # New items start with a zero balance at every location, so they
-        # immediately show up correctly everywhere rather than needing a
-        # separate first-time setup step.
-        for loc, _ in StockBalance.LOCATION_CHOICES:
-            StockBalance.objects.get_or_create(item=item, location=loc)
+        # New items start with a zero balance at every location AT EVERY
+        # BRANCH, so they immediately show up correctly everywhere rather
+        # than needing a separate first-time setup step per branch.
+        from apps.hotels.models import Hotel
+        for hotel in Hotel.objects.all():
+            for loc, _ in StockBalance.LOCATION_CHOICES:
+                StockBalance.objects.get_or_create(item=item, hotel=hotel, location=loc)
         return Response(InventoryItemSerializer(item).data, status=201)
 
 
@@ -197,15 +220,24 @@ class ListOnGuestMenuView(APIView):
 
 
 class StockBalanceListView(APIView):
-    """GET /api/v1/inventory/balances/?location=store — every item's
-    stock at a given location (or every location, if omitted)."""
+    """GET /api/v1/inventory/balances/?location=store&hotel=<id> —
+    every item's stock at a given location (or every location, if
+    omitted), scoped to the caller's own branch. Owner/Admin sees every
+    branch by default, or can narrow to one with ?hotel=."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if not _can_view_inventory(request.user):
             return Response({"error": "Inventory access only."}, status=403)
+
+        effective = _effective_hotel(request.user, request.query_params.get("hotel"))
+        if effective is False:
+            return Response([])  # branch-requiring role, no branch assigned — see nothing, not everything
+
         location = request.query_params.get("location")
-        qs = StockBalance.objects.select_related("item", "item__category")
+        qs = StockBalance.objects.select_related("item", "item__category", "hotel")
+        if effective:
+            qs = qs.filter(hotel_id=effective)
         if location:
             qs = qs.filter(location=location)
         low_only = request.query_params.get("low_only") == "true"
@@ -223,13 +255,20 @@ class StockBalanceListView(APIView):
 
 class AdjustStockView(APIView):
     """POST /api/v1/inventory/balances/adjust/
-    Body: {item, location, delta, reason}
+    Body: {item, location, delta, reason, hotel (Admin only)}
     `delta` can be positive (stock received/found) or negative (used up,
     spoiled, broken). This is the Phase 1 stand-in for direct
     corrections at the location you own — Phase 2 adds a proper
     request-and-fulfill flow specifically for Store -> Bar/Kitchen
     transfers, which is a different, more accountable path than a
     simple self-adjustment.
+
+    Branch is deliberately taken from the ADJUSTING USER's own account
+    for every role except Admin, never from the request body — a Store
+    Keeper at Fwavwei must never be able to touch Zarmaganda's stock by
+    passing a different hotel id, whether by mistake or otherwise. Only
+    Admin/Owner may specify which branch, since they're the one role
+    that genuinely operates across all of them.
     """
     permission_classes = [IsAuthenticated]
 
@@ -246,6 +285,15 @@ class AdjustStockView(APIView):
         if not _can_adjust_location(request.user, location):
             return Response({"error": f"You don't have permission to adjust stock at {location}."}, status=403)
 
+        if request.user.role == "admin":
+            hotel_id = request.data.get("hotel")
+            if not hotel_id:
+                return Response({"error": "hotel is required."}, status=400)
+        else:
+            if request.user.requires_branch and not request.user.hotel_id:
+                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can adjust stock."}, status=403)
+            hotel_id = request.user.hotel_id
+
         try:
             delta = float(delta)
         except (TypeError, ValueError):
@@ -256,7 +304,7 @@ class AdjustStockView(APIView):
         except InventoryItem.DoesNotExist:
             return Response({"error": "Item not found."}, status=404)
 
-        balance, _ = StockBalance.objects.get_or_create(item=item, location=location)
+        balance, _ = StockBalance.objects.get_or_create(item=item, hotel_id=hotel_id, location=location)
         new_qty = float(balance.quantity) + delta
         if new_qty < 0:
             return Response({"error": f"That would take {item.name} at {location} below zero (currently {balance.quantity})."}, status=400)
@@ -265,7 +313,7 @@ class AdjustStockView(APIView):
         balance.save()
 
         StockAdjustmentLog.objects.create(
-            item=item, location=location, delta=delta, resulting_quantity=new_qty,
+            item=item, hotel_id=hotel_id, location=location, delta=delta, resulting_quantity=new_qty,
             reason=reason, adjusted_by=request.user,
         )
 
@@ -274,10 +322,12 @@ class AdjustStockView(APIView):
 
 class StockRequisitionListCreateView(generics.ListCreateAPIView):
     """Phase 2: the request side. Bar/Kitchen staff request items from
-    the Store; everyone on the same team sees the same pending list
-    (not just their own requests), so anyone can follow up. Store
-    Keeper sees every pending request across both departments, since
-    they're the one fulfilling them. Manager/Owner see everything.
+    the Store; everyone on the same team AT THE SAME BRANCH sees the
+    same pending list (not just their own requests), so anyone can
+    follow up. Store Keeper sees every pending request across both
+    departments AT THEIR OWN BRANCH, since they're the one fulfilling
+    them. Manager sees their own branch's requests; Owner sees every
+    branch's.
     """
     serializer_class = StockRequisitionSerializer
     permission_classes = [IsAuthenticated]
@@ -285,15 +335,20 @@ class StockRequisitionListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = StockRequisition.objects.select_related("item", "requested_by", "decided_by")
+        qs = StockRequisition.objects.select_related("item", "requested_by", "decided_by", "hotel")
 
         status_filter = self.request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
 
-        if user.role in ["manager", "admin"]:
-            return qs
-        if user.role == "store_keeper":
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return StockRequisition.objects.none()
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        # else: Admin with no ?hotel= narrows nothing — sees every branch
+
+        if user.role in ["manager", "admin", "store_keeper"]:
             return qs
         if user.role == "bar_staff":
             return qs.filter(destination=StockBalance.BAR)
@@ -306,12 +361,14 @@ class StockRequisitionListCreateView(generics.ListCreateAPIView):
         destination = {"bar_staff": StockBalance.BAR, "kitchen_staff": StockBalance.KITCHEN}.get(user.role)
         if not destination:
             return Response({"error": "Only Bar Staff or Kitchen Staff can request items from the Store."}, status=403)
+        if not user.hotel_id:
+            return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can request stock."}, status=403)
 
         data = request.data.copy()
         data["destination"] = destination
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(requested_by=user, status=StockRequisition.PENDING)
+        serializer.save(requested_by=user, status=StockRequisition.PENDING, hotel_id=user.hotel_id)
         return Response(serializer.data, status=201)
 
 
@@ -321,8 +378,9 @@ class StockRequisitionDecideView(APIView):
 
     Fulfilling is the moment stock actually moves — Store goes down,
     the requesting department goes up, both by the SAME confirmed
-    amount, inside one transaction so it's never possible to end up
-    with one side updated and not the other.
+    amount AT THE SAME BRANCH as the requisition itself, inside one
+    transaction so it's never possible to end up with one side updated
+    and not the other, or moving the wrong branch's stock.
     """
     permission_classes = [IsAuthenticated]
 
@@ -334,6 +392,10 @@ class StockRequisitionDecideView(APIView):
             req = StockRequisition.objects.select_related("item").get(id=pk)
         except StockRequisition.DoesNotExist:
             return Response({"error": "Request not found."}, status=404)
+
+        if request.user.role != "admin":
+            if not request.user.hotel_id or str(request.user.hotel_id) != str(req.hotel_id):
+                return Response({"error": "This request belongs to a different branch than your account."}, status=403)
 
         if req.status != StockRequisition.PENDING:
             return Response({"error": f"This request was already {req.status}."}, status=400)
@@ -360,14 +422,14 @@ class StockRequisitionDecideView(APIView):
 
             with transaction.atomic():
                 store_balance = StockBalance.objects.select_for_update().get_or_create(
-                    item=req.item, location=StockBalance.STORE)[0]
+                    item=req.item, hotel_id=req.hotel_id, location=StockBalance.STORE)[0]
                 if float(store_balance.quantity) < qty:
                     return Response({
-                        "error": f"Store only has {store_balance.quantity} {req.item.unit}(s) of {req.item.name} — can't fulfill {qty}."
+                        "error": f"Store only has {store_balance.quantity} {req.item.unit}(s) of {req.item.name} at this branch — can't fulfill {qty}."
                     }, status=400)
 
                 dest_balance = StockBalance.objects.select_for_update().get_or_create(
-                    item=req.item, location=req.destination)[0]
+                    item=req.item, hotel_id=req.hotel_id, location=req.destination)[0]
 
                 store_balance.quantity = float(store_balance.quantity) - qty
                 store_balance.save()

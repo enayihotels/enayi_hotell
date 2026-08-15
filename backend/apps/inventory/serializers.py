@@ -15,18 +15,21 @@ class InventoryCategorySerializer(serializers.ModelSerializer):
 
 class StockBalanceSerializer(serializers.ModelSerializer):
     location_display = serializers.CharField(source="get_location_display", read_only=True)
+    hotel_name = serializers.CharField(source="hotel.name", read_only=True)
+    hotel_branch = serializers.CharField(source="hotel.branch", read_only=True)
     is_low = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = StockBalance
-        fields = ["id", "location", "location_display", "quantity", "is_low", "updated_at"]
+        fields = ["id", "hotel", "hotel_name", "hotel_branch", "location", "location_display", "quantity", "is_low", "updated_at"]
 
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
-    balances = StockBalanceSerializer(many=True, read_only=True)
-    # Convenience: total across every location, for a quick "how much do
-    # we have of this, anywhere" figure on list views.
+    balances = serializers.SerializerMethodField()
+    # Convenience: total across every location AT THE VISIBLE BRANCH(ES)
+    # ONLY — a branch-scoped user must never see a number that secretly
+    # includes another branch's stock folded in.
     total_quantity = serializers.SerializerMethodField()
     on_guest_menu = serializers.SerializerMethodField()
 
@@ -39,8 +42,27 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["sku"]
 
+    def _visible_balances(self, obj):
+        from .views import _effective_hotel
+        request = self.context.get("request")
+        if not request:
+            return obj.balances.none()
+        hotel_id = self.context.get("hotel_override") or request.query_params.get("hotel")
+        effective = _effective_hotel(request.user, hotel_id)
+        if effective is False:
+            return obj.balances.none()  # branch-requiring role, no branch assigned yet
+        if effective is None and request.user.role != "admin":
+            return obj.balances.none()
+        qs = obj.balances.all()
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs
+
+    def get_balances(self, obj):
+        return StockBalanceSerializer(self._visible_balances(obj), many=True).data
+
     def get_total_quantity(self, obj):
-        return sum(float(b.quantity) for b in obj.balances.all())
+        return sum(float(b.quantity) for b in self._visible_balances(obj))
 
     def get_on_guest_menu(self, obj):
         return obj.menu_items.exists()
@@ -63,22 +85,28 @@ class StockRequisitionSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     requested_by_name = serializers.CharField(source="requested_by.get_full_name", read_only=True)
     decided_by_name = serializers.SerializerMethodField()
+    hotel_name = serializers.CharField(source="hotel.name", read_only=True)
     store_available = serializers.SerializerMethodField()
 
     class Meta:
         model = StockRequisition
         fields = [
-            "id", "item", "item_name", "item_unit", "item_sku", "destination", "destination_display",
+            "id", "item", "item_name", "item_unit", "item_sku", "hotel", "hotel_name",
+            "destination", "destination_display",
             "quantity_requested", "quantity_fulfilled", "status", "status_display",
             "requested_by", "requested_by_name", "note_from_requester",
             "decided_by", "decided_by_name", "note_from_fulfiller", "decided_at",
             "store_available", "created_at",
         ]
-        read_only_fields = ["status", "quantity_fulfilled", "decided_by", "note_from_fulfiller", "decided_at", "requested_by"]
+        read_only_fields = ["status", "quantity_fulfilled", "decided_by", "note_from_fulfiller", "decided_at", "requested_by", "hotel"]
 
     def get_decided_by_name(self, obj):
         return obj.decided_by.get_full_name() if obj.decided_by_id else None
 
     def get_store_available(self, obj):
-        bal = obj.item.balances.filter(location=StockBalance.STORE).first()
+        # Must match the SAME branch as the requisition itself — the store
+        # could easily have stock at the OTHER branch too, and showing that
+        # number here would be actively misleading about what's actually
+        # available to fulfill this specific request.
+        bal = obj.item.balances.filter(location=StockBalance.STORE, hotel_id=obj.hotel_id).first()
         return float(bal.quantity) if bal else 0

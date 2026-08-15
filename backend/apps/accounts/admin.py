@@ -4,18 +4,18 @@ from .models import User, OTPVerification, LoyaltyTransaction, StaffProfile
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ["email","first_name","last_name","role","is_verified","loyalty_points","date_joined"]
-    list_filter  = ["role","is_verified","is_active","nationality"]
+    list_display = ["email","first_name","last_name","role","hotel","is_verified","loyalty_points","date_joined"]
+    list_filter  = ["role","hotel","is_verified","is_active","nationality"]
     search_fields= ["email","first_name","last_name","phone"]
     ordering     = ["-date_joined"]
     fieldsets = (
         (None, {"fields": ("email","password")}),
         ("Personal", {"fields": ("first_name","last_name","phone","date_of_birth","nationality","address","city","state","country")}),
         ("ID Verification", {"fields": ("id_type","id_number")}),
-        ("Status", {"fields": ("role","is_verified","is_active","is_staff","is_superuser","loyalty_points","newsletter")}),
+        ("Status", {"fields": ("role","hotel","is_verified","is_active","is_staff","is_superuser","loyalty_points","newsletter")}),
         ("Dates", {"fields": ("date_joined","last_login","last_login_ip")}),
     )
-    add_fieldsets = ((None, {"classes":("wide",),"fields":("email","first_name","last_name","password1","password2","role")}),)
+    add_fieldsets = ((None, {"classes":("wide",),"fields":("email","first_name","last_name","password1","password2","role","hotel")}),)
     readonly_fields = ["date_joined","last_login","last_login_ip"]
 
 @admin.register(StaffProfile)

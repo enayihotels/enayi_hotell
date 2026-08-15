@@ -64,6 +64,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name      = models.CharField(max_length=100)
     phone          = PhoneNumberField(blank=True, null=True, region="NG")
     role           = models.CharField(max_length=20, choices=ROLE_CHOICES, default=GUEST, db_index=True)
+    hotel          = models.ForeignKey(
+        "hotels.Hotel", on_delete=models.SET_NULL, null=True, blank=True, related_name="staff_members",
+        help_text="Which branch this account belongs to. Required for Manager, Front Desk Staff, Store "
+                   "Keeper, Bar Staff, and Kitchen Staff — they only see and manage that branch's rooms, "
+                   "inventory, and orders. Left blank for Owner/Admin (who sees every branch) and Guest "
+                   "(who isn't tied to one). An account with a role that needs a branch but has none set "
+                   "sees nothing at all, on purpose — never silently 'all branches'.",
+    )
     avatar         = models.ImageField(upload_to="avatars/%Y/%m/", blank=True, null=True)
     date_of_birth  = models.DateField(blank=True, null=True)
     nationality    = models.CharField(max_length=50,  choices=NATIONALITIES, blank=True, default="nigerian")
@@ -126,6 +134,25 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.BAR_STAFF:     "bar",
             self.KITCHEN_STAFF: "kitchen",
         }.get(self.role)
+
+    @property
+    def requires_branch(self):
+        """Every role except Owner (sees all branches) and Guest (isn't
+        tied to one) needs a `hotel` set to actually see or manage
+        anything branch-scoped — Manager, Front Desk Staff, Store
+        Keeper, Bar Staff, Kitchen Staff."""
+        return self.role in [self.STAFF, self.MANAGER, self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF]
+
+    @property
+    def is_branch_scoped(self):
+        """True only once a branch-requiring role actually HAS a branch
+        set. The distinction from requires_branch matters: a Manager
+        with no hotel assigned yet requires one but isn't yet scoped to
+        it — views should treat that as 'sees nothing', not 'sees
+        everything', which is why nothing in this codebase should ever
+        check `not requires_branch` as a stand-in for 'can see all
+        branches' — that's what `role == ADMIN` is for."""
+        return self.requires_branch and self.hotel_id is not None
 
     def add_loyalty_points(self, points: int, reason: str = ""):
         self.loyalty_points += points
