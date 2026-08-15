@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
-import { Package, Plus, Pencil, Trash2, LayoutGrid, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ClipboardList, Check, X, UtensilsCrossed } from 'lucide-react'
+import { Package, Plus, Pencil, Trash2, LayoutGrid, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ClipboardList, Check, X, UtensilsCrossed, Building2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import type { InventoryCategory, InventoryItem, StockLocation, StockRequisition, MenuCategory } from '@/types'
 
@@ -30,6 +30,7 @@ export default function AdminInventory() {
     user?.role === 'bar_staff'    ? 'bar' :
     user?.role === 'kitchen_staff' ? 'kitchen' : null
 
+  const isAdmin = user?.role === 'admin'
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const canManageCatalog = user?.role === 'store_keeper' || isManagerOrAdmin
   const canRequest = user?.role === 'bar_staff' || user?.role === 'kitchen_staff'
@@ -37,18 +38,34 @@ export default function AdminInventory() {
 
   const [tab, setTab] = useState<'stock' | 'categories' | 'requests'>('stock')
   const [locationFilter, setLocationFilter] = useState<StockLocation | 'all'>(ownLocation ?? 'all')
+  // Only the Owner operates across every branch — everyone else (including
+  // Manager) is scoped server-side to their own account's branch already,
+  // so this selector only ever renders for Admin.
+  const [hotelFilter, setHotelFilter] = useState<string>('')
+
+  const { data: hotels } = useQuery<any[]>({
+    queryKey: ['hotels-for-inventory'],
+    queryFn: () => api.get('/hotels/').then(r => unwrapList(r.data)),
+    enabled: isAdmin,
+  })
+
+  useEffect(() => {
+    if (isAdmin && !hotelFilter && hotels && hotels.length > 0) {
+      setHotelFilter(hotels[0].id)
+    }
+  }, [isAdmin, hotelFilter, hotels])
 
   const { data: categories, isLoading: catsLoading } = useQuery<InventoryCategory[]>({
     queryKey: ['inventory-categories'],
     queryFn: () => api.get('/inventory/categories/').then(r => unwrapList(r.data)),
   })
   const { data: items, isLoading: itemsLoading } = useQuery<InventoryItem[]>({
-    queryKey: ['inventory-items'],
-    queryFn: () => api.get('/inventory/items/').then(r => unwrapList(r.data)),
+    queryKey: ['inventory-items', hotelFilter],
+    queryFn: () => api.get('/inventory/items/', { params: hotelFilter ? { hotel: hotelFilter } : {} }).then(r => unwrapList(r.data)),
   })
   const { data: requisitions, isLoading: reqLoading } = useQuery<StockRequisition[]>({
-    queryKey: ['inventory-requisitions'],
-    queryFn: () => api.get('/inventory/requisitions/').then(r => unwrapList(r.data)),
+    queryKey: ['inventory-requisitions', hotelFilter],
+    queryFn: () => api.get('/inventory/requisitions/', { params: hotelFilter ? { hotel: hotelFilter } : {} }).then(r => unwrapList(r.data)),
     enabled: canRequest || canFulfill,
   })
   const { data: menuCategories } = useQuery<MenuCategory[]>({
@@ -190,6 +207,7 @@ export default function AdminInventory() {
   const adjustStock = useMutation({
     mutationFn: (delta: number) => api.post('/inventory/balances/adjust/', {
       item: adjustTarget!.item.id, location: adjustTarget!.location, delta, reason: adjustReason,
+      ...(isAdmin ? { hotel: hotelFilter } : {}),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory-items'] })
@@ -199,7 +217,11 @@ export default function AdminInventory() {
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
-  if (catsLoading || itemsLoading) return <PageSpinner />
+  // Admin must pick one branch to work in — showing two branches'
+  // numbers folded into the same row would be ambiguous, and every
+  // adjustment needs exactly one branch anyway. The useEffect above
+  // auto-selects the first branch once the list loads.
+  if (catsLoading || itemsLoading || (isAdmin && !hotelFilter)) return <PageSpinner />
 
   const balanceFor = (item: InventoryItem, loc: StockLocation) =>
     item.balances.find(b => b.location === loc)?.quantity ?? 0
@@ -207,6 +229,7 @@ export default function AdminInventory() {
     balanceFor(item, loc) <= item.reorder_threshold
 
   const visibleLocations: StockLocation[] = ownLocation ? [ownLocation] : (locationFilter === 'all' ? ['store', 'bar', 'kitchen'] : [locationFilter])
+  const currentHotelName = hotels?.find(h => h.id === hotelFilter)?.name
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -214,7 +237,7 @@ export default function AdminInventory() {
         <div>
           <h1 className="font-display text-2xl md:text-3xl text-enayi-text">Inventory</h1>
           <p className="text-enayi-muted text-sm">
-            {ownLocation ? `${LOCATION_LABEL[ownLocation]} stock and the shared item catalog.` : 'Store, Bar, and Kitchen stock across the hotel.'}
+            {ownLocation ? `${LOCATION_LABEL[ownLocation]} stock and the shared item catalog.` : isAdmin && currentHotelName ? `Store, Bar, and Kitchen stock at ${currentHotelName}.` : 'Store, Bar, and Kitchen stock across the hotel.'}
           </p>
         </div>
         <div className="flex gap-2">
@@ -229,6 +252,17 @@ export default function AdminInventory() {
           )}
         </div>
       </div>
+
+      {isAdmin && hotels && hotels.length > 0 && (
+        <div className="card p-3 flex items-center gap-3 flex-wrap bg-enayi-gold/5 border-enayi-gold/20">
+          <Building2 size={16} className="text-enayi-gold flex-shrink-0" />
+          <span className="text-enayi-muted text-xs">Viewing branch:</span>
+          <Select value={hotelFilter} onChange={e => setHotelFilter(e.target.value)} className="max-w-[240px]">
+            {hotels.map((h: any) => <option key={h.id} value={h.id}>{h.name}</option>)}
+          </Select>
+          <span className="text-enayi-muted text-xs italic">Only the Owner can switch branches — everyone else only ever sees their own.</span>
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap items-center">
         <button onClick={() => setTab('stock')}
