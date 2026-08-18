@@ -13,8 +13,8 @@ class Hotel(models.Model):
     ZARAMAGANDA = "zaramaganda"
     FWAWEI      = "fwawei"
     BRANCHES = [
-        (ZARAMAGANDA, "Zaramaganda"),
-        (FWAWEI,      "Fwawei"),
+        (ZARAMAGANDA, "Zarmaganda"),
+        (FWAWEI,      "Fwavwei"),
     ]
 
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
