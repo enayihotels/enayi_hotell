@@ -13,14 +13,24 @@ place, never duplicated.
 
 UNIT CHOICES — decided per item based on how it's actually bought/
 used in a Nigerian hotel kitchen, using the unit dropdown that already
-exists on the Add Item form:
-  - kg    — anything sold/used by weight (meat, produce, salt, sugar)
-  - bag   — dry staples bought in sacks (rice, beans, garri, flour)
+exists on the Add Item form. Meat/fish items and Rice/Beans are all
+`kg` per Adrian's request — "mudu" isn't currently an available unit
+in the app; kg was used as the closest supported fit:
+  - kg    — anything sold/used by weight (meat, fish, produce, rice,
+            beans, salt, sugar)
+  - bag   — dry staples still bought in sacks (semovita, garri, flour)
   - litre — liquids bought in bulk (oil, milk)
-  - piece — whole countable items (a chicken, a loaf, a yam tuber)
+  - piece — whole countable items (a loaf, a yam tuber)
   - bunch — plantain, the way it's actually sold
   - pack  — small pre-packaged goods (seasoning cubes, frozen veg)
   - carton — items bought by the carton (tomato paste, pasta)
+
+Safe to re-run after editing this list — items are matched by
+(hotel, name), so changing a unit/price here and re-running updates
+the existing row in place rather than creating a duplicate. Renaming
+an item here instead of just fixing its unit WOULD create a duplicate
+(new name = new match) — that's why entries were adjusted in place
+rather than renamed.
 
 EGGS: deliberately NOT re-added here — "2 Crates of Egg" already
 exists under Dairy & Eggs from earlier manual testing. Worth a quick
@@ -46,10 +56,10 @@ INGREDIENTS = [
     # ── Meat, Poultry & Seafood ──
     ("Beef",                      "meat", "kg",    8000),
     ("Goat Meat",                 "meat", "kg",    9000),
-    ("Chicken (Whole)",           "meat", "piece", 6500),
+    ("Chicken (Whole)",           "meat", "kg",    3800),
     ("Turkey",                    "meat", "kg",    7500),
     ("Titus Fish",                "meat", "kg",    5500),
-    ("Catfish",                   "meat", "piece", 4000),
+    ("Catfish",                   "meat", "kg",    3200),
     ("Prawns",                    "meat", "kg",    9500),
     ("Snails",                    "meat", "kg",    7000),
 
@@ -60,9 +70,13 @@ INGREDIENTS = [
     ("Evaporated Milk (Tin)",     "dairy", "piece", 800),
 
     # ── Grains, Staples & Pantry ──
-    ("Rice (Local)",              "pantry", "bag",   75000),
-    ("Rice (Foreign)",            "pantry", "bag",   90000),
-    ("Beans",                     "pantry", "bag",   65000),
+    # Rice/Beans switched to kg per Adrian's request — "mudu" isn't a
+    # currently-available unit in the app (dropdown has no mudu option);
+    # kg is the closest supported fit. Semovita/Garri/Flour left as
+    # "bag" — not part of the requested change.
+    ("Rice (Local)",              "pantry", "kg",   1500),
+    ("Rice (Foreign)",            "pantry", "kg",   1800),
+    ("Beans",                     "pantry", "kg",   1300),
     ("Semovita",                  "pantry", "bag",   35000),
     ("Garri",                     "pantry", "bag",   30000),
     ("Vegetable Oil",             "pantry", "litre", 2200),
@@ -76,6 +90,8 @@ INGREDIENTS = [
     # ── Fresh Produce ──
     ("Tomatoes",                  "produce", "kg",    1200),
     ("Onions",                    "produce", "kg",    1000),
+    ("Garlic",                    "produce", "kg",    3500),
+    ("Ginger",                    "produce", "kg",    3000),
     ("Tatashe Pepper",            "produce", "kg",    1800),
     ("Scotch Bonnet Pepper",      "produce", "kg",    2000),
     ("Plantain",                  "produce", "bunch", 2500),
@@ -93,6 +109,7 @@ INGREDIENTS = [
     ("Sausage Rolls (Frozen)",    "bakery", "pack",  4000),
     ("Meat Pie Pastry",           "bakery", "pack",  3500),
     ("Ice Cream (Tub)",           "bakery", "piece", 5000),
+    ("Yeast / Baking Supplies",   "bakery", "pack",  1200),
 ]
 
 REORDER_THRESHOLD = 5
