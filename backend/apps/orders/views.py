@@ -525,8 +525,23 @@ class KitchenOrdersView(generics.ListAPIView):
         )
         if effective:
             qs = qs.filter(hotel_id=effective)
+
+        # A Room Service order can mix food and drinks in one order —
+        # Kitchen needs to know the order exists, but should only ever
+        # see HER items in it, not the drinks Bar is handling. This
+        # filters BOTH which orders show up here (an order that's 100%
+        # drinks has nothing for Kitchen and shouldn't appear at all)
+        # AND, via the Prefetch below, which line items render within
+        # an order that does show up.
+        qs = qs.filter(items__menu_item__category__type__in=FOOD_TYPES).distinct()
+        from django.db.models import Prefetch
         return qs.prefetch_related(
-            "items__menu_item"
+            Prefetch(
+                "items",
+                queryset=OrderItem.objects.filter(
+                    menu_item__category__type__in=FOOD_TYPES
+                ).select_related("menu_item", "menu_item__category"),
+            )
         ).order_by(
             "created_at"
         )
@@ -562,8 +577,20 @@ class BarOrdersView(generics.ListAPIView):
         )
         if effective:
             qs = qs.filter(hotel_id=effective)
+
+        # Same reasoning as KitchenOrdersView above, mirrored for Bar —
+        # only orders with at least one drink item show up here, and
+        # within those, only the drink lines are visible, not Kitchen's
+        # food items from the same mixed order.
+        qs = qs.filter(items__menu_item__category__type__in=DRINK_TYPES).distinct()
+        from django.db.models import Prefetch
         return qs.prefetch_related(
-            "items__menu_item"
+            Prefetch(
+                "items",
+                queryset=OrderItem.objects.filter(
+                    menu_item__category__type__in=DRINK_TYPES
+                ).select_related("menu_item", "menu_item__category"),
+            )
         ).order_by(
             "created_at"
         )
