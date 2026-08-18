@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ShoppingCart, Plus, Minus, Trash2, Send, Loader2, UtensilsCrossed, Wine, CheckCircle2, Clock, X } from 'lucide-react'
 import { useMenuCategories, useMenuItems, usePlaceOrder, useMyOrders } from '@/hooks/useOrders'
@@ -9,6 +10,7 @@ import toast from 'react-hot-toast'
 import type { MenuItem, Order } from '@/types'
 
 export default function OrdersPage() {
+  const navigate = useNavigate()
   const [view, setView] = useState<'menu'|'orders'>('menu')
   const [activeCategory, setActiveCategory] = useState<string>('')
   const [source, setSource] = useState('room_service')
@@ -168,7 +170,7 @@ export default function OrdersPage() {
                 <div className="text-enayi-gold font-display text-2xl">{confirmedOrder.estimated_minutes} min</div>
               </div>
             </div>
-            <button onClick={()=>{setConfirmedOrder(null); setView('orders')}} className="btn-gold w-full">Track My Order</button>
+            <button onClick={()=>{setConfirmedOrder(null); navigate('/my-orders')}} className="btn-gold w-full">Track My Order</button>
           </motion.div>
         </div>
       )}

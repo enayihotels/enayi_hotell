@@ -22,6 +22,8 @@ export const useMyOrders = () =>
   useQuery<Order[]>({
     queryKey: ['my-orders'],
     queryFn: () => api.get('/orders/my/').then(r => r.data?.results ?? r.data), // ← fixed
+    refetchInterval: 20_000, // guests are actively tracking "is it ready yet" — same
+                              // idea as the staff-facing Kitchen/Bar queues polling
   })
 
 export const usePlaceOrder = () => {

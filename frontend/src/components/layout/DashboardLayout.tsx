@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard, ShieldCheck, Package } from 'lucide-react'
+import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard, ShieldCheck, Package, ClipboardList } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/utils/api'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ const NAV = [
   { href:'/dashboard',    icon:LayoutDashboard, label:'Dashboard' },
   { href:'/my-bookings',  icon:BedDouble,       label:'My Bookings' },
   { href:'/orders',       icon:Utensils,        label:'Food & Bar' },
+  { href:'/my-orders',    icon:ClipboardList,   label:'My Orders' },
   { href:'/events/book',  icon:CalendarDays,    label:'Book Event' },
   { href:'/events/my',    icon:CalendarDays,    label:'My Events' },
   { href:'/payment/callback', icon:CreditCard,  label:'Payments' },

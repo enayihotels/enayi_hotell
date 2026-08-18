@@ -34,6 +34,7 @@ const DashboardPage     = lazy(() => import('@/pages/guest/DashboardPage'))
 const BookingPage       = lazy(() => import('@/pages/guest/BookingPage'))
 const MyBookingsPage    = lazy(() => import('@/pages/guest/MyBookingsPage'))
 const OrdersPage        = lazy(() => import('@/pages/guest/OrdersPage'))
+const MyOrdersPage      = lazy(() => import('@/pages/guest/MyOrdersPage'))
 const EventBookingPage  = lazy(() => import('@/pages/guest/EventBookingPage'))
 const MyEventsPage      = lazy(() => import('@/pages/guest/MyEventsPage'))
 const PaymentPage       = lazy(() => import('@/pages/guest/PaymentPage'))
@@ -115,6 +116,7 @@ export default function App() {
               <Route path="/book/:slug"      element={<BookingPage key="book-slug" />} />
               <Route path="/my-bookings"     element={<MyBookingsPage key="my-bookings" />} />
               <Route path="/orders"          element={<OrdersPage key="orders" />} />
+              <Route path="/my-orders"       element={<MyOrdersPage key="my-orders" />} />
               <Route path="/events/book"     element={<EventBookingPage key="events-book" />} />
               <Route path="/events/my"       element={<MyEventsPage key="events-my" />} />
               <Route path="/payment/:id"     element={<PaymentPage key="payment-id" />} />
