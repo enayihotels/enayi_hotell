@@ -57,6 +57,7 @@ const AdminInventory    = lazy(() => import('@/pages/admin/AdminInventory'))
 const AdminAssets       = lazy(() => import('@/pages/admin/AdminAssets'))
 const HousekeepingPage  = lazy(() => import('@/pages/admin/HousekeepingPage'))
 const MenuManagerPage   = lazy(() => import('@/pages/admin/MenuManagerPage'))
+const MyAssetsPage      = lazy(() => import('@/pages/admin/MyAssetsPage'))
 
 const Spinner = () => (
   <div className="flex items-center justify-center h-screen bg-enayi-bg">
@@ -148,6 +149,7 @@ export default function App() {
               <Route path="/inventory" element={<AdminInventory key="inventory" />} />
               <Route path="/inventory/orders" element={<AdminOrders key="inventory-orders" />} />
               <Route path="/inventory/menu" element={<MenuManagerPage key="inventory-menu" />} />
+              <Route path="/inventory/assets" element={<MyAssetsPage key="inventory-assets" />} />
               <Route path="/housekeeping" element={<HousekeepingPage key="housekeeping" />} />
             </Route>
 

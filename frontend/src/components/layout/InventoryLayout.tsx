@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { Package, User, LogOut, Menu, Utensils, BedDouble, Camera } from 'lucide-react'
+import { Package, User, LogOut, Menu, Utensils, BedDouble, Camera, Wrench } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/utils/api'
 import { useAuthStore } from '@/store/authStore'
@@ -14,7 +14,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin:         'Owner',
 }
 
-function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullName, isHousekeeper, showMenuManager }: { onNavigate?: () => void; onLogout: () => void; roleLabel: string; firstInitial: string; fullName: string; isHousekeeper: boolean; showMenuManager: boolean }) {
+function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullName, isHousekeeper, showMenuManager, showAssets }: { onNavigate?: () => void; onLogout: () => void; roleLabel: string; firstInitial: string; fullName: string; isHousekeeper: boolean; showMenuManager: boolean; showAssets: boolean }) {
   return (
     <>
       <div className="p-5 border-b border-enayi-border">
@@ -37,6 +37,12 @@ function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullNam
           className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
           <Package size={16} /> Inventory
         </NavLink>
+        {showAssets && (
+          <NavLink to="/inventory/assets" onClick={onNavigate}
+            className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
+            <Wrench size={16} /> My Assets
+          </NavLink>
+        )}
         {!isHousekeeper && (
           <>
             <NavLink to="/inventory/orders" onClick={onNavigate}
@@ -87,6 +93,12 @@ export default function InventoryLayout() {
   // main Admin panel, so this stays scoped to the two staff roles who
   // actually live in this inventory-only shell day to day.
   const showMenuManager = user?.role === 'bar_staff' || user?.role === 'kitchen_staff'
+  // Bar/Kitchen/Housekeeping now have their own department-scoped
+  // Property & Assets view (report damage, confirm fixed once
+  // cleared) — Store Keeper is deliberately excluded, since she
+  // manages the Inventory catalog itself rather than "owning" a
+  // department's assets the way Bar/Kitchen/Housekeeping do.
+  const showAssets = user?.role === 'bar_staff' || user?.role === 'kitchen_staff' || user?.role === 'housekeeper'
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout/', { refresh: localStorage.getItem('refresh_token') }) } catch {}
@@ -97,14 +109,14 @@ export default function InventoryLayout() {
     <div className="min-h-screen bg-enayi-bg flex">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-enayi-surface border-r border-enayi-border flex-shrink-0">
-        <SidebarContent onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} showMenuManager={showMenuManager} />
+        <SidebarContent onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} showMenuManager={showMenuManager} showAssets={showAssets} />
       </aside>
 
       {/* Mobile drawer */}
       <div className={`md:hidden fixed inset-0 z-40 ${drawerOpen ? '' : 'pointer-events-none'}`}>
         <div onClick={() => setDrawerOpen(false)} className={`absolute inset-0 bg-black/60 transition-opacity ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} />
         <aside className={`absolute left-0 top-0 bottom-0 w-64 bg-enayi-surface border-r border-enayi-border flex flex-col transition-transform ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} showMenuManager={showMenuManager} />
+          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} showMenuManager={showMenuManager} showAssets={showAssets} />
         </aside>
       </div>
 
