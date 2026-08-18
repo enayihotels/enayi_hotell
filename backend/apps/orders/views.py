@@ -55,6 +55,10 @@ def _guest_branch(user):
 class MenuCategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = MenuCategorySerializer
+    # Guest menu category chips must always show the complete list —
+    # this is a complete catalog view, not a paged browse. Same
+    # DRF PAGE_SIZE=20 gap that hit MenuItemListView below and the
+    # Rooms list before that (see project handoff "Recurring Gotchas").
     pagination_class = None
 
     def get_queryset(self):
@@ -66,15 +70,13 @@ class MenuCategoryListView(generics.ListAPIView):
 
 
 class MenuItemListView(generics.ListAPIView):
-    """No pagination — a hotel's full food & bar menu (110+ items across
-    both branches combined, growing over time) should never be silently
-    truncated to the first 20 alphabetically. This is exactly the same
-    fix RoomListView needed earlier for the same underlying reason: the
-    global DRF page size default quietly applies to any view that
-    doesn't explicitly opt out, and a browsable menu is not something
-    that should ever be paginated away from a guest."""
     permission_classes = [AllowAny]
     serializer_class = MenuItemSerializer
+    # Global DRF PAGE_SIZE=20 (config/settings.py) would otherwise cap
+    # the guest menu at 20 items total regardless of category — this is
+    # a complete catalog view a guest scrolls, not a paged browse.
+    # Confirmed via the ~110-item Fwavwei menu (37 drinks + 73 food)
+    # that this was silently truncating results once fully listed.
     pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = [
