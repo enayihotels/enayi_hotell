@@ -27,17 +27,18 @@ function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullNam
         </div>
       </div>
       <nav className="flex-1 p-3 space-y-1">
-        {isHousekeeper ? (
+        {isHousekeeper && (
           <NavLink to="/housekeeping" end onClick={onNavigate}
             className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
             <BedDouble size={16} /> Housekeeping
           </NavLink>
-        ) : (
+        )}
+        <NavLink to="/inventory" end onClick={onNavigate}
+          className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
+          <Package size={16} /> Inventory
+        </NavLink>
+        {!isHousekeeper && (
           <>
-            <NavLink to="/inventory" end onClick={onNavigate}
-              className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
-              <Package size={16} /> Inventory
-            </NavLink>
             <NavLink to="/inventory/orders" onClick={onNavigate}
               className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
               <Utensils size={16} /> Orders

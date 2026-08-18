@@ -20,13 +20,15 @@ class InventoryCategory(models.Model):
     be confusing in practice (a Store Keeper at one branch seeing every
     item name the other branch had ever created), so items and
     categories were made fully separate per branch instead."""
-    BAR     = "bar"
-    KITCHEN = "kitchen"
-    SHARED  = "shared"
+    BAR         = "bar"
+    KITCHEN     = "kitchen"
+    HOUSEKEEPING = "housekeeping"
+    SHARED      = "shared"
     DEPARTMENT_CHOICES = [
-        (BAR,     "Bar only"),
-        (KITCHEN, "Kitchen only"),
-        (SHARED,  "Shared / Store only"),
+        (BAR,          "Bar only"),
+        (KITCHEN,      "Kitchen only"),
+        (HOUSEKEEPING, "Housekeeping only"),
+        (SHARED,       "Shared / Store only"),
     ]
 
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -34,7 +36,7 @@ class InventoryCategory(models.Model):
     name        = models.CharField(max_length=100)
     slug        = models.SlugField(max_length=120)
     description = models.CharField(max_length=255, blank=True)
-    department  = models.CharField(max_length=10, choices=DEPARTMENT_CHOICES, default=SHARED,
+    department  = models.CharField(max_length=15, choices=DEPARTMENT_CHOICES, default=SHARED,
                                     help_text="Who requests items in this category from the Store. "
                                               "'Bar only' / 'Kitchen only' hides it from the other "
                                               "department's Inventory screen entirely — a Kitchen Staff "
@@ -117,13 +119,15 @@ class StockBalance(models.Model):
     from then on. This is the live "what do we have, where" table that
     every stock-related screen reads from.
     """
-    STORE   = "store"
-    BAR     = "bar"
-    KITCHEN = "kitchen"
+    STORE        = "store"
+    BAR          = "bar"
+    KITCHEN      = "kitchen"
+    HOUSEKEEPING = "housekeeping"
     LOCATION_CHOICES = [
-        (STORE,   "Store"),
-        (BAR,     "Bar"),
-        (KITCHEN, "Kitchen"),
+        (STORE,        "Store"),
+        (BAR,          "Bar"),
+        (KITCHEN,      "Kitchen"),
+        (HOUSEKEEPING, "Housekeeping"),
     ]
 
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -203,8 +207,9 @@ class StockRequisition(models.Model):
     ]
 
     DESTINATION_CHOICES = [
-        (StockBalance.BAR,     "Bar"),
-        (StockBalance.KITCHEN, "Kitchen"),
+        (StockBalance.BAR,          "Bar"),
+        (StockBalance.KITCHEN,      "Kitchen"),
+        (StockBalance.HOUSEKEEPING, "Housekeeping"),
     ]
 
     id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

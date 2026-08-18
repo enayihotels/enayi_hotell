@@ -517,7 +517,7 @@ export interface FraudAuditReport {
 }
 
 // ── Inventory ────────────────────────────────────────────
-export type InventoryDepartment = 'bar' | 'kitchen' | 'shared'
+export type InventoryDepartment = 'bar' | 'kitchen' | 'housekeeping' | 'shared'
 
 export interface InventoryCategory {
   id: string
@@ -529,7 +529,7 @@ export interface InventoryCategory {
   item_count: number
 }
 
-export type StockLocation = 'store' | 'bar' | 'kitchen'
+export type StockLocation = 'store' | 'bar' | 'kitchen' | 'housekeeping'
 
 export interface StockBalance {
   id: string

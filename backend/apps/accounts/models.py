@@ -123,9 +123,14 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def is_inventory_staff(self):
-        """Store Keeper, Bar Staff, or Kitchen Staff — the three new
-        department roles introduced for the Store/Inventory system."""
-        return self.role in [self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF]
+        """Store Keeper, Bar Staff, Kitchen Staff, or Housekeeper — the
+        department roles that can view/request from the Store/
+        Inventory system. Housekeeper added alongside the housekeeping
+        StockBalance location/requisition destination — she can now
+        request Housekeeping-tagged items (linens, toiletries,
+        cleaning supplies) the same way Bar/Kitchen Staff already
+        request their own."""
+        return self.role in [self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER]
 
     @property
     def inventory_department(self):
@@ -135,6 +140,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.STORE_KEEPER:  "store",
             self.BAR_STAFF:     "bar",
             self.KITCHEN_STAFF: "kitchen",
+            self.HOUSEKEEPER:   "housekeeping",
         }.get(self.role)
 
     @property

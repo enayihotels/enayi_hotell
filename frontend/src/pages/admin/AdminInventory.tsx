@@ -12,13 +12,13 @@ const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ??
 
 const UNITS = ['bottle','can','crate','carton','bag','kg','litre','piece','pack','roll','bunch','box']
 
-type CategoryForm = { name: string; slug: string; description: string; department: 'bar' | 'kitchen' | 'shared'; is_active: boolean }
+type CategoryForm = { name: string; slug: string; description: string; department: 'bar' | 'kitchen' | 'housekeeping' | 'shared'; is_active: boolean }
 const emptyCategoryForm: CategoryForm = { name: '', slug: '', description: '', department: 'shared', is_active: true }
 
 type ItemForm = { name: string; category: string; unit: string; cost_price: string; sale_price: string; reorder_threshold: string; expiry_tracked: boolean; is_active: boolean }
 const emptyItemForm: ItemForm = { name: '', category: '', unit: 'piece', cost_price: '', sale_price: '', reorder_threshold: '5', expiry_tracked: false, is_active: true }
 
-const LOCATION_LABEL: Record<StockLocation, string> = { store: 'Store', bar: 'Bar', kitchen: 'Kitchen' }
+const LOCATION_LABEL: Record<StockLocation, string> = { store: 'Store', bar: 'Bar', kitchen: 'Kitchen', housekeeping: 'Housekeeping' }
 
 export default function AdminInventory() {
   const { user } = useAuthStore()
@@ -28,12 +28,13 @@ export default function AdminInventory() {
   const ownLocation: StockLocation | null =
     user?.role === 'store_keeper' ? 'store' :
     user?.role === 'bar_staff'    ? 'bar' :
-    user?.role === 'kitchen_staff' ? 'kitchen' : null
+    user?.role === 'kitchen_staff' ? 'kitchen' :
+    user?.role === 'housekeeper'  ? 'housekeeping' : null
 
   const isAdmin = user?.role === 'admin'
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const canManageCatalog = user?.role === 'store_keeper' || isManagerOrAdmin
-  const canRequest = user?.role === 'bar_staff' || user?.role === 'kitchen_staff'
+  const canRequest = user?.role === 'bar_staff' || user?.role === 'kitchen_staff' || user?.role === 'housekeeper'
   const canFulfill = user?.role === 'store_keeper' || isManagerOrAdmin
 
   const [tab, setTab] = useState<'stock' | 'categories' | 'requests'>('stock')
@@ -229,7 +230,7 @@ export default function AdminInventory() {
   const isLowAt = (item: InventoryItem, loc: StockLocation) =>
     balanceFor(item, loc) <= item.reorder_threshold
 
-  const visibleLocations: StockLocation[] = ownLocation ? [ownLocation] : (locationFilter === 'all' ? ['store', 'bar', 'kitchen'] : [locationFilter])
+  const visibleLocations: StockLocation[] = ownLocation ? [ownLocation] : (locationFilter === 'all' ? ['store', 'bar', 'kitchen', 'housekeeping'] : [locationFilter])
   const currentHotelName = hotels?.find(h => h.id === hotelFilter)?.name
 
   return (
@@ -245,7 +246,7 @@ export default function AdminInventory() {
             )}
           </h1>
           <p className="text-enayi-muted text-sm">
-            {ownLocation ? `${LOCATION_LABEL[ownLocation]} stock and the shared item catalog.` : isAdmin && currentHotelName ? `Store, Bar, and Kitchen stock at ${currentHotelName}.` : 'Store, Bar, and Kitchen stock across the hotel.'}
+            {ownLocation ? `${LOCATION_LABEL[ownLocation]} stock and the shared item catalog.` : isAdmin && currentHotelName ? `Store, Bar, Kitchen, and Housekeeping stock at ${currentHotelName}.` : 'Store, Bar, Kitchen, and Housekeeping stock across the hotel.'}
           </p>
           {(ownLocation || user?.role === 'manager') && !user?.hotel_name && (
             <p className="text-red-400 text-xs mt-1">No branch assigned to your account yet — ask the Owner to set one in Django admin.</p>
@@ -298,6 +299,7 @@ export default function AdminInventory() {
             <option value="store">Store only</option>
             <option value="bar">Bar only</option>
             <option value="kitchen">Kitchen only</option>
+            <option value="housekeeping">Housekeeping only</option>
           </Select>
         )}
       </div>
@@ -382,6 +384,7 @@ export default function AdminInventory() {
                   <div className="flex gap-1.5 flex-shrink-0">
                     {c.department === 'bar' && <Badge variant="blue">Bar only</Badge>}
                     {c.department === 'kitchen' && <Badge variant="green">Kitchen only</Badge>}
+                    {c.department === 'housekeeping' && <Badge variant="gold">Housekeeping only</Badge>}
                     {!c.is_active && <Badge variant="gray">Inactive</Badge>}
                   </div>
                 </div>
@@ -440,9 +443,10 @@ export default function AdminInventory() {
             value={catForm.department}
             onChange={e => setCatForm({ ...catForm, department: e.target.value as CategoryForm['department'] })}
           >
-            <option value="shared">Shared / Store only — visible to both departments</option>
-            <option value="bar">Bar only — hidden from Kitchen Staff</option>
-            <option value="kitchen">Kitchen only — hidden from Bar Staff</option>
+            <option value="shared">Shared / Store only — visible to all departments</option>
+            <option value="bar">Bar only — hidden from Kitchen &amp; Housekeeping</option>
+            <option value="kitchen">Kitchen only — hidden from Bar &amp; Housekeeping</option>
+            <option value="housekeeping">Housekeeping only — hidden from Bar &amp; Kitchen</option>
           </Select>
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="ghost" onClick={() => setCatModalOpen(false)}>Cancel</Button>

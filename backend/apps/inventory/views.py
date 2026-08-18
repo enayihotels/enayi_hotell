@@ -27,14 +27,16 @@ def _can_manage_catalog(user):
 def _can_adjust_location(user, location):
     """Who's allowed to directly adjust the stock balance at a given
     location. Store Keeper owns 'store', Bar Staff owns 'bar', Kitchen
-    Staff owns 'kitchen' — manager/admin can adjust any of them (at
-    their own branch; Admin at any branch)."""
+    Staff owns 'kitchen', Housekeeper owns 'housekeeping' — manager/
+    admin can adjust any of them (at their own branch; Admin at any
+    branch)."""
     if user.role in ["manager", "admin"]:
         return True
     return {
         "store_keeper":  StockBalance.STORE,
         "bar_staff":     StockBalance.BAR,
         "kitchen_staff": StockBalance.KITCHEN,
+        "housekeeper":   StockBalance.HOUSEKEEPING,
     }.get(user.role) == location
 
 def _effective_hotel(user, requested_hotel_id=None):
@@ -66,6 +68,28 @@ def _effective_hotel(user, requested_hotel_id=None):
 DRINK_TYPES = {"drink", "cocktail", "mocktail", "wine"}
 FOOD_TYPES = {"food", "breakfast", "dessert", "snack"}
 
+# Which department a role is scoped to, for filtering categories/items.
+# A role sees ONLY their own department's categories plus 'shared' ones
+# — not "everything except the other departments," which stopped
+# working cleanly the moment a 3rd non-shared department (housekeeping)
+# existed alongside bar/kitchen.
+ROLE_DEPARTMENT = {
+    "bar_staff":     InventoryCategory.BAR,
+    "kitchen_staff": InventoryCategory.KITCHEN,
+    "housekeeper":   InventoryCategory.HOUSEKEEPING,
+}
+
+
+def _scope_by_department(qs, user, category_field="department"):
+    """Filters a category or item queryset down to what this user's
+    role is allowed to see: their own department plus anything tagged
+    'shared'. No-ops for roles with no single department (Store
+    Keeper, Manager, Admin all see everything)."""
+    dept = ROLE_DEPARTMENT.get(user.role)
+    if not dept:
+        return qs
+    return qs.filter(**{f"{category_field}__in": [dept, InventoryCategory.SHARED]})
+
 
 class InventoryCategoryListView(generics.ListCreateAPIView):
     serializer_class = InventoryCategorySerializer
@@ -82,14 +106,11 @@ class InventoryCategoryListView(generics.ListCreateAPIView):
         if effective:
             qs = qs.filter(hotel_id=effective)
 
-        # Same department scoping as the items themselves — a Kitchen
-        # Staff account shouldn't see a "Beer & Spirits" category tab
-        # sitting there with nothing in it just because the items
-        # underneath got filtered out; hide the category entirely.
-        if user.role == "bar_staff":
-            qs = qs.exclude(department=InventoryCategory.KITCHEN)
-        elif user.role == "kitchen_staff":
-            qs = qs.exclude(department=InventoryCategory.BAR)
+        # A role only sees their own department's categories plus
+        # 'shared' ones — e.g. a Kitchen Staff account shouldn't see a
+        # "Beer & Spirits" tab sitting there empty, or now a
+        # "Housekeeping Supplies" tab that isn't hers either.
+        qs = _scope_by_department(qs, user)
 
         return qs
 
@@ -167,14 +188,11 @@ class InventoryItemListView(generics.ListCreateAPIView):
         if category:
             qs = qs.filter(category__slug=category)
 
-        # Bar/Kitchen Staff only see items in categories tagged for their
-        # own department — InventoryCategory.department is the explicit
-        # source of truth now (Store Keeper sets this when creating a
-        # category). 'shared' categories stay visible to both.
-        if user.role == "bar_staff":
-            qs = qs.exclude(category__department=InventoryCategory.KITCHEN)
-        elif user.role == "kitchen_staff":
-            qs = qs.exclude(category__department=InventoryCategory.BAR)
+        # Bar/Kitchen/Housekeeping staff only see items in categories
+        # tagged for their own department — InventoryCategory.department
+        # is the explicit source of truth (Store Keeper sets this when
+        # creating a category). 'shared' categories stay visible to all.
+        qs = _scope_by_department(qs, user, category_field="category__department")
 
         return qs
 
@@ -226,10 +244,7 @@ class InventoryItemDetailView(generics.RetrieveUpdateDestroyAPIView):
         # Same department scoping as InventoryItemListView above — a
         # Kitchen Staff account hitting a bar item's detail URL directly
         # should get a 404, not a peek at bar-only stock.
-        if user.role == "bar_staff":
-            qs = qs.exclude(category__department=InventoryCategory.KITCHEN)
-        elif user.role == "kitchen_staff":
-            qs = qs.exclude(category__department=InventoryCategory.BAR)
+        qs = _scope_by_department(qs, user, category_field="category__department")
 
         return qs
 
@@ -481,13 +496,19 @@ class StockRequisitionListCreateView(generics.ListCreateAPIView):
             return qs.filter(destination=StockBalance.BAR)
         if user.role == "kitchen_staff":
             return qs.filter(destination=StockBalance.KITCHEN)
+        if user.role == "housekeeper":
+            return qs.filter(destination=StockBalance.HOUSEKEEPING)
         return StockRequisition.objects.none()
 
     def create(self, request, *args, **kwargs):
         user = request.user
-        destination = {"bar_staff": StockBalance.BAR, "kitchen_staff": StockBalance.KITCHEN}.get(user.role)
+        destination = {
+            "bar_staff":     StockBalance.BAR,
+            "kitchen_staff": StockBalance.KITCHEN,
+            "housekeeper":   StockBalance.HOUSEKEEPING,
+        }.get(user.role)
         if not destination:
-            return Response({"error": "Only Bar Staff or Kitchen Staff can request items from the Store."}, status=403)
+            return Response({"error": "Only Bar Staff, Kitchen Staff, or Housekeeper can request items from the Store."}, status=403)
         if not user.hotel_id:
             return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can request stock."}, status=403)
 
