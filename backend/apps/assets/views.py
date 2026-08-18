@@ -110,8 +110,8 @@ class PropertyAssetListView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         user = request.user
-        if not (user.is_hotel_staff or user.role in ["manager", "admin"]):
-            return Response({"error": "Only Front Desk Staff, Manager, or Owner can add assets."}, status=403)
+        if not user.role in ["manager", "admin"]:
+            return Response({"error": "Only a Manager or the Owner can add assets."}, status=403)
 
         if user.role == "admin":
             hotel_id = request.data.get("hotel")
@@ -150,14 +150,14 @@ class PropertyAssetDetailView(generics.RetrieveUpdateDestroyAPIView):
         return PropertyAssetWriteSerializer if self.request.method in ["PUT", "PATCH"] else PropertyAssetSerializer
 
     def update(self, request, *args, **kwargs):
-        if not (request.user.is_hotel_staff or request.user.role in ["manager", "admin"]):
-            return Response({"error": "Only Front Desk Staff, Manager, or Owner can edit assets."}, status=403)
+        if not request.user.role in ["manager", "admin"]:
+            return Response({"error": "Only a Manager or the Owner can edit assets."}, status=403)
         response = super().update(request, *args, **kwargs)
         return Response(PropertyAssetSerializer(self.get_object()).data, status=response.status_code)
 
     def destroy(self, request, *args, **kwargs):
-        if not (request.user.is_hotel_staff or request.user.role in ["manager", "admin"]):
-            return Response({"error": "Only Front Desk Staff, Manager, or Owner can delete assets."}, status=403)
+        if not request.user.role in ["manager", "admin"]:
+            return Response({"error": "Only a Manager or the Owner can delete assets."}, status=403)
         return super().destroy(request, *args, **kwargs)
 
 
@@ -280,7 +280,7 @@ class ResolveAssetIssueView(APIView):
 
         asset = issue.asset
         dept = ROLE_DEPARTMENT.get(user.role)
-        if dept and asset.department != dept and not (user.is_hotel_staff or user.role in ["manager", "admin"]):
+        if dept and asset.department != dept and not user.role in ["manager", "admin"]:
             return Response({"error": "That asset isn't in your department."}, status=403)
 
         issue.status = AssetIssueReport.FIXED

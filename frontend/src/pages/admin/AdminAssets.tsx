@@ -48,6 +48,7 @@ export default function AdminAssets() {
   const qc = useQueryClient()
   const isAdmin = user?.role === 'admin'
   const canClearOrReject = user?.role === 'manager' || user?.role === 'admin'
+  const canAddOrDelete   = user?.role === 'manager' || user?.role === 'admin'
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'broken' | 'working' | 'awaiting_review'>('all')
   const [departmentFilter, setDepartmentFilter] = useState<string>('all')
@@ -204,7 +205,7 @@ export default function AdminAssets() {
               {hotels.map((h: any) => <option key={h.id} value={h.id}>{h.name}</option>)}
             </Select>
           )}
-          <Button variant="gold" onClick={openNewAsset}><Plus size={14} /> Add Asset</Button>
+          {canAddOrDelete && <Button variant="gold" onClick={openNewAsset}><Plus size={14} /> Add Asset</Button>}
         </div>
       </div>
 
@@ -279,8 +280,8 @@ export default function AdminAssets() {
                 </div>
               )}
               <div className="flex gap-2 pt-1 flex-wrap">
-                <Button size="sm" variant="outline" onClick={() => openEditAsset(a)}><Pencil size={12} /> Edit</Button>
-                <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${a.name}"?`)) deleteAsset.mutate(a.id) }}><Trash2 size={12} /> Delete</Button>
+                {canAddOrDelete && <Button size="sm" variant="outline" onClick={() => openEditAsset(a)}><Pencil size={12} /> Edit</Button>}
+                {canAddOrDelete && <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${a.name}"?`)) deleteAsset.mutate(a.id) }}><Trash2 size={12} /> Delete</Button>}
                 {a.status === 'working' && (
                   <Button size="sm" variant="danger" onClick={() => { setReportTarget(a); setIssueDescription('') }}><AlertTriangle size={12} /> Report Broken</Button>
                 )}
