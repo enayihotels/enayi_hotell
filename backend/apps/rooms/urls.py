@@ -9,6 +9,7 @@ urlpatterns = [
     path("images/<uuid:pk>/",  views.RoomImageDeleteView.as_view(),    name="room-image-delete"),
     path("categories/<slug:slug>/reviews/", views.RoomReviewListCreateView.as_view(), name="room-reviews"),    path("list/",                             views.RoomListView.as_view(),           name="room-list"),
     path("list/<uuid:pk>/",                   views.RoomDetailView.as_view(),         name="room-detail"),
+    path("list/<uuid:pk>/mark-cleaned/",      views.MarkRoomCleanedView.as_view(),    name="room-mark-cleaned"),
     path("list/<uuid:room_id>/photos/",       views.RoomPhotoListUploadView.as_view(), name="room-photos"),
     path("photos/<uuid:pk>/",                 views.RoomPhotoDeleteView.as_view(),    name="room-photo-delete"),
     path("availability/",                     views.RoomAvailabilityView.as_view(),   name="room-availability"),

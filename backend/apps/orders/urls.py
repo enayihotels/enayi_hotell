@@ -10,4 +10,5 @@ urlpatterns = [
     path("<uuid:pk>/status/",  views.UpdateOrderStatusView.as_view(),   name="order-status"),
     path("kitchen/",           views.KitchenOrdersView.as_view(),       name="kitchen-orders"),
     path("bar/",               views.BarOrdersView.as_view(),           name="bar-orders"),
+    path("housekeeping/",      views.HousekeepingOrdersView.as_view(),  name="housekeeping-orders"),
 ]

@@ -10,6 +10,17 @@ class MenuCategorySerializer(serializers.ModelSerializer):
         read_only_fields = ["hotel"]
 
 
+class MenuItemStaffUpdateSerializer(serializers.ModelSerializer):
+    """What Bar/Kitchen Staff can actually change day to day — mainly
+    availability and a photo, plus a couple of small display details.
+    Deliberately does NOT include price or the linked inventory_item —
+    those stay Store Keeper/Manager-level changes, made through the
+    Inventory screen, not here."""
+    class Meta:
+        model = MenuItem
+        fields = ["is_available", "image", "description", "preparation_time"]
+
+
 class MenuItemSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_type = serializers.CharField(source="category.type", read_only=True)

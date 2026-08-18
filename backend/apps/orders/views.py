@@ -8,6 +8,7 @@ from rest_framework import generics, filters, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -15,6 +16,7 @@ from .models import MenuCategory, MenuItem, Order, OrderItem
 from .serializers import (
     MenuCategorySerializer,
     MenuItemSerializer,
+    MenuItemStaffUpdateSerializer,
     OrderSerializer,
     CreateOrderSerializer,
     UpdateOrderStatusSerializer,
@@ -77,7 +79,13 @@ class MenuItemListView(generics.ListAPIView):
 
     def get_queryset(self):
         hotel_id = self.request.query_params.get("hotel") or _guest_branch(self.request.user)
-        qs = MenuItem.objects.filter(is_available=True).select_related("category")
+        # Deliberately NOT filtering by is_available here — guests should
+        # still SEE an item that's temporarily out of stock (with a clear
+        # "unavailable" state on the frontend), not have it silently
+        # vanish from the menu as if it never existed. Actually placing
+        # an order for an unavailable item is still blocked separately,
+        # in OrderListCreateView.post().
+        qs = MenuItem.objects.select_related("category")
         if hotel_id:
             qs = qs.filter(hotel_id=hotel_id)
         return qs.order_by(
@@ -90,13 +98,52 @@ class MenuItemListView(generics.ListAPIView):
         return {"request": self.request}
 
 
-class MenuItemDetailView(generics.RetrieveAPIView):
-    permission_classes = [AllowAny]
-    serializer_class = MenuItemSerializer
-    queryset = MenuItem.objects.select_related("category")
+DRINK_TYPES = {"drink", "cocktail", "mocktail", "wine"}
+FOOD_TYPES = {"food", "breakfast", "dessert", "snack"}
+
+
+def _can_manage_menu_item(user, item):
+    """Who can toggle availability / upload a photo for THIS specific
+    menu item. Bar Staff owns drink-type items, Kitchen Staff owns
+    food-type items — both only at their own branch. Manager is
+    branch-scoped too; only Admin/Owner can touch any branch."""
+    if user.role == "admin":
+        return True
+    if not user.hotel_id or str(user.hotel_id) != str(item.hotel_id):
+        return False
+    if user.role == "manager":
+        return True
+    if user.role == "bar_staff":
+        return item.category.type in DRINK_TYPES
+    if user.role == "kitchen_staff":
+        return item.category.type in FOOD_TYPES
+    return False
+
+
+class MenuItemDetailView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    queryset = MenuItem.objects.select_related("category", "hotel")
+
+    def get_permissions(self):
+        # Anyone (including no one logged in) can look at a menu item's
+        # detail page — only editing it requires being signed in at all.
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated()]
+
+    def get_serializer_class(self):
+        return MenuItemStaffUpdateSerializer if self.request.method in ["PUT", "PATCH"] else MenuItemSerializer
 
     def get_serializer_context(self):
         return {"request": self.request}
+
+    def update(self, request, *args, **kwargs):
+        item = self.get_object()
+        if not _can_manage_menu_item(request.user, item):
+            return Response({"error": "You don't have permission to update this menu item."}, status=403)
+        response = super().update(request, *args, **kwargs)
+        return Response(MenuItemSerializer(self.get_object(), context={"request": request}).data, status=response.status_code)
 
 
 class OrderListCreateView(APIView):
@@ -236,8 +283,23 @@ class OrderListCreateView(APIView):
                     order.delivery_charge +
                     order.tax
                 )
+                # Real estimate instead of a flat 30 minutes: the
+                # kitchen/bar prepares items in parallel, not one after
+                # another, so the wait is roughly the SLOWEST single
+                # item on the order, not the sum of all of them — plus
+                # a short buffer for plating and bringing it over.
+                # Capped so nothing ever looks discouragingly long on
+                # the guest's screen; if a real order is going to take
+                # longer than that in practice, that's a kitchen
+                # timing/menu prep_time setting worth revisiting rather
+                # than something to show a guest up front.
+                max_prep = max(
+                    (oi.menu_item.preparation_time for oi in order.items.select_related("menu_item")),
+                    default=20,
+                )
+                estimated_minutes = min(max_prep + 5, 40)
                 order.estimated_delivery = (
-                    timezone.now() + timedelta(minutes=30)
+                    timezone.now() + timedelta(minutes=estimated_minutes)
                 )
 
                 order.save(
@@ -251,10 +313,27 @@ class OrderListCreateView(APIView):
         except ValueError as exc:
             return Response({"error": str(exc)}, status=400)
 
-        return Response(
-            OrderSerializer(order).data,
-            status=201
-        )
+        response_data = OrderSerializer(order).data
+        response_data["estimated_minutes"] = estimated_minutes
+        response_data["friendly_message"] = _order_confirmation_message()
+        return Response(response_data, status=201)
+
+
+def _order_confirmation_message():
+    """A warm, human line for the guest to see the instant their order
+    goes through — deliberately a curated bank rather than a live AI
+    call, so it shows up instantly with the order confirmation instead
+    of guests waiting on a model response for something this small."""
+    import random
+    messages = [
+        "You're all set! Please hold on for a bit while we get this ready for you.",
+        "Thank you for your order — our team is on it. Sit back and relax, it won't be long.",
+        "Got it! We're preparing your order with care — thanks for your patience.",
+        "Your order is in good hands. We'll have it with you shortly.",
+        "Wonderful choice! Please bear with us while we get everything ready.",
+        "Thanks for ordering with us — we're already getting started on it.",
+    ]
+    return random.choice(messages)
 
 
 class MyOrdersView(generics.ListAPIView):
@@ -316,6 +395,8 @@ class UpdateOrderStatusView(APIView):
         if not can_update and same_branch and user.role == "bar_staff" and order.source in ["bar", "room_service"]:
             can_update = True
         if not can_update and same_branch and user.role == "kitchen_staff" and order.source in ["kitchen", "room_service"]:
+            can_update = True
+        if not can_update and same_branch and user.role == "housekeeper" and order.source == "room_service":
             can_update = True
         if not can_update:
             return Response(
@@ -471,6 +552,40 @@ class BarOrdersView(generics.ListAPIView):
         if effective:
             qs = qs.filter(hotel_id=effective)
         return qs.prefetch_related(
+            "items__menu_item"
+        ).order_by(
+            "created_at"
+        )
+
+
+class HousekeepingOrdersView(generics.ListAPIView):
+    """Room Service orders specifically, at Housekeeping's own branch —
+    what they actually need to know: which rooms have a delivery
+    coming so they can bring it over once Kitchen/Bar have it ready.
+    Deliberately narrower than KitchenOrdersView's queue (which
+    includes Kitchen pickup orders too, not just Room Service) since
+    that's the one part of it Housekeeping actually acts on.
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = OrderSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if not (user.role in ["housekeeper", "manager", "admin"]):
+            return Order.objects.none()
+
+        from apps.inventory.views import _effective_hotel
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return Order.objects.none()
+
+        qs = Order.objects.filter(
+            source="room_service",
+            status__in=["pending", "confirmed", "preparing", "ready"],
+        )
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs.select_related("room").prefetch_related(
             "items__menu_item"
         ).order_by(
             "created_at"

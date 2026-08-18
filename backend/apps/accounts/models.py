@@ -31,6 +31,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     STORE_KEEPER  = "store_keeper"
     BAR_STAFF     = "bar_staff"
     KITCHEN_STAFF = "kitchen_staff"
+    HOUSEKEEPER   = "housekeeper"
     MANAGER       = "manager"
     ADMIN         = "admin"
 
@@ -40,6 +41,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         (STORE_KEEPER,  "Store Keeper"),
         (BAR_STAFF,     "Bar Staff"),
         (KITCHEN_STAFF, "Kitchen Staff"),
+        (HOUSEKEEPER,   "Housekeeper"),
         (MANAGER,       "Manager"),
         (ADMIN,         "Admin"),
     ]
@@ -140,8 +142,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         """Every role except Owner (sees all branches) and Guest (isn't
         tied to one) needs a `hotel` set to actually see or manage
         anything branch-scoped — Manager, Front Desk Staff, Store
-        Keeper, Bar Staff, Kitchen Staff."""
-        return self.role in [self.STAFF, self.MANAGER, self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF]
+        Keeper, Bar Staff, Kitchen Staff, Housekeeper."""
+        return self.role in [self.STAFF, self.MANAGER, self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER]
 
     @property
     def is_branch_scoped(self):

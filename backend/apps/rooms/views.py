@@ -146,11 +146,12 @@ class RoomListView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
     pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ["status","floor","category"]
+    filterset_fields = ["status","floor","category","hotel"]
     search_fields = ["room_number"]
     def get_queryset(self):
         Room.release_stale_cleaning_rooms()
-        if self.request.user.is_hotel_staff:
+        user = self.request.user
+        if user.is_hotel_staff or user.role == "housekeeper":
             return Room.objects.select_related("category").all()
         return Room.objects.filter(status="available").select_related("category")
 
@@ -321,7 +322,9 @@ class BranchRoomsView(APIView):
         # Strip branch names from category display names
         import re as _re
         _strip = ["Zaramaganda", "Fwawei", "zaramaganda", "fwawei",
-                  "ZARAMAGANDA", "FWAWEI"]
+                  "ZARAMAGANDA", "FWAWEI",
+                  "Zarmaganda", "Fwavwei", "zarmaganda", "fwavwei",
+                  "ZARMAGANDA", "FWAVWEI"]
         for cat in grouped.values():
             clean = cat["category"]
             for word in _strip:
@@ -392,3 +395,39 @@ class RoomPhotoDeleteView(APIView):
         photo.image.delete(save=False)
         photo.delete()
         return Response(status=204)
+
+
+class MarkRoomCleanedView(APIView):
+    """POST /api/v1/rooms/<uuid:pk>/mark-cleaned/
+    Manually moves a room from 'cleaning' straight to 'available'
+    instead of waiting for the 30-minute auto-release — this is the
+    actual "I've finished cleaning this room" action, mainly for
+    Housekeeping, who work alongside Kitchen/Bar to get a room fully
+    ready for the next guest. Front Desk/Manager/Admin can do this too,
+    matching who could already touch room status before Housekeeping
+    existed as a role.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        allowed_roles = ["housekeeper", "staff", "manager", "admin"]
+        if user.role not in allowed_roles:
+            return Response({"error": "Only Housekeeping, Front Desk Staff, Manager, or Owner can mark a room cleaned."}, status=403)
+
+        try:
+            room = Room.objects.get(id=pk)
+        except Room.DoesNotExist:
+            return Response({"error": "Room not found."}, status=404)
+
+        if user.role != "admin":
+            if not user.hotel_id or str(user.hotel_id) != str(room.hotel_id):
+                return Response({"error": "That room belongs to a different branch than your account."}, status=403)
+
+        if room.status != "cleaning":
+            return Response({"error": f"This room isn't in cleaning status right now (currently {room.status})."}, status=400)
+
+        room.status = "available"
+        room.cleaning_started_at = None
+        room.save(update_fields=["status", "cleaning_started_at"])
+        return Response(RoomSerializer(room, context={"request": request}).data)
