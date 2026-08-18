@@ -45,6 +45,7 @@ export default {
         float:       'float 7s ease-in-out infinite',
         'fade-up':   'fadeUp 0.7s cubic-bezier(0.16,1,0.3,1) forwards',
         'glow-pulse':'glowPulse 3s ease-in-out infinite',
+        'update-progress': 'updateProgress 1.2s ease-in-out infinite',
       }
     }
   },

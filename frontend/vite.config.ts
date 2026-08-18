@@ -16,6 +16,18 @@ export default defineConfig({
       // to introduce carelessly with a service worker and hard to notice
       // until someone's looking at a room that's actually already booked.
       workbox: {
+        // Without this, a newly-activated service worker doesn't take
+        // control of the CURRENTLY open tab — only pages loaded after
+        // activation. That's the actual cause of "Reload Now just sits
+        // there doing nothing": updateServiceWorker(true) in
+        // UpdatePrompt.tsx waits for a controllerchange event to fire
+        // before it reloads, and without clientsClaim, that event can
+        // never fire on the page you're already looking at. This does
+        // NOT change when a new version activates (still only after
+        // the user explicitly clicks Reload — registerType stays
+        // 'prompt', no auto-updating behind anyone's back) — it only
+        // fixes what happens the moment after they do.
+        clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [

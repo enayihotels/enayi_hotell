@@ -133,3 +133,13 @@
 @keyframes fadeUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes glowPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+/* Indeterminate progress bar for the PWA update banner — we don't have
+   real byte-level download progress from the service worker, so this
+   is deliberately an honest "something is happening" indicator (a bar
+   sliding back and forth) rather than a fake percentage. */
+@keyframes updateProgress {
+  0%   { transform: translateX(-100%); }
+  50%  { transform: translateX(20%); }
+  100% { transform: translateX(120%); }
+}
+
