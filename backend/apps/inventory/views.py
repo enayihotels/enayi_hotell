@@ -57,6 +57,19 @@ def _effective_hotel(user, requested_hotel_id=None):
     return None
 
 
+# Mirrors DRINK_TYPES / FOOD_TYPES in apps/orders/views.py. InventoryCategory
+# itself has no department field, so a catalog item's department is inferred
+# from the guest-menu item it's linked to (Phase 3's inventory_item link) —
+# a Coca-Cola InventoryItem linked to a "drink"-type MenuItem is clearly a
+# Bar item. Items with NO menu link at all (a raw ingredient never listed on
+# the guest menu, e.g. a future kitchen ingredient) are deliberately left
+# visible to both departments below, since there's no signal to tell which
+# one it belongs to — better to show an ambiguous item than silently hide a
+# real one.
+DRINK_TYPES = {"drink", "cocktail", "mocktail", "wine"}
+FOOD_TYPES = {"food", "breakfast", "dessert", "snack"}
+
+
 class InventoryCategoryListView(generics.ListCreateAPIView):
     serializer_class = InventoryCategorySerializer
     permission_classes = [IsAuthenticated]
@@ -146,6 +159,19 @@ class InventoryItemListView(generics.ListCreateAPIView):
         category = self.request.query_params.get("category")
         if category:
             qs = qs.filter(category__slug=category)
+
+        # Bar/Kitchen Staff only see items relevant to their own
+        # department (see DRINK_TYPES/FOOD_TYPES note above) — otherwise
+        # Kitchen Staff sees the entire drinks catalog with a meaningless
+        # 0.00 Kitchen balance on every row, none of which she can
+        # actually do anything with.
+        if user.role == "bar_staff":
+            from django.db.models import Q
+            qs = qs.filter(Q(menu_items__isnull=True) | Q(menu_items__category__type__in=DRINK_TYPES)).distinct()
+        elif user.role == "kitchen_staff":
+            from django.db.models import Q
+            qs = qs.filter(Q(menu_items__isnull=True) | Q(menu_items__category__type__in=FOOD_TYPES)).distinct()
+
         return qs
 
     def create(self, request, *args, **kwargs):
@@ -192,10 +218,18 @@ class InventoryItemDetailView(generics.RetrieveUpdateDestroyAPIView):
         qs = InventoryItem.objects.select_related("category", "hotel").prefetch_related("balances")
         if effective:
             qs = qs.filter(hotel_id=effective)
-        return qs
 
-    def get_serializer_class(self):
-        return InventoryItemWriteSerializer if self.request.method in ["PUT", "PATCH"] else InventoryItemSerializer
+        # Same department scoping as InventoryItemListView above — a
+        # Kitchen Staff account hitting a bar item's detail URL directly
+        # should get a 404, not a peek at bar-only stock.
+        if user.role == "bar_staff":
+            from django.db.models import Q
+            qs = qs.filter(Q(menu_items__isnull=True) | Q(menu_items__category__type__in=DRINK_TYPES)).distinct()
+        elif user.role == "kitchen_staff":
+            from django.db.models import Q
+            qs = qs.filter(Q(menu_items__isnull=True) | Q(menu_items__category__type__in=FOOD_TYPES)).distinct()
+
+        return qs
 
     def update(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):

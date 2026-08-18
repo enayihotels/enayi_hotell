@@ -304,7 +304,17 @@ export default function AdminInventory() {
 
       {tab === 'stock' && (
         (items || []).length === 0 ? (
-          <div className="card p-12 text-center"><EmptyState icon={Package} title="No items yet" desc={canManageCatalog ? 'Add your first item to get started.' : 'None have been added yet.'} /></div>
+          <div className="card p-12 text-center">
+            <EmptyState
+              icon={user?.role === 'kitchen_staff' ? UtensilsCrossed : Package}
+              title={user?.role === 'kitchen_staff' ? 'No kitchen stock items yet' : 'No items yet'}
+              desc={
+                user?.role === 'kitchen_staff'
+                  ? 'Food items aren\'t tracked as stock here — head to Menu to manage what\'s on the guest menu and its photos.'
+                  : canManageCatalog ? 'Add your first item to get started.' : 'None have been added yet.'
+              }
+            />
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {items!.map(it => (
