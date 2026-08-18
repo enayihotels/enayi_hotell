@@ -55,6 +55,7 @@ def _guest_branch(user):
 class MenuCategoryListView(generics.ListAPIView):
     permission_classes = [AllowAny]
     serializer_class = MenuCategorySerializer
+    pagination_class = None
 
     def get_queryset(self):
         hotel_id = self.request.query_params.get("hotel") or _guest_branch(self.request.user)
@@ -65,8 +66,16 @@ class MenuCategoryListView(generics.ListAPIView):
 
 
 class MenuItemListView(generics.ListAPIView):
+    """No pagination — a hotel's full food & bar menu (110+ items across
+    both branches combined, growing over time) should never be silently
+    truncated to the first 20 alphabetically. This is exactly the same
+    fix RoomListView needed earlier for the same underlying reason: the
+    global DRF page size default quietly applies to any view that
+    doesn't explicitly opt out, and a browsable menu is not something
+    that should ever be paginated away from a guest."""
     permission_classes = [AllowAny]
     serializer_class = MenuItemSerializer
+    pagination_class = None
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = [
         "category",
