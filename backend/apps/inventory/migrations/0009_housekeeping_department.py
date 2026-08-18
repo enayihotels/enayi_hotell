@@ -26,7 +26,7 @@ class Migration(migrations.Migration):
                           "'Housekeeping only' hides it from every OTHER department's Inventory screen — a "
                           "Kitchen Staff account never sees a Bar-only or Housekeeping-only category and vice "
                           "versa. 'Shared / Store only' is visible to all of them (or none, if it's something "
-                          "only the Store Keeper handles directly).",
+                          "only the Store Keeper handles directly, like cleaning supplies).",
             ),
         ),
         # location's max_length was already 20, plenty of room for

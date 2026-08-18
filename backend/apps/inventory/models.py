@@ -38,10 +38,11 @@ class InventoryCategory(models.Model):
     description = models.CharField(max_length=255, blank=True)
     department  = models.CharField(max_length=15, choices=DEPARTMENT_CHOICES, default=SHARED,
                                     help_text="Who requests items in this category from the Store. "
-                                              "'Bar only' / 'Kitchen only' hides it from the other "
-                                              "department's Inventory screen entirely — a Kitchen Staff "
-                                              "account never sees a Bar-only category and vice versa. "
-                                              "'Shared / Store only' is visible to both (or neither, if "
+                                              "'Bar only' / 'Kitchen only' / 'Housekeeping only' hides "
+                                              "it from every OTHER department's Inventory screen — a "
+                                              "Kitchen Staff account never sees a Bar-only or "
+                                              "Housekeeping-only category and vice versa. 'Shared / "
+                                              "Store only' is visible to all of them (or none, if "
                                               "it's something only the Store Keeper handles directly, "
                                               "like cleaning supplies).")
     is_active   = models.BooleanField(default=True)
