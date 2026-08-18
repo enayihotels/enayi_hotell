@@ -37,7 +37,11 @@ const ISSUE_STATUS_BADGE: Record<string, 'red' | 'gold' | 'gray' | 'green'> = {
 }
 
 type AssetForm = { name: string; category: string; department: string; quantity: string; roomMode: 'room' | 'common'; room: string; location_note: string; serial_number: string; notes: string }
-const emptyAssetForm: AssetForm = { name: '', category: 'appliance', department: 'shared', quantity: '1', roomMode: 'common', room: '', location_note: '', serial_number: '', notes: '' }
+const emptyAssetForm: AssetForm = { name: '', category: 'appliance', department: 'shared', quantity: '1', roomMode: 'common', room: '', location_note: '', serial_number: '' , notes: '' }
+
+const DEPT_LABELS: Record<string, string> = {
+  shared: '🏨 Common Areas', frontdesk: '🖥️ Front Desk', kitchen: '🍳 Kitchen', bar: '🍸 Bar', housekeeping: '🛏️ Housekeeping',
+}
 
 export default function AdminAssets() {
   const { user } = useAuthStore()
@@ -46,6 +50,7 @@ export default function AdminAssets() {
   const canClearOrReject = user?.role === 'manager' || user?.role === 'admin'
 
   const [statusFilter, setStatusFilter] = useState<'all' | 'broken' | 'working' | 'awaiting_review'>('all')
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all')
 
   // Only the Owner operates across every branch — Manager/Front Desk are
   // already scoped server-side to their own account's branch, so this
@@ -160,10 +165,31 @@ export default function AdminAssets() {
 
   const brokenCount = (assets || []).filter(a => a.status === 'broken').length
   const awaitingReviewCount = (assets || []).filter(a => a.open_issue?.status === 'reported').length
-  const filteredAssets = (assets || []).filter(a => {
+
+  // Filter first by status/review, then by department segment
+  const segmentFiltered = (assets || []).filter(a => {
     if (statusFilter === 'awaiting_review') return a.open_issue?.status === 'reported'
-    return statusFilter === 'all' || a.status === statusFilter
+    if (statusFilter !== 'all' && a.status !== statusFilter) return false
+    if (departmentFilter !== 'all' && a.department !== departmentFilter) return false
+    return true
   })
+
+  // Group by physical location within the selected segment — Rooms first,
+  // then common areas alphabetically. Rooms sort numerically ("Room 2"
+  // before "Room 10") rather than lexicographically.
+  const grouped = new Map<string, PropertyAsset[]>()
+  for (const a of segmentFiltered) {
+    const key = a.where
+    const list = grouped.get(key) || []
+    list.push(a)
+    grouped.set(key, list)
+  }
+  const sortedLocations = Array.from(grouped.keys()).sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true })
+  )
+
+  // Which departments actually have assets, for the segment picker
+  const activeDepartments = [...new Set((assets || []).map(a => a.department))].sort()
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -203,17 +229,40 @@ export default function AdminAssets() {
         </button>
       </div>
 
-      {filteredAssets.length === 0 ? (
+      {/* Department/segment picker — makes 292 items navigable instead of one wall of cards */}
+      {statusFilter !== 'awaiting_review' && activeDepartments.length > 1 && (
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <span className="text-enayi-muted text-xs mr-1">Segment:</span>
+          <button onClick={() => setDepartmentFilter('all')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${departmentFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
+            All ({(assets||[]).length})
+          </button>
+          {activeDepartments.map(d => (
+            <button key={d} onClick={() => setDepartmentFilter(departmentFilter === d ? 'all' : d)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${departmentFilter===d ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
+              {DEPT_LABELS[d] ?? d} ({(assets||[]).filter(a => a.department === d).length})
+            </button>
+          ))}
+        </div>
+      )}
+
+      {segmentFiltered.length === 0 ? (
         <div className="card p-12 text-center"><EmptyState icon={Wrench} title="No assets here" desc="Nothing matches this filter yet." /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAssets.map(a => (
+        // Group by location — rooms first, then common areas
+        sortedLocations.map(where => (
+          <div key={where} className="space-y-3">
+            <h2 className="font-heading text-base text-enayi-text border-b border-enayi-border pb-2">
+              {where} <span className="text-enayi-muted text-sm font-normal">({grouped.get(where)!.length} item{grouped.get(where)!.length === 1 ? '' : 's'})</span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {grouped.get(where)!.map(a => (
             <div key={a.id} className="card p-4 space-y-2.5">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-enayi-text font-medium">{a.quantity > 1 ? `${a.quantity}× ` : ''}{a.name}</div>
-                  <div className="text-enayi-muted text-xs">{a.where} · {a.category_display?.split(' (')[0] ?? a.category}</div>
-                  <div className="text-enayi-muted text-[11px] mt-0.5">{a.department_display}{isAdmin ? ` · ${a.hotel_name}` : ''}</div>
+                  <div className="text-enayi-muted text-xs">{a.category_display?.split(' (')[0] ?? a.category}</div>
+                  {departmentFilter === 'all' && <div className="text-enayi-muted text-[11px]">{DEPT_LABELS[a.department] ?? a.department_display}{isAdmin ? ` · ${a.hotel_name}` : ''}</div>}
                 </div>
                 <Badge variant={STATUS_BADGE[a.status]}>{a.status.replace('_',' ')}</Badge>
               </div>
@@ -232,12 +281,9 @@ export default function AdminAssets() {
               <div className="flex gap-2 pt-1 flex-wrap">
                 <Button size="sm" variant="outline" onClick={() => openEditAsset(a)}><Pencil size={12} /> Edit</Button>
                 <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${a.name}"?`)) deleteAsset.mutate(a.id) }}><Trash2 size={12} /> Delete</Button>
-
                 {a.status === 'working' && (
                   <Button size="sm" variant="danger" onClick={() => { setReportTarget(a); setIssueDescription('') }}><AlertTriangle size={12} /> Report Broken</Button>
                 )}
-
-                {/* Approval gate — Manager/Owner only, and only while awaiting review */}
                 {canClearOrReject && a.open_issue?.status === 'reported' && (
                   <>
                     <Button size="sm" variant="gold" onClick={() => { setClearanceTarget({ asset: a, issueId: a.open_issue!.id, action: 'clear' }); setClearanceNote('') }}>
@@ -248,8 +294,6 @@ export default function AdminAssets() {
                     </Button>
                   </>
                 )}
-
-                {/* Mark Fixed — only once cleared, matches backend enforcement */}
                 {a.open_issue?.status === 'cleared_for_repair' && (
                   <Button size="sm" variant="surface" onClick={() => { setResolveTarget({ asset: a, issueId: a.open_issue!.id }); setFixNotes('') }}>
                     <CheckCircle2 size={12} /> Mark Fixed
@@ -271,8 +315,10 @@ export default function AdminAssets() {
                 </details>
               )}
             </div>
-          ))}
-        </div>
+              ))}
+            </div>
+          </div>
+        ))
       )}
 
       {/* Add/Edit Asset modal */}

@@ -39,6 +39,7 @@ export default function AdminInventory() {
 
   const [tab, setTab] = useState<'stock' | 'categories' | 'requests'>('stock')
   const [locationFilter, setLocationFilter] = useState<StockLocation | 'all'>(ownLocation ?? 'all')
+  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   // Only the Owner operates across every branch — everyone else (including
   // Manager) is scoped server-side to their own account's branch already,
   // so this selector only ever renders for Admin.
@@ -304,14 +305,38 @@ export default function AdminInventory() {
         )}
       </div>
 
-      {tab === 'stock' && (
-        (items || []).length === 0 ? (
+      {/* Category filter chips — shows when on Stock tab so clicking a
+          category from the Categories tab switches here pre-filtered,
+          and the user can see which filter is active and clear it. */}
+      {tab === 'stock' && (categories || []).length > 0 && (
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <span className="text-enayi-muted text-xs mr-1">Category:</span>
+          <button onClick={() => setCategoryFilter('all')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${categoryFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text bg-enayi-panel'}`}>
+            All
+          </button>
+          {(categories || []).map(c => (
+            <button key={c.id} onClick={() => setCategoryFilter(categoryFilter === c.id ? 'all' : c.id)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${categoryFilter===c.id ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text bg-enayi-panel'}`}>
+              {c.name} ({c.item_count})
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'stock' && (() => {
+        const filteredItems = (items || []).filter(it =>
+          categoryFilter === 'all' || it.category === categoryFilter
+        )
+        const activeCategory = categoryFilter !== 'all' ? (categories || []).find(c => c.id === categoryFilter) : null
+        return filteredItems.length === 0 ? (
           <div className="card p-12 text-center">
             <EmptyState
               icon={user?.role === 'kitchen_staff' ? UtensilsCrossed : Package}
-              title={user?.role === 'kitchen_staff' ? 'No kitchen stock items yet' : 'No items yet'}
+              title={activeCategory ? `No items in "${activeCategory.name}"` : user?.role === 'kitchen_staff' ? 'No kitchen stock items yet' : 'No items yet'}
               desc={
-                user?.role === 'kitchen_staff'
+                activeCategory ? 'This category has no items yet — add the first one above.'
+                : user?.role === 'kitchen_staff'
                   ? 'Food items aren\'t tracked as stock here — head to Menu to manage what\'s on the guest menu and its photos.'
                   : canManageCatalog ? 'Add your first item to get started.' : 'None have been added yet.'
               }
@@ -319,7 +344,7 @@ export default function AdminInventory() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items!.map(it => (
+            {filteredItems.map(it => (
               <div key={it.id} className="card p-4 space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -370,7 +395,7 @@ export default function AdminInventory() {
             ))}
           </div>
         )
-      )}
+      })()}
 
       {tab === 'categories' && canManageCatalog && (
         (categories || []).length === 0 ? (
@@ -390,6 +415,7 @@ export default function AdminInventory() {
                 </div>
                 <div className="text-enayi-muted text-xs">{c.item_count} item(s)</div>
                 <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="gold" onClick={() => { setCategoryFilter(c.id); setTab('stock') }}><Package size={12} /> View Items</Button>
                   <Button size="sm" variant="outline" onClick={() => openEditCat(c)}><Pencil size={12} /> Edit</Button>
                   <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCat.mutate(c.slug) }}><Trash2 size={12} /> Delete</Button>
                 </div>

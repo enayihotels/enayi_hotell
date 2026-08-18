@@ -68,12 +68,13 @@ const Spinner = () => (
 function Guard({ children, adminOnly = false, inventoryOnly = false }: { children: React.ReactNode; adminOnly?: boolean; inventoryOnly?: boolean }) {
   const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (adminOnly && !['admin', 'manager', 'staff'].includes(user?.role ?? ''))
+  // Admin panel is for Manager and Owner only
+  if (adminOnly && !['admin', 'manager'].includes(user?.role ?? ''))
     return <Navigate to="/dashboard" replace />
-  // Separate from adminOnly on purpose — inventory roles (Store Keeper,
-  // Bar Staff, Kitchen Staff) should only ever reach the Inventory
-  // screen, not Bookings/Rooms/Guests/etc., so this never gets folded
-  // into the broader adminOnly role list above.
+  // Inventory shell — store/bar/kitchen/housekeeper; redirect to /dashboard
+  // for anyone else without access. (Note: manager/admin have the full
+  // admin panel instead — if they somehow reach an /inventory URL they
+  // still pass this check, but they'd normally navigate via /admin.)
   if (inventoryOnly && !['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper', 'manager', 'admin'].includes(user?.role ?? ''))
     return <Navigate to="/dashboard" replace />
   return <>{children}</>

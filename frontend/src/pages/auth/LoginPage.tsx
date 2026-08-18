@@ -35,9 +35,24 @@ export default function LoginPage() {
   const onSubmit = async (data: Form) => {
     try {
       const res = await api.post('/auth/login/', data)
-      login(res.data.user, res.data.access, res.data.refresh)
-      toast.success(res.data.message || `Welcome back, ${res.data.user.first_name}! 🏨`)
-      navigate('/dashboard', { replace: true })
+      const user = res.data.user
+      login(user, res.data.access, res.data.refresh)
+      toast.success(res.data.message || `Welcome back, ${user.first_name}! 🏨`)
+      // Route to the right landing page based on role — staff roles
+      // that live in the inventory shell should never land in the guest
+      // portal, and front desk/manager who have both the admin panel and
+      // their own entry points need to go to the right one too.
+      const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper']
+      const ADMIN_ROLES = ['manager', 'admin', 'staff']
+      if (INVENTORY_ROLES.includes(user.role)) {
+        // Housekeeping → their own page; all others → inventory list
+        navigate(user.role === 'housekeeper' ? '/housekeeping' : '/inventory', { replace: true })
+      } else if (ADMIN_ROLES.includes(user.role)) {
+        navigate('/admin', { replace: true })
+      } else {
+        // Guest (default)
+        navigate('/dashboard', { replace: true })
+      }
     } catch (err) {
       toast.error(getErrorMessage(err))
     }
