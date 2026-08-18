@@ -68,15 +68,30 @@ const Spinner = () => (
 function Guard({ children, adminOnly = false, inventoryOnly = false }: { children: React.ReactNode; adminOnly?: boolean; inventoryOnly?: boolean }) {
   const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" replace />
+
+  const role = user?.role ?? ''
+  const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper']
+  const ADMIN_ROLES = ['manager', 'admin']
+
   // Admin panel is for Manager and Owner only
-  if (adminOnly && !['admin', 'manager'].includes(user?.role ?? ''))
+  if (adminOnly && !ADMIN_ROLES.includes(role))
     return <Navigate to="/dashboard" replace />
-  // Inventory shell — store/bar/kitchen/housekeeper; redirect to /dashboard
-  // for anyone else without access. (Note: manager/admin have the full
-  // admin panel instead — if they somehow reach an /inventory URL they
-  // still pass this check, but they'd normally navigate via /admin.)
-  if (inventoryOnly && !['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper', 'manager', 'admin'].includes(user?.role ?? ''))
+
+  // Inventory shell — bar/kitchen/housekeeper/store keeper
+  if (inventoryOnly && ![...INVENTORY_ROLES, ...ADMIN_ROLES].includes(role))
     return <Navigate to="/dashboard" replace />
+
+  // Guest portal — if a staff member somehow lands here, route them to the
+  // right place rather than letting them browse the guest-facing portal.
+  // This fires even if they're already authenticated (e.g. a cached session
+  // from before the login-routing fix), not just at login time.
+  if (!adminOnly && !inventoryOnly) {
+    if (INVENTORY_ROLES.includes(role))
+      return <Navigate to={role === 'housekeeper' ? '/housekeeping' : '/inventory'} replace />
+    if (ADMIN_ROLES.includes(role))
+      return <Navigate to="/admin" replace />
+  }
+
   return <>{children}</>
 }
 
