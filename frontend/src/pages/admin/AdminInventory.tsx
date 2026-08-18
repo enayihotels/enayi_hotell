@@ -12,8 +12,8 @@ const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ??
 
 const UNITS = ['bottle','can','crate','carton','bag','kg','litre','piece','pack','roll','bunch','box']
 
-type CategoryForm = { name: string; slug: string; description: string; is_active: boolean }
-const emptyCategoryForm: CategoryForm = { name: '', slug: '', description: '', is_active: true }
+type CategoryForm = { name: string; slug: string; description: string; department: 'bar' | 'kitchen' | 'shared'; is_active: boolean }
+const emptyCategoryForm: CategoryForm = { name: '', slug: '', description: '', department: 'shared', is_active: true }
 
 type ItemForm = { name: string; category: string; unit: string; cost_price: string; sale_price: string; reorder_threshold: string; expiry_tracked: boolean; is_active: boolean }
 const emptyItemForm: ItemForm = { name: '', category: '', unit: 'piece', cost_price: '', sale_price: '', reorder_threshold: '5', expiry_tracked: false, is_active: true }
@@ -149,7 +149,7 @@ export default function AdminInventory() {
   const [catForm, setCatForm] = useState<CategoryForm>(emptyCategoryForm)
 
   const openNewCat = () => { setEditingCat(null); setCatForm(emptyCategoryForm); setCatModalOpen(true) }
-  const openEditCat = (c: InventoryCategory) => { setEditingCat(c); setCatForm({ name: c.name, slug: c.slug, description: c.description, is_active: c.is_active }); setCatModalOpen(true) }
+  const openEditCat = (c: InventoryCategory) => { setEditingCat(c); setCatForm({ name: c.name, slug: c.slug, description: c.description, department: c.department, is_active: c.is_active }); setCatModalOpen(true) }
 
   const saveCat = useMutation({
     mutationFn: () => editingCat
@@ -379,7 +379,11 @@ export default function AdminInventory() {
               <div key={c.id} className="card p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="text-enayi-text font-medium">{c.name}</div>
-                  {!c.is_active && <Badge variant="gray">Inactive</Badge>}
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    {c.department === 'bar' && <Badge variant="blue">Bar only</Badge>}
+                    {c.department === 'kitchen' && <Badge variant="green">Kitchen only</Badge>}
+                    {!c.is_active && <Badge variant="gray">Inactive</Badge>}
+                  </div>
                 </div>
                 <div className="text-enayi-muted text-xs">{c.item_count} item(s)</div>
                 <div className="flex gap-2 pt-1">
@@ -431,6 +435,15 @@ export default function AdminInventory() {
         <div className="space-y-4">
           <Input label="Name" placeholder="e.g. Soft Drinks" value={catForm.name} onChange={e => setCatForm({ ...catForm, name: e.target.value })} />
           <Textarea label="Description (optional)" value={catForm.description} onChange={e => setCatForm({ ...catForm, description: e.target.value })} />
+          <Select
+            label="Who requests this from the Store?"
+            value={catForm.department}
+            onChange={e => setCatForm({ ...catForm, department: e.target.value as CategoryForm['department'] })}
+          >
+            <option value="shared">Shared / Store only — visible to both departments</option>
+            <option value="bar">Bar only — hidden from Kitchen Staff</option>
+            <option value="kitchen">Kitchen only — hidden from Bar Staff</option>
+          </Select>
           <div className="flex gap-2 justify-end pt-2">
             <Button variant="ghost" onClick={() => setCatModalOpen(false)}>Cancel</Button>
             <Button variant="gold" loading={saveCat.isPending} onClick={() => saveCat.mutate()} disabled={!catForm.name}>

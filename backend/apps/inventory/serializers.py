@@ -8,7 +8,7 @@ class InventoryCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InventoryCategory
-        fields = ["id", "hotel", "hotel_name", "name", "slug", "description", "is_active", "item_count"]
+        fields = ["id", "hotel", "hotel_name", "name", "slug", "description", "department", "is_active", "item_count"]
         read_only_fields = ["hotel"]
 
     def get_item_count(self, obj):

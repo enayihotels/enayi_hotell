@@ -1,12 +1,23 @@
 import { useKitchenOrders, useBarOrders, useUpdateOrderStatus } from '@/hooks/useOrders'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import { StatusBadge, PageSpinner } from '@/components/ui'
+import { useAuthStore } from '@/store/authStore'
 
 const STATUS_FLOW: Record<string,string> = { pending:'confirmed', confirmed:'preparing', preparing:'ready', ready:'delivered' }
 
 export default function AdminOrders() {
-  const { data: kitchen, isLoading: kl } = useKitchenOrders()
-  const { data: bar,     isLoading: bl } = useBarOrders()
+  const { user } = useAuthStore()
+  // Kitchen Staff only cares about food orders, Bar Staff only about
+  // drink orders — showing both sections to a scoped role is the same
+  // cross-department noise problem fixed on the Inventory stock page
+  // (a Kitchen Staff account seeing Bar's orders every time she opens
+  // this page). Store Keeper, Manager, and Admin keep the full view
+  // since they aren't scoped to a single department.
+  const showKitchen = user?.role !== 'bar_staff'
+  const showBar = user?.role !== 'kitchen_staff'
+
+  const { data: kitchen, isLoading: kl } = useKitchenOrders(showKitchen)
+  const { data: bar,     isLoading: bl } = useBarOrders(showBar)
   const updateStatus = useUpdateOrderStatus()
 
   const Section = ({ title, orders, loading }: any) => (
@@ -33,9 +44,11 @@ export default function AdminOrders() {
 
   return (
     <div className="p-4 md:p-6 space-y-8">
-      <h1 className="font-display text-3xl text-enayi-text">Kitchen & Bar Orders</h1>
-      <Section title="🍳 Kitchen" orders={kitchen} loading={kl} />
-      <Section title="🍸 Bar" orders={bar} loading={bl} />
+      <h1 className="font-display text-3xl text-enayi-text">
+        {showKitchen && showBar ? 'Kitchen & Bar Orders' : showKitchen ? 'Kitchen Orders' : 'Bar Orders'}
+      </h1>
+      {showKitchen && <Section title="🍳 Kitchen" orders={kitchen} loading={kl} />}
+      {showBar && <Section title="🍸 Bar" orders={bar} loading={bl} />}
     </div>
   )
 }

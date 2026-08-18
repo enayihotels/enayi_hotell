@@ -57,16 +57,18 @@ export const useUpdateOrderStatus = () => {
   })
 }
 
-export const useKitchenOrders = () =>
+export const useKitchenOrders = (enabled: boolean = true) =>
   useQuery<Order[]>({
     queryKey: ['kitchen-orders'],
     queryFn: () => api.get('/orders/kitchen/').then(r => r.data?.results ?? r.data), // ← fixed
     refetchInterval: 30_000,
+    enabled,
   })
 
-export const useBarOrders = () =>
+export const useBarOrders = (enabled: boolean = true) =>
   useQuery<Order[]>({
     queryKey: ['bar-orders'],
     queryFn: () => api.get('/orders/bar/').then(r => r.data?.results ?? r.data), // ← fixed
     refetchInterval: 30_000,
+    enabled,
   })

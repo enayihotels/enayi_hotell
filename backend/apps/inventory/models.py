@@ -20,11 +20,28 @@ class InventoryCategory(models.Model):
     be confusing in practice (a Store Keeper at one branch seeing every
     item name the other branch had ever created), so items and
     categories were made fully separate per branch instead."""
+    BAR     = "bar"
+    KITCHEN = "kitchen"
+    SHARED  = "shared"
+    DEPARTMENT_CHOICES = [
+        (BAR,     "Bar only"),
+        (KITCHEN, "Kitchen only"),
+        (SHARED,  "Shared / Store only"),
+    ]
+
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     hotel       = models.ForeignKey("hotels.Hotel", on_delete=models.CASCADE, related_name="inventory_categories")
     name        = models.CharField(max_length=100)
     slug        = models.SlugField(max_length=120)
     description = models.CharField(max_length=255, blank=True)
+    department  = models.CharField(max_length=10, choices=DEPARTMENT_CHOICES, default=SHARED,
+                                    help_text="Who requests items in this category from the Store. "
+                                              "'Bar only' / 'Kitchen only' hides it from the other "
+                                              "department's Inventory screen entirely — a Kitchen Staff "
+                                              "account never sees a Bar-only category and vice versa. "
+                                              "'Shared / Store only' is visible to both (or neither, if "
+                                              "it's something only the Store Keeper handles directly, "
+                                              "like cleaning supplies).")
     is_active   = models.BooleanField(default=True)
     created_at  = models.DateTimeField(auto_now_add=True)
 

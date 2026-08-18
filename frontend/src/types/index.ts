@@ -517,11 +517,14 @@ export interface FraudAuditReport {
 }
 
 // ── Inventory ────────────────────────────────────────────
+export type InventoryDepartment = 'bar' | 'kitchen' | 'shared'
+
 export interface InventoryCategory {
   id: string
   name: string
   slug: string
   description: string
+  department: InventoryDepartment
   is_active: boolean
   item_count: number
 }
