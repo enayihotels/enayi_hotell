@@ -1,17 +1,18 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ShoppingCart, Plus, Minus, Trash2, Send, Loader2, UtensilsCrossed, Wine } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, Trash2, Send, Loader2, UtensilsCrossed, Wine, CheckCircle2, Clock, X } from 'lucide-react'
 import { useMenuCategories, useMenuItems, usePlaceOrder, useMyOrders } from '@/hooks/useOrders'
 import { useCartStore } from '@/store/cartStore'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import { StatusBadge, EmptyState, PageSpinner } from '@/components/ui'
 import toast from 'react-hot-toast'
-import type { MenuItem } from '@/types'
+import type { MenuItem, Order } from '@/types'
 
 export default function OrdersPage() {
   const [view, setView] = useState<'menu'|'orders'>('menu')
   const [activeCategory, setActiveCategory] = useState<string>('')
   const [source, setSource] = useState('room_service')
+  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null)
   const { data: cats, isLoading: catsLoading } = useMenuCategories()
   const { data: items, isLoading: itemsLoading } = useMenuItems(activeCategory || undefined)
   const { data: myOrders, isLoading: ordersLoading } = useMyOrders()
@@ -20,11 +21,12 @@ export default function OrdersPage() {
 
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) { toast.error('Your cart is empty'); return }
-    await placeOrder.mutateAsync({
+    const order = await placeOrder.mutateAsync({
       source,
       items: cartItems.map(i => ({ menu_item: i.menu_item.id, quantity: i.quantity, customizations: i.customizations })),
     })
     clearCart()
+    setConfirmedOrder(order)
   }
 
   if (catsLoading) return <PageSpinner />
@@ -60,12 +62,13 @@ export default function OrdersPage() {
                 {(items||[]).map((item:MenuItem,i)=>{
                   const inCart = cartItems.find(c=>c.menu_item.id===item.id)
                   return (
-                    <motion.div key={item.id} initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:i*0.05}} className="card-hover p-4">
+                    <motion.div key={item.id} initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:i*0.05}} className={`card-hover p-4 ${!item.is_available ? 'opacity-60' : ''}`}>
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 pr-2">
                           <div className="font-semibold text-enayi-text text-sm">{item.name}</div>
                           <p className="text-enayi-muted text-xs mt-1 line-clamp-2">{item.description}</p>
                           <div className="flex gap-1.5 mt-2 flex-wrap">
+                            {!item.is_available && <span className="badge-red text-[10px]">Currently Unavailable</span>}
                             {item.is_halal&&<span className="badge-green text-[10px]">Halal</span>}
                             {item.is_vegetarian&&<span className="badge-gold text-[10px]">Veg</span>}
                             {item.is_spicy&&<span className="badge-red text-[10px]">Spicy 🌶️</span>}
@@ -75,7 +78,9 @@ export default function OrdersPage() {
                       </div>
                       <div className="flex items-center justify-between mt-3">
                         <span className="text-enayi-gold font-display text-lg">{formatCurrency(item.price)}</span>
-                        {inCart ? (
+                        {!item.is_available ? (
+                          <span className="text-enayi-muted text-xs italic">Unavailable</span>
+                        ) : inCart ? (
                           <div className="flex items-center gap-2">
                             <button onClick={()=>updateQty(item.id,inCart.quantity-1)} className="w-7 h-7 rounded-lg bg-enayi-panel border border-enayi-border flex items-center justify-center text-enayi-text hover:border-enayi-gold transition-colors"><Minus size={12}/></button>
                             <span className="text-enayi-text font-semibold text-sm w-5 text-center">{inCart.quantity}</span>
@@ -137,6 +142,34 @@ export default function OrdersPage() {
               </div>
             ))
           }
+        </div>
+      )}
+
+      {/* Order confirmation — total, estimated time, and a warm message,
+          shown right on the page instead of a quickly-vanishing toast. */}
+      {confirmedOrder && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] p-4" onClick={()=>setConfirmedOrder(null)}>
+          <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} onClick={e=>e.stopPropagation()} className="card-gold rounded-2xl p-6 max-w-sm w-full text-center relative">
+            <button onClick={()=>setConfirmedOrder(null)} className="absolute top-3 right-3 text-enayi-muted hover:text-enayi-text"><X size={18}/></button>
+            <div className="w-14 h-14 rounded-full bg-enayi-gold/10 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle2 size={28} className="text-enayi-gold" />
+            </div>
+            <h2 className="font-display text-xl text-enayi-text mb-1">Order Confirmed!</h2>
+            <p className="text-enayi-muted text-xs mb-4">{confirmedOrder.order_number}</p>
+            <p className="text-enayi-text text-sm mb-5">{confirmedOrder.friendly_message}</p>
+            <div className="flex items-center justify-center gap-6 mb-5">
+              <div>
+                <div className="text-enayi-muted text-xs">Total</div>
+                <div className="text-enayi-gold font-display text-2xl">{formatCurrency(confirmedOrder.total_amount)}</div>
+              </div>
+              <div className="w-px h-10 bg-enayi-border" />
+              <div>
+                <div className="text-enayi-muted text-xs flex items-center gap-1 justify-center"><Clock size={11}/> Ready in about</div>
+                <div className="text-enayi-gold font-display text-2xl">{confirmedOrder.estimated_minutes} min</div>
+              </div>
+            </div>
+            <button onClick={()=>{setConfirmedOrder(null); setView('orders')}} className="btn-gold w-full">Track My Order</button>
+          </motion.div>
         </div>
       )}
     </div>

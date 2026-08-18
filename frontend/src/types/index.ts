@@ -236,6 +236,8 @@ export interface Order {
   total_amount: number
   is_paid: boolean
   estimated_delivery?: string
+  estimated_minutes?: number
+  friendly_message?: string
   delivered_at?: string
   created_at: string
   updated_at: string

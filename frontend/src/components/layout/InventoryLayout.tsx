@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { Package, User, LogOut, Menu, Utensils } from 'lucide-react'
+import { Package, User, LogOut, Menu, Utensils, BedDouble } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/utils/api'
 import { useAuthStore } from '@/store/authStore'
@@ -9,11 +9,12 @@ const ROLE_LABEL: Record<string, string> = {
   store_keeper:  'Store Keeper',
   bar_staff:     'Bar Staff',
   kitchen_staff: 'Kitchen Staff',
+  housekeeper:   'Housekeeper',
   manager:       'Manager',
   admin:         'Owner',
 }
 
-function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullName }: { onNavigate?: () => void; onLogout: () => void; roleLabel: string; firstInitial: string; fullName: string }) {
+function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullName, isHousekeeper }: { onNavigate?: () => void; onLogout: () => void; roleLabel: string; firstInitial: string; fullName: string; isHousekeeper: boolean }) {
   return (
     <>
       <div className="p-5 border-b border-enayi-border">
@@ -26,14 +27,23 @@ function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullNam
         </div>
       </div>
       <nav className="flex-1 p-3 space-y-1">
-        <NavLink to="/inventory" end onClick={onNavigate}
-          className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
-          <Package size={16} /> Inventory
-        </NavLink>
-        <NavLink to="/inventory/orders" onClick={onNavigate}
-          className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
-          <Utensils size={16} /> Orders
-        </NavLink>
+        {isHousekeeper ? (
+          <NavLink to="/housekeeping" end onClick={onNavigate}
+            className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
+            <BedDouble size={16} /> Housekeeping
+          </NavLink>
+        ) : (
+          <>
+            <NavLink to="/inventory" end onClick={onNavigate}
+              className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
+              <Package size={16} /> Inventory
+            </NavLink>
+            <NavLink to="/inventory/orders" onClick={onNavigate}
+              className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
+              <Utensils size={16} /> Orders
+            </NavLink>
+          </>
+        )}
       </nav>
       <div className="p-3 border-t border-enayi-border space-y-1.5">
         <div className="flex items-center gap-3 px-3 py-2">
@@ -60,9 +70,10 @@ export default function InventoryLayout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const roleLabel = ROLE_LABEL[user?.role ?? ''] ?? 'Inventory'
+  const roleLabel = ROLE_LABEL[user?.role ?? ''] ?? 'Staff'
   const fullName = user?.full_name ?? ''
   const firstInitial = user?.first_name?.[0] ?? '?'
+  const isHousekeeper = user?.role === 'housekeeper'
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout/', { refresh: localStorage.getItem('refresh_token') }) } catch {}
@@ -73,14 +84,14 @@ export default function InventoryLayout() {
     <div className="min-h-screen bg-enayi-bg flex">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-enayi-surface border-r border-enayi-border flex-shrink-0">
-        <SidebarContent onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} />
+        <SidebarContent onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} />
       </aside>
 
       {/* Mobile drawer */}
       <div className={`md:hidden fixed inset-0 z-40 ${drawerOpen ? '' : 'pointer-events-none'}`}>
         <div onClick={() => setDrawerOpen(false)} className={`absolute inset-0 bg-black/60 transition-opacity ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} />
         <aside className={`absolute left-0 top-0 bottom-0 w-64 bg-enayi-surface border-r border-enayi-border flex flex-col transition-transform ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} />
+          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} />
         </aside>
       </div>
 

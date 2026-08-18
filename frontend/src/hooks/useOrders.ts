@@ -32,10 +32,12 @@ export const usePlaceOrder = () => {
       items: { menu_item: string; quantity: number; customizations?: string }[]
       special_instructions?: string
       room_id?: string
-    }) => api.post('/orders/', data).then(r => r.data),
-    onSuccess: (order: Order) => {
+    }) => api.post('/orders/', data).then(r => r.data as Order),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
-      toast.success(`Order ${order.order_number} placed! 🍽️ Estimated delivery: 30 mins`)
+      // No toast here on purpose — the caller shows a proper confirmation
+      // with the real total, wait time, and message from the response,
+      // which a quick toast can't hold. See OrdersPage.tsx.
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })

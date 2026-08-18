@@ -54,6 +54,7 @@ const AdminGuests       = lazy(() => import('@/pages/admin/AdminGuests'))
 const AdminPayments     = lazy(() => import('@/pages/admin/AdminPayments'))
 const AdminInventory    = lazy(() => import('@/pages/admin/AdminInventory'))
 const AdminAssets       = lazy(() => import('@/pages/admin/AdminAssets'))
+const HousekeepingPage  = lazy(() => import('@/pages/admin/HousekeepingPage'))
 
 const Spinner = () => (
   <div className="flex items-center justify-center h-screen bg-enayi-bg">
@@ -70,7 +71,7 @@ function Guard({ children, adminOnly = false, inventoryOnly = false }: { childre
   // Bar Staff, Kitchen Staff) should only ever reach the Inventory
   // screen, not Bookings/Rooms/Guests/etc., so this never gets folded
   // into the broader adminOnly role list above.
-  if (inventoryOnly && !['store_keeper', 'bar_staff', 'kitchen_staff', 'manager', 'admin'].includes(user?.role ?? ''))
+  if (inventoryOnly && !['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper', 'manager', 'admin'].includes(user?.role ?? ''))
     return <Navigate to="/dashboard" replace />
   return <>{children}</>
 }
@@ -143,6 +144,7 @@ export default function App() {
             <Route element={<Guard inventoryOnly><InventoryLayout /></Guard>}>
               <Route path="/inventory" element={<AdminInventory key="inventory" />} />
               <Route path="/inventory/orders" element={<AdminOrders key="inventory-orders" />} />
+              <Route path="/housekeeping" element={<HousekeepingPage key="housekeeping" />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
