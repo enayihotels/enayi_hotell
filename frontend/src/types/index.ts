@@ -603,14 +603,21 @@ export interface ApiError {
 }
 
 // ── Property Assets ──────────────────────────────────────
+export type AssetDepartment = 'frontdesk' | 'kitchen' | 'bar' | 'housekeeping' | 'shared'
+
 export interface AssetIssueReport {
   id: string
   asset: string
   issue_description: string
-  status: 'reported' | 'in_progress' | 'fixed'
+  status: 'reported' | 'cleared_for_repair' | 'rejected' | 'fixed'
+  status_display: string
   reported_by: string | null
   reported_by_name: string | null
   reported_at: string
+  cleared_by: string | null
+  cleared_by_name: string | null
+  cleared_at: string | null
+  clearance_note: string
   fixed_by: string | null
   fixed_by_name: string | null
   fixed_at: string | null
@@ -619,8 +626,14 @@ export interface AssetIssueReport {
 
 export interface PropertyAsset {
   id: string
+  hotel: string
+  hotel_name: string
   name: string
-  category: 'appliance' | 'electrical' | 'plumbing' | 'furniture' | 'fixture' | 'other'
+  category: 'appliance' | 'electrical' | 'plumbing' | 'furniture' | 'fixture' | 'linen' | 'other'
+  category_display: string
+  department: AssetDepartment
+  department_display: string
+  quantity: number
   room: string | null
   room_number: string | null
   location_note: string

@@ -69,10 +69,17 @@ DRINK_TYPES = {"drink", "cocktail", "mocktail", "wine"}
 FOOD_TYPES = {"food", "breakfast", "dessert", "snack"}
 
 # Which department a role is scoped to, for filtering categories/items.
-# A role sees ONLY their own department's categories plus 'shared' ones
-# — not "everything except the other departments," which stopped
-# working cleanly the moment a 3rd non-shared department (housekeeping)
-# existed alongside bar/kitchen.
+# A role sees ONLY their own department — 'shared' is deliberately NOT
+# auto-included here anymore. It used to be, but that meant every
+# department-scoped role (Bar/Kitchen/Housekeeping) also saw every
+# 'shared' category regardless of relevance — Kitchen Staff seeing
+# Front Desk stationery, Laundry Supplies, Admin & Office Supplies,
+# none of which concern her. 'shared' now genuinely means "Store
+# Keeper/Manager/Admin only" (matching its own label, "Shared / Store
+# only"), not "visible to every department." If a category should
+# genuinely be visible to more than one specific department in the
+# future, that needs its own real solution (e.g. multiple department
+# tags), not a silent shared-to-everyone fallback.
 ROLE_DEPARTMENT = {
     "bar_staff":     InventoryCategory.BAR,
     "kitchen_staff": InventoryCategory.KITCHEN,
@@ -81,14 +88,14 @@ ROLE_DEPARTMENT = {
 
 
 def _scope_by_department(qs, user, category_field="department"):
-    """Filters a category or item queryset down to what this user's
-    role is allowed to see: their own department plus anything tagged
-    'shared'. No-ops for roles with no single department (Store
-    Keeper, Manager, Admin all see everything)."""
+    """Filters a category or item queryset down to ONLY what this
+    user's role's department is tagged for. No-ops for roles with no
+    single department (Store Keeper, Manager, Admin all see
+    everything, including 'shared')."""
     dept = ROLE_DEPARTMENT.get(user.role)
     if not dept:
         return qs
-    return qs.filter(**{f"{category_field}__in": [dept, InventoryCategory.SHARED]})
+    return qs.filter(**{category_field: dept})
 
 
 class InventoryCategoryListView(generics.ListCreateAPIView):
