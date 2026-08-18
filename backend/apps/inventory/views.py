@@ -1,5 +1,6 @@
 """Enayi Hotels — Store & Inventory Views (Phase 1: catalog + balances)"""
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import generics, status
@@ -241,7 +242,31 @@ class InventoryItemDetailView(generics.RetrieveUpdateDestroyAPIView):
     def destroy(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):
             return Response({"error": "Only the Store Keeper, Manager, or Owner can delete items."}, status=403)
-        return super().destroy(request, *args, **kwargs)
+        instance = self.get_object()
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            # StockRequisition.item is on_delete=PROTECT on purpose — a
+            # requisition is a real audit record (who requested what,
+            # who fulfilled it, when), and deleting the item it points
+            # to would silently break that history. Without this catch,
+            # Django's ProtectedError went completely unhandled and DRF
+            # returned a raw 500 error page — which is what actually
+            # happened when trying to delete "2 Crates of Egg" (it has
+            # at least one requisition against it already). The real
+            # fix isn't to force the delete through; it's to tell the
+            # person WHY it's blocked and point at the alternative that
+            # already exists — deactivating (is_active=False) removes
+            # it from active stock/menu views everywhere while keeping
+            # its request history intact.
+            return Response({
+                "error": (
+                    f'"{instance.name}" can\'t be deleted because it has existing Store request '
+                    f"history (a Bar or Kitchen Staff account has requested it before) — deleting "
+                    f"it would break that record. Use Edit and switch it to Inactive instead, which "
+                    f"removes it from active stock and the guest menu without losing the history."
+                )
+            }, status=409)
 
 
 class ListOnGuestMenuView(APIView):
