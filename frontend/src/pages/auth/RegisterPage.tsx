@@ -25,7 +25,7 @@ const PERKS = [
   'Exclusive member-only room rates',
   'Priority booking confirmation',
   'Loyalty points on every stay',
-  'AI Concierge ARIA access 24/7',
+  'AI Concierge ENAYI access 24/7',
   'Early check-in privileges',
   'Birthday & anniversary surprises',
 ]

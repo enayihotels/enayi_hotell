@@ -19,7 +19,7 @@ const FEATURES = [
   'Book rooms online 24/7',
   'Order food & drinks to your room',
   'Book our event halls for any occasion',
-  'Access AI concierge ARIA anytime',
+  'Access AI concierge ENAYI anytime',
   'Earn loyalty points on every stay',
 ]
 

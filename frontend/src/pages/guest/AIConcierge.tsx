@@ -40,7 +40,7 @@ export default function AIConcierge() {
       <div className="card-gold p-4 rounded-2xl mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-enayi-gold/10 border border-enayi-gold/30 flex items-center justify-center"><Bot size={24} className="text-enayi-gold"/></div>
-          <div><div className="font-heading text-lg text-enayi-text">ARIA</div><div className="flex items-center gap-1.5 text-xs"><div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"/><span className="text-green-400">Online 24/7</span></div></div>
+          <div><div className="font-heading text-lg text-enayi-text">ENAYI</div><div className="flex items-center gap-1.5 text-xs"><div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"/><span className="text-green-400">Online 24/7</span></div></div>
         </div>
         <div className="flex items-center gap-2">
           <div className="badge-gold text-xs"><Sparkles size={10}/> AI Powered</div>
@@ -54,7 +54,7 @@ export default function AIConcierge() {
           <div className="text-center py-12">
             <Bot size={48} className="text-enayi-gold/30 mx-auto mb-4"/>
             <h2 className="font-heading text-xl text-enayi-text mb-2">Hello, {user?.first_name}! 👋</h2>
-            <p className="text-enayi-muted text-sm mb-8 max-w-sm mx-auto">I'm ARIA, your personal concierge. Ask me anything about Enayi Hotels & Suites.</p>
+            <p className="text-enayi-muted text-sm mb-8 max-w-sm mx-auto">I'm ENAYI, your personal concierge. Ask me anything about Enayi Hotels & Suites.</p>
             <div className="flex flex-wrap gap-2 justify-center">
               {SUGGESTIONS.map(s=><button key={s} onClick={()=>sendMessage(s)} className="badge-gold text-xs cursor-pointer hover:bg-enayi-gold hover:text-enayi-bg transition-all px-3 py-2">{s}</button>)}
             </div>
@@ -83,7 +83,7 @@ export default function AIConcierge() {
 
       {/* Input */}
       <div className="card p-3 mt-4 flex gap-3">
-        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&(e.preventDefault(),sendMessage(input))} placeholder="Ask ARIA anything…" className="flex-1 bg-transparent text-enayi-text placeholder:text-enayi-muted outline-none text-sm"/>
+        <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&(e.preventDefault(),sendMessage(input))} placeholder="Ask ENAYI anything…" className="flex-1 bg-transparent text-enayi-text placeholder:text-enayi-muted outline-none text-sm"/>
         <button onClick={()=>sendMessage(input)} disabled={loading||!input.trim()} className="btn-gold px-4 py-2 text-sm gap-2 disabled:opacity-40">
           {loading?<Loader2 size={15} className="animate-spin"/>:<Send size={15}/>}
         </button>

@@ -14,7 +14,7 @@ const NAV = [
   { href:'/events/book',  icon:CalendarDays,    label:'Book Event' },
   { href:'/events/my',    icon:CalendarDays,    label:'My Events' },
   { href:'/payment/callback', icon:CreditCard,  label:'Payments' },
-  { href:'/concierge',    icon:Bot,             label:'ARIA Concierge' },
+  { href:'/concierge',    icon:Bot,             label:'ENAYI Concierge' },
   { href:'/profile',      icon:User,            label:'My Profile' },
 ]
 

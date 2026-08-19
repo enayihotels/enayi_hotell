@@ -12,7 +12,7 @@ const QUICK_ACTIONS = [
   { icon: BedDouble,    label: 'Book a Room',       href: '/book',       color: 'text-blue-400' },
   { icon: Utensils,     label: 'Order Food & Drinks',href: '/orders',     color: 'text-green-400' },
   { icon: CalendarDays, label: 'Book Event Hall',    href: '/events/book',color: 'text-purple-400' },
-  { icon: Bot,          label: 'Chat with ARIA',     href: '/concierge',  color: 'text-enayi-gold' },
+  { icon: Bot,          label: 'Chat with ENAYI',     href: '/concierge',  color: 'text-enayi-gold' },
 ]
 
 export default function DashboardPage() {

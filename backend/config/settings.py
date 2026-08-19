@@ -340,6 +340,9 @@ FRONTEND_URL             = env("FRONTEND_URL",             default="http://local
 OPENAI_API_KEY = env("OPENAI_API_KEY", default="")
 OPENAI_MODEL   = env("OPENAI_MODEL",   default="gpt-4o-mini")
 
+# ── Anthropic (ENAYI concierge) ─────────────────────────────────
+ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY", default="")
+
 # ─── Hotel Config ────────────────────────────────────────
 HOTEL_NAME        = env("HOTEL_NAME",    default="Enayi Hotels & Suites")
 HOTEL_TAGLINE     = env("HOTEL_TAGLINE", default="Where Luxury Meets Nigerian Warmth")
