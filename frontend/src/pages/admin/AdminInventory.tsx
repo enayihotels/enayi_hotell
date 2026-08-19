@@ -6,7 +6,7 @@ import { formatCurrency } from '@/utils/helpers'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge } from '@/components/ui'
 import { Package, Plus, Pencil, Trash2, LayoutGrid, AlertTriangle, ArrowUpCircle, ArrowDownCircle, ClipboardList, Check, X, UtensilsCrossed, Building2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import type { InventoryCategory, InventoryItem, StockLocation, StockRequisition, MenuCategory } from '@/types'
+import type { InventoryCategory, InventoryItem, InventoryDepartment, StockLocation, StockRequisition, MenuCategory } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
 
@@ -324,9 +324,23 @@ export default function AdminInventory() {
       )}
 
       {tab === 'stock' && (() => {
-        const filteredItems = (items || []).filter(it =>
-          categoryFilter === 'all' || it.category === categoryFilter
-        )
+        // location→department mapping: when admin/manager selects "Bar only",
+        // only show items whose category is tagged department='bar'. 'store'
+        // and 'all' show everything — Store is the central catalog location
+        // that holds items for all departments, so no filtering there.
+        const LOCATION_TO_DEPT: Partial<Record<StockLocation | 'all', InventoryDepartment | null>> = {
+          bar:          'bar',
+          kitchen:      'kitchen',
+          housekeeping: 'housekeeping',
+          store:        null,  // show all
+        }
+        const deptForLocation = locationFilter !== 'all' ? LOCATION_TO_DEPT[locationFilter] ?? null : null
+
+        const filteredItems = (items || []).filter(it => {
+          if (categoryFilter !== 'all' && it.category !== categoryFilter) return false
+          if (deptForLocation && it.category_department !== deptForLocation) return false
+          return true
+        })
         const activeCategory = categoryFilter !== 'all' ? (categories || []).find(c => c.id === categoryFilter) : null
         return filteredItems.length === 0 ? (
           <div className="card p-12 text-center">

@@ -27,19 +27,24 @@ class StockBalanceSerializer(serializers.ModelSerializer):
 
 
 class InventoryItemSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
-    hotel_name = serializers.CharField(source="hotel.name", read_only=True)
-    balances = serializers.SerializerMethodField()
+    category_name       = serializers.CharField(source="category.name", read_only=True)
+    # Include the category's department tag so the frontend can filter items
+    # by location-to-department mapping (e.g. "Bar only" shows only items
+    # whose category is tagged department='bar') without a second API call.
+    category_department = serializers.CharField(source="category.department", read_only=True)
+    hotel_name          = serializers.CharField(source="hotel.name", read_only=True)
+    balances            = serializers.SerializerMethodField()
     # Convenience: total across every location AT THE VISIBLE BRANCH(ES)
     # ONLY — a branch-scoped user must never see a number that secretly
     # includes another branch's stock folded in.
-    total_quantity = serializers.SerializerMethodField()
-    on_guest_menu = serializers.SerializerMethodField()
+    total_quantity      = serializers.SerializerMethodField()
+    on_guest_menu       = serializers.SerializerMethodField()
 
     class Meta:
         model = InventoryItem
         fields = [
-            "id", "hotel", "hotel_name", "name", "sku", "category", "category_name", "unit", "cost_price",
+            "id", "hotel", "hotel_name", "name", "sku", "category", "category_name",
+            "category_department", "unit", "cost_price",
             "sale_price", "reorder_threshold", "expiry_tracked", "is_active",
             "balances", "total_quantity", "on_guest_menu", "created_at", "updated_at",
         ]

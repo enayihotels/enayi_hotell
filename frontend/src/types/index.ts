@@ -551,6 +551,7 @@ export interface InventoryItem {
   sku: string
   category: string
   category_name: string
+  category_department: InventoryDepartment
   unit: string
   cost_price: number
   sale_price: number | null
