@@ -1,8 +1,9 @@
-import { Outlet, Link, NavLink } from 'react-router-dom'
+import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User, Package, Wrench } from 'lucide-react'
+import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User, Package, Wrench, LogOut } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
+import toast from 'react-hot-toast'
 
 const ADMIN_NAV = [
   {href:'/admin',icon:LayoutDashboard,label:'Dashboard'},
@@ -21,9 +22,13 @@ const ADMIN_NAV = [
 
 // Defined outside AdminLayout on purpose — a stable, module-level component
 // so React never treats it as a brand-new type on re-render.
-function AdminSidebarContent({ visibleNav, onNavigate }: {
+function AdminSidebarContent({ visibleNav, onNavigate, onLogout, fullName, roleLabel, firstInitial }: {
   visibleNav: typeof ADMIN_NAV
   onNavigate: () => void
+  onLogout: () => void
+  fullName: string
+  roleLabel: string
+  firstInitial: string
 }) {
   return (
     <aside className="w-56 flex-shrink-0 flex flex-col h-full bg-enayi-surface border-r border-enayi-border">
@@ -45,27 +50,51 @@ function AdminSidebarContent({ visibleNav, onNavigate }: {
         ))}
       </nav>
       <div className="p-3 border-t border-enayi-border space-y-1.5">
-        <Link to="/dashboard" className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-gold hover:bg-enayi-gold/10 text-xs font-medium transition-all">
-          <User size={14} /> My Account
+        {/* User identity */}
+        <div className="flex items-center gap-2.5 px-3 py-2 mb-1">
+          <div className="w-8 h-8 rounded-full bg-enayi-gold/10 border border-enayi-gold/30 flex items-center justify-center flex-shrink-0 text-enayi-gold font-semibold text-sm">{firstInitial}</div>
+          <div className="min-w-0">
+            <div className="text-enayi-text text-xs font-semibold truncate">{fullName}</div>
+            <div className="text-enayi-muted text-[11px] truncate">{roleLabel}</div>
+          </div>
+        </div>
+        <Link to="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all">
+          ← Main Website
         </Link>
-        <Link to="/" className="btn-ghost w-full text-xs">← Main Website</Link>
+        <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 text-xs font-medium transition-all w-full">
+          <LogOut size={14} /> Sign Out
+        </button>
       </div>
     </aside>
   )
 }
 
 export default function AdminLayout() {
-  const { user } = useAuthStore()
+  const { user, logout } = useAuthStore()
+  const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const visibleNav = ADMIN_NAV.filter(item => !item.managerOnly || isManagerOrAdmin)
   const closeDrawer = () => setMobileOpen(false)
 
+  const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Admin'
+  const firstInitial = (user?.first_name?.[0] || user?.last_name?.[0] || 'A').toUpperCase()
+  const ROLE_LABELS: Record<string, string> = {
+    admin: 'Owner', manager: 'Manager', staff: 'Front Desk Staff',
+  }
+  const roleLabel = ROLE_LABELS[user?.role ?? ''] ?? 'Admin'
+
+  const handleLogout = () => {
+    logout()
+    toast.success('Signed out successfully.')
+    navigate('/login', { replace: true })
+  }
+
   return (
     <div className="flex h-screen bg-enayi-bg overflow-hidden">
       {/* Desktop sidebar — always visible md and up */}
       <div className="hidden md:flex flex-shrink-0 h-full">
-        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} />
+        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} onLogout={handleLogout} fullName={fullName} roleLabel={roleLabel} firstInitial={firstInitial} />
       </div>
 
       {/* Mobile sidebar — ALWAYS rendered in the DOM below md, visibility
@@ -90,7 +119,7 @@ export default function AdminLayout() {
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} />
+        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} onLogout={handleLogout} fullName={fullName} roleLabel={roleLabel} firstInitial={firstInitial} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
