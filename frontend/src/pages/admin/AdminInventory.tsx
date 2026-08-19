@@ -295,7 +295,7 @@ export default function AdminInventory() {
           </button>
         )}
         {!ownLocation && tab === 'stock' && (
-          <Select value={locationFilter} onChange={e => setLocationFilter(e.target.value as any)} className="ml-auto max-w-[180px]">
+          <Select value={locationFilter} onChange={e => setLocationFilter(e.target.value as any)} className="w-full sm:w-auto sm:ml-auto max-w-full sm:max-w-[180px] mt-1 sm:mt-0">
             <option value="all">All locations</option>
             <option value="store">Store only</option>
             <option value="bar">Bar only</option>
@@ -305,19 +305,21 @@ export default function AdminInventory() {
         )}
       </div>
 
-      {/* Category filter chips — shows when on Stock tab so clicking a
-          category from the Categories tab switches here pre-filtered,
-          and the user can see which filter is active and clear it. */}
+      {/* Category filter chips — on mobile, turns into a horizontal scroll
+          rather than wrapping (13 chips would take 6+ lines wrapped). A
+          scrollable single row is more scannable and matches how most
+          mobile apps handle chip filters. Active chip stays visible because
+          the user just tapped it. */}
       {tab === 'stock' && (categories || []).length > 0 && (
-        <div className="flex gap-1.5 flex-wrap items-center">
-          <span className="text-enayi-muted text-xs mr-1">Category:</span>
+        <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+          <span className="text-enayi-muted text-xs mr-1 flex-shrink-0">Category:</span>
           <button onClick={() => setCategoryFilter('all')}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${categoryFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text bg-enayi-panel'}`}>
+            className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${categoryFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text bg-enayi-panel'}`}>
             All
           </button>
           {(categories || []).map(c => (
             <button key={c.id} onClick={() => setCategoryFilter(categoryFilter === c.id ? 'all' : c.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${categoryFilter===c.id ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text bg-enayi-panel'}`}>
+              className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${categoryFilter===c.id ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text bg-enayi-panel'}`}>
               {c.name} ({c.item_count})
             </button>
           ))}
@@ -494,7 +496,7 @@ export default function AdminInventory() {
           <Select label="Unit" value={itemForm.unit} onChange={e => setItemForm({ ...itemForm, unit: e.target.value })}>
             {UNITS.map(u => <option key={u} value={u} className="capitalize">{u}</option>)}
           </Select>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Cost price (₦)" type="number" value={itemForm.cost_price} onChange={e => setItemForm({ ...itemForm, cost_price: e.target.value })} />
             <Input label="Sale price (₦, optional)" type="number" placeholder="Leave blank if not resold" value={itemForm.sale_price} onChange={e => setItemForm({ ...itemForm, sale_price: e.target.value })} />
           </div>

@@ -230,17 +230,18 @@ export default function AdminAssets() {
         </button>
       </div>
 
-      {/* Department/segment picker — makes 292 items navigable instead of one wall of cards */}
+      {/* Department/segment picker — horizontal scroll on mobile to avoid
+          5+ wrapped rows at 388px. Same pattern as inventory category chips. */}
       {statusFilter !== 'awaiting_review' && activeDepartments.length > 1 && (
-        <div className="flex gap-1.5 flex-wrap items-center">
-          <span className="text-enayi-muted text-xs mr-1">Segment:</span>
+        <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+          <span className="text-enayi-muted text-xs mr-1 flex-shrink-0">Segment:</span>
           <button onClick={() => setDepartmentFilter('all')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${departmentFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
+            className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${departmentFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
             All ({(assets||[]).length})
           </button>
           {activeDepartments.map(d => (
             <button key={d} onClick={() => setDepartmentFilter(departmentFilter === d ? 'all' : d)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${departmentFilter===d ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
+              className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${departmentFilter===d ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
               {DEPT_LABELS[d] ?? d} ({(assets||[]).filter(a => a.department === d).length})
             </button>
           ))}
@@ -326,7 +327,7 @@ export default function AdminAssets() {
       <Modal open={assetModalOpen} onClose={() => setAssetModalOpen(false)} title={editingAsset ? 'Edit Asset' : 'Add Asset'} size="sm">
         <div className="space-y-4">
           <Input label="Name" placeholder="e.g. Split AC Unit, Pillow" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select label="Category" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
             </Select>
