@@ -305,13 +305,10 @@ export default function AdminInventory() {
         )}
       </div>
 
-      {/* Category filter chips — on mobile, turns into a horizontal scroll
-          rather than wrapping (13 chips would take 6+ lines wrapped). A
-          scrollable single row is more scannable and matches how most
-          mobile apps handle chip filters. Active chip stays visible because
-          the user just tapped it. */}
+      {/* Category filter chips — always a single horizontal scroll row on every
+          screen size. 13 chips wrapping into 3 rows is not readable at any width. */}
       {tab === 'stock' && (categories || []).length > 0 && (
-        <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+        <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:-mx-6 md:px-6">
           <span className="text-enayi-muted text-xs mr-1 flex-shrink-0">Category:</span>
           <button onClick={() => setCategoryFilter('all')}
             className={`flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${categoryFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text bg-enayi-panel'}`}>
@@ -364,6 +361,13 @@ export default function AdminInventory() {
                     const qty = balanceFor(it, loc)
                     const low = isLowAt(it, loc)
                     const canAdjust = ownLocation === loc || isManagerOrAdmin
+                    // When viewing all locations (admin/manager/store keeper overview),
+                    // skip rows that are zero AND aren't adjustable by this user's own
+                    // location — showing "Bar: 0 bottles" and "Kitchen: 0 bottles" on
+                    // a Dairy & Eggs item clutters every card with meaningless rows.
+                    // An item's own adjustable location always shows (even at zero) so
+                    // Store Keeper can still edit stock she owns.
+                    if (visibleLocations.length > 1 && qty === 0 && !canAdjust) return null
                     return (
                       <div key={loc} className="flex items-center justify-between text-sm">
                         <span className="text-enayi-muted flex items-center gap-1.5">

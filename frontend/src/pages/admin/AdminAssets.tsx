@@ -233,7 +233,7 @@ export default function AdminAssets() {
       {/* Department/segment picker — horizontal scroll on mobile to avoid
           5+ wrapped rows at 388px. Same pattern as inventory category chips. */}
       {statusFilter !== 'awaiting_review' && activeDepartments.length > 1 && (
-        <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+        <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:-mx-6 md:px-6">
           <span className="text-enayi-muted text-xs mr-1 flex-shrink-0">Segment:</span>
           <button onClick={() => setDepartmentFilter('all')}
             className={`flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-all whitespace-nowrap ${departmentFilter==='all' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
