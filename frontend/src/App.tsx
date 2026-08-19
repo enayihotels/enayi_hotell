@@ -65,13 +65,16 @@ const Spinner = () => (
   </div>
 )
 
-function Guard({ children, adminOnly = false, inventoryOnly = false }: { children: React.ReactNode; adminOnly?: boolean; inventoryOnly?: boolean }) {
+function Guard({ children, adminOnly = false, inventoryOnly = false, conciergeOnly = false }: { children: React.ReactNode; adminOnly?: boolean; inventoryOnly?: boolean; conciergeOnly?: boolean }) {
   const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   const role = user?.role ?? ''
   const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper']
   const ADMIN_ROLES = ['manager', 'admin']
+
+  // ENAYI AI Agent — all authenticated roles allowed, no redirect
+  if (conciergeOnly) return <>{children}</>
 
   // Admin panel is for Manager and Owner only
   if (adminOnly && !ADMIN_ROLES.includes(role))
@@ -83,8 +86,6 @@ function Guard({ children, adminOnly = false, inventoryOnly = false }: { childre
 
   // Guest portal — if a staff member somehow lands here, route them to the
   // right place rather than letting them browse the guest-facing portal.
-  // This fires even if they're already authenticated (e.g. a cached session
-  // from before the login-routing fix), not just at login time.
   if (!adminOnly && !inventoryOnly) {
     if (INVENTORY_ROLES.includes(role))
       return <Navigate to={role === 'housekeeper' ? '/housekeeping' : '/inventory'} replace />
@@ -139,7 +140,14 @@ export default function App() {
               <Route path="/payment/:id"     element={<PaymentPage key="payment-id" />} />
               <Route path="/payment/callback" element={<PaymentCallback key="payment-callback" />} />
               <Route path="/profile"         element={<ProfilePage key="profile" />} />
-              <Route path="/concierge"       element={<AIConcierge key="concierge" />} />
+            </Route>
+
+            {/* ENAYI AI Agent — standalone, accessible to ALL authenticated
+                roles (guest, admin, manager, staff). Kept outside the
+                guest-only Guard so Admin/Manager clicking the nav link
+                aren't redirected away to /admin before reaching it. */}
+            <Route element={<Guard conciergeOnly><DashboardLayout /></Guard>}>
+              <Route path="/concierge" element={<AIConcierge key="concierge" />} />
             </Route>
 
             {/* Admin */}

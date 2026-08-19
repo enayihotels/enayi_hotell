@@ -97,17 +97,22 @@ export default function PublicLayout() {
           </div>
 
           {/* ── CTA buttons ── */}
-          <div className="hidden lg:flex items-center gap-4 ml-6 xl:ml-10 shrink-0">
+          <div className="hidden lg:flex items-center gap-3 ml-6 xl:ml-10 shrink-0">
             {isAuthenticated ? (
               <>
                 <Link to="/concierge"
                   className="flex items-center gap-1.5 text-enayi-muted hover:text-enayi-gold transition-colors text-xs tracking-widest uppercase">
-                  <Bot size={14} /> ENAYI
+                  <Bot size={14} /> ENAYI AI Agent
                 </Link>
                 <Link to="/dashboard" className="btn-surface text-xs px-5 py-3">Dashboard</Link>
               </>
             ) : (
-              <Link to="/login" className="btn-ghost text-xs">Sign In</Link>
+              <>
+                <Link to="/login"
+                  className="flex items-center gap-2 text-sm font-semibold text-enayi-gold border border-enayi-gold/60 hover:bg-enayi-gold hover:text-enayi-bg px-6 py-2.5 rounded-lg transition-all duration-200 tracking-wide">
+                  Login / Sign In
+                </Link>
+              </>
             )}
             <Link to="/book" className="btn-gold">Book Now</Link>
           </div>
@@ -138,10 +143,20 @@ export default function PublicLayout() {
                   </NavLink>
                 ))}
                 <div className="flex flex-col gap-3 pt-2">
-                  {isAuthenticated
-                    ? <Link to="/dashboard" onClick={() => setOpen(false)} className="btn-surface">Dashboard</Link>
-                    : <Link to="/login" onClick={() => setOpen(false)} className="btn-ghost">Sign In</Link>
-                  }
+                  {isAuthenticated ? (
+                    <>
+                      <Link to="/concierge" onClick={() => setOpen(false)}
+                        className="flex items-center justify-center gap-2 border border-enayi-gold/40 text-enayi-gold rounded-lg py-3 text-sm font-medium tracking-wide">
+                        <Bot size={15} /> ENAYI AI Agent
+                      </Link>
+                      <Link to="/dashboard" onClick={() => setOpen(false)} className="btn-surface">Dashboard</Link>
+                    </>
+                  ) : (
+                    <Link to="/login" onClick={() => setOpen(false)}
+                      className="flex items-center justify-center gap-2 bg-enayi-gold text-enayi-bg font-bold py-3.5 rounded-lg text-base tracking-wide w-full">
+                      Login / Sign In
+                    </Link>
+                  )}
                   <Link to="/book" onClick={() => setOpen(false)} className="btn-gold">Book Now</Link>
                 </div>
               </div>

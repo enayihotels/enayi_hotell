@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowRight, Star, Wifi, Coffee, UtensilsCrossed, Car, Calendar, Bot, MapPin,
-  X, ChevronLeft, ChevronRight, ImageIcon, Phone,
+  X, ChevronLeft, ChevronRight, ImageIcon, Phone, LogIn,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/utils/api'
 import { formatCurrency } from '@/utils/helpers'
+import { useAuthStore } from '@/store/authStore'
 import type { RoomCategory } from '@/types'
 
 // ── Branch types (kept local so this page is fully self-contained) ──────────
@@ -35,6 +36,7 @@ interface Hotel {
 }
 
 export default function LandingPage() {
+  const { isAuthenticated } = useAuthStore()
   const { data: rooms } = useQuery<RoomCategory[]>({
     queryKey: ['rooms'],
     queryFn: () => api.get('/rooms/categories/').then(r => {
@@ -70,7 +72,10 @@ export default function LandingPage() {
           </motion.p>
           <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.4}} className="flex gap-4 justify-center flex-wrap">
             <Link to="/rooms" className="btn-gold-lg gap-2">Book Your Stay <ArrowRight size={18}/></Link>
-            <Link to="/rooms" className="btn-outline">Explore Rooms</Link>
+            {isAuthenticated
+              ? <Link to="/dashboard" className="btn-outline">Go to Dashboard</Link>
+              : <Link to="/login" className="btn-outline gap-2"><LogIn size={16}/> Login / Sign In</Link>
+            }
           </motion.div>
         </div>
       </section>
