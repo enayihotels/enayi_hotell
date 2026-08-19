@@ -102,7 +102,7 @@ export default function PublicLayout() {
               <>
                 <Link to="/concierge"
                   className="flex items-center gap-1.5 text-enayi-muted hover:text-enayi-gold transition-colors text-xs tracking-widest uppercase">
-                  <Bot size={14} /> ARIA
+                  <Bot size={14} /> ENAYI
                 </Link>
                 <Link to="/dashboard" className="btn-surface text-xs px-5 py-3">Dashboard</Link>
               </>
@@ -197,7 +197,7 @@ export default function PublicLayout() {
           <div>
             <h4 className="text-enayi-gold text-xs font-semibold tracking-[0.2em] uppercase mb-6">Services</h4>
             <div className="flex flex-col gap-2.5 text-sm text-enayi-muted">
-              {['24hr Room Service','Restaurant & Bar','Event Hall Rentals','Airport Pickup','Laundry','AI Concierge (ARIA)','Conference Rooms','Swimming Pool'].map(s => (
+              {['24hr Room Service','Restaurant & Bar','Event Hall Rentals','Airport Pickup','Laundry','AI Concierge (ENAYI)','Conference Rooms','Swimming Pool'].map(s => (
                 <span key={s} className="flex items-center gap-2">
                   <span className="w-1 h-1 rounded-full bg-enayi-gold/50" />{s}
                 </span>
