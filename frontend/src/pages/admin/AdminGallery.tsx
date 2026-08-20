@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge, Alert } from '@/components/ui'
-import { Image as ImageIcon, LayoutGrid, Plus, Pencil, Trash2, Upload, Star } from 'lucide-react'
+import { Image as ImageIcon, LayoutGrid, Plus, Pencil, Trash2, Upload, Star, Expand } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { Lightbox } from '@/components/Lightbox'
 import type { GalleryCategory, GalleryImage } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
@@ -78,6 +79,8 @@ export default function AdminGallery() {
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+
   const openNewCategory = () => { setEditingCategory(null); setCategoryForm(emptyCategoryForm); setCategoryModalOpen(true) }
   const openEditCategory = (c: GalleryCategory) => {
     setEditingCategory(c)
@@ -129,10 +132,19 @@ export default function AdminGallery() {
           <div className="card p-12 text-center"><EmptyState icon={ImageIcon} title="No images yet" desc={categories?.length ? 'Upload your first photo.' : 'Add a category first.'} /></div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {images!.map(img => (
+            {images!.map((img, idx) => (
               <div key={img.id} className="card overflow-hidden group relative">
-                <img src={img.image_url} alt={img.alt_text || img.title} className="w-full aspect-square object-cover" />
-                {img.is_featured && <div className="absolute top-2 left-2"><Badge variant="gold"><Star size={10} className="inline -mt-0.5" /> Featured</Badge></div>}
+                <div className="relative cursor-zoom-in" onClick={() => setLightboxIndex(idx)}>
+                  <img src={img.image_url} alt={img.alt_text || img.title} className="w-full aspect-square object-cover transition-transform duration-300 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <Expand size={18} className="text-white" />
+                    </div>
+                  </div>
+                  {img.is_featured && (
+                    <div className="absolute top-2 left-2"><Badge variant="gold"><Star size={10} className="inline -mt-0.5" /> Featured</Badge></div>
+                  )}
+                </div>
                 <div className="p-2.5 space-y-1">
                   <div className="text-enayi-text text-xs font-medium truncate">{img.title || img.category_name}</div>
                   <div className="text-enayi-muted text-[11px]">{img.category_name}</div>
@@ -144,6 +156,15 @@ export default function AdminGallery() {
             ))}
           </div>
         )
+      )}
+
+      {/* Lightbox — outside ternary so it renders correctly as a portal */}
+      {tab === 'images' && lightboxIndex !== null && images && (
+        <Lightbox
+          images={images.map(img => ({ src: img.image_url, alt: img.alt_text || img.title, caption: img.title || img.category_name }))}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
       )}
 
       {tab === 'categories' && (

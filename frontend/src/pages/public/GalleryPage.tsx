@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { ImageIcon } from 'lucide-react'
+import { ImageIcon, Expand } from 'lucide-react'
 import api from '@/utils/api'
+import { Lightbox } from '@/components/Lightbox'
 import type { GalleryCategory, GalleryImage } from '@/types'
 
 export default function GalleryPage() {
   const [tab, setTab] = useState('all')
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const { data: cats } = useQuery<GalleryCategory[]>({
     queryKey: ['gallery-cats'],
@@ -76,20 +78,28 @@ export default function GalleryPage() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: i * 0.03 }}
-                className="aspect-square rounded-2xl overflow-hidden bg-enayi-panel group cursor-pointer w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.75rem)] lg:w-[calc(25%-0.75rem)]"
+                onClick={() => setLightboxIndex(i)}
+                className="aspect-square rounded-2xl overflow-hidden bg-enayi-panel group cursor-zoom-in w-[calc(50%-0.5rem)] sm:w-[calc(33.333%-0.75rem)] lg:w-[calc(25%-0.75rem)]"
               >
                 {img.image_url ? (
-                  <img
-                    src={img.image_url}
-                    alt={img.alt_text || img.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    onError={(e) => {
-                      const el = e.target as HTMLImageElement
-                      el.style.display = 'none'
-                      const parent = el.parentElement
-                      if (parent) parent.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-enayi-muted gap-2"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg><span class="text-xs">Image unavailable</span></div>'
-                    }}
-                  />
+                  <div className="relative w-full h-full">
+                    <img
+                      src={img.image_url}
+                      alt={img.alt_text || img.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      onError={(e) => {
+                        const el = e.target as HTMLImageElement
+                        el.style.display = 'none'
+                        const parent = el.parentElement
+                        if (parent) parent.innerHTML = '<div class="flex flex-col items-center justify-center h-full text-enayi-muted gap-2"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg><span class="text-xs">Image unavailable</span></div>'
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-all duration-200 flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                        <Expand size={18} className="text-white" />
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-enayi-muted gap-2">
                     <ImageIcon size={32} className="opacity-40" />
@@ -99,6 +109,15 @@ export default function GalleryPage() {
               </motion.div>
             ))}
           </div>
+        )}
+
+        {/* Lightbox — rendered outside the flex grid, but still inside ternary scope */}
+        {lightboxIndex !== null && images && images.length > 0 && (
+          <Lightbox
+            images={images.filter(img => img.image_url).map(img => ({ src: img.image_url, alt: img.alt_text || img.title, caption: img.title || img.category_name }))}
+            initialIndex={lightboxIndex}
+            onClose={() => setLightboxIndex(null)}
+          />
         )}
 
         {/* Empty State */}
