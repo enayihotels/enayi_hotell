@@ -137,110 +137,208 @@ def _kv_table(rows, s):
 # ═══════════════════════════════════════════════════════════════════════════
 def _generate_booking_receipt(booking) -> bytes:
     buffer = io.BytesIO()
-    doc    = _build_doc(buffer, f"Booking Receipt — {booking.booking_reference}")
-    s      = _styles()
-    story  = []
+    # Use A4 with tighter margins to fit on one page
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=1.5*cm, leftMargin=1.5*cm,
+        topMargin=1.2*cm, bottomMargin=1.2*cm,
+        title=f"Booking Receipt — {booking.booking_reference}",
+    )
+    s     = _styles()
+    story = []
+    W_available = A4[0] - 3*cm   # usable width
 
     branch = booking.hotel.name if booking.hotel_id else "Enayi Hotels & Suites"
-    story += _header_block(s, branch, "BOOKING RECEIPT")
 
-    # Status badge
-    story.append(Spacer(1, 5*mm))
-    story.append(Paragraph("GUEST INFORMATION", s["section"]))
-    story.append(_kv_table([
-        ("Full Name",         f"{booking.guest.get_full_name() or booking.guest.email}"),
-        ("Email",             booking.guest.email),
-        ("Booking Reference", booking.booking_reference),
-        ("Booking Date",      _fmt_date(booking.created_at)),
-        ("Source",            booking.get_source_display()),
-        ("Status",            booking.get_status_display()),
-    ], s))
-
-    # Stay details
+    # ── Header: coloured banner on left, hotel info on right ───────────────
+    header_data = [[
+        Paragraph("ENAYI\nHOTELS &amp;\nSUITES",
+                  ParagraphStyle("hb", fontSize=15, textColor=GOLD,
+                                 fontName="Helvetica-Bold", leading=18)),
+        Paragraph(
+            f"<b>{branch}</b><br/>"
+            "Rayfield Zarmaganda Road, Jos, Plateau State, Nigeria<br/>"
+            "+234 (0) 913 894 3008 &nbsp;|&nbsp; info@enayihotels.com",
+            ParagraphStyle("hi", fontSize=8.5, textColor=DARK,
+                           fontName="Helvetica", leading=12)),
+        Paragraph(
+            "BOOKING<br/>RECEIPT",
+            ParagraphStyle("rt", fontSize=18, textColor=WHITE,
+                           fontName="Helvetica-Bold", alignment=TA_CENTER, leading=20)),
+    ]]
+    ht = Table(header_data, colWidths=[3.2*cm, 9.0*cm, 4.0*cm])
+    ht.setStyle(TableStyle([
+        ("BACKGROUND",   (0,0), (0,0), DARK),
+        ("BACKGROUND",   (1,0), (1,0), colors.HexColor("#F5F5F0")),
+        ("BACKGROUND",   (2,0), (2,0), GOLD),
+        ("TOPPADDING",   (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING",(0,0), (-1,-1), 10),
+        ("LEFTPADDING",  (0,0), (-1,-1), 8),
+        ("RIGHTPADDING", (0,0), (-1,-1), 8),
+        ("VALIGN",       (0,0), (-1,-1), "MIDDLE"),
+    ]))
+    story.append(ht)
     story.append(Spacer(1, 4*mm))
-    story.append(Paragraph("STAY DETAILS", s["section"]))
-    story.append(_kv_table([
-        ("Branch",            branch),
-        ("Room Number",       f"Room {booking.room.room_number}"),
-        ("Room Type",         booking.room.category.name if hasattr(booking.room, 'category') and booking.room.category else "—"),
-        ("Check-In Date",     _fmt_date(booking.check_in)),
-        ("Check-Out Date",    _fmt_date(booking.check_out)),
-        ("Total Nights",      str(booking.total_nights)),
-        ("Guests",            f"{booking.adults} adult(s), {booking.children} child(ren)"),
-        ("Breakfast",         "Included" if booking.breakfast_included else "Not included"),
-    ], s))
 
-    # Charges
+    # ── Reference strip ─────────────────────────────────────────────────────
+    ref_data = [[
+        Paragraph(f"<b>Ref:</b> {booking.booking_reference}", ParagraphStyle("ref", fontSize=9, fontName="Helvetica", textColor=DARK)),
+        Paragraph(f"<b>Date:</b> {_fmt_date(booking.created_at)}", ParagraphStyle("ref", fontSize=9, fontName="Helvetica", textColor=DARK, alignment=TA_CENTER)),
+        Paragraph(
+            f"<b>Status:</b> {booking.get_status_display().upper()}",
+            ParagraphStyle("refs", fontSize=9, fontName="Helvetica-Bold",
+                           textColor=GREEN if booking.status in ("checked_out","confirmed","checked_in") else MUTED,
+                           alignment=TA_RIGHT)),
+    ]]
+    rt = Table(ref_data, colWidths=[W_available/3]*3)
+    rt.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor("#F5F5F0")),
+        ("TOPPADDING",    (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 8),
+        ("BOX",           (0,0), (-1,-1), 0.5, GOLD),
+        ("LINEAFTER",     (0,0), (1,-1), 0.3, MUTED),
+    ]))
+    story.append(rt)
     story.append(Spacer(1, 4*mm))
-    story.append(Paragraph("CHARGES", s["section"]))
-    charge_data = [
-        [Paragraph("Description", s["th"]), Paragraph("Amount", ParagraphStyle("th_r", fontSize=9, textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT))],
-        [Paragraph(f"Room rate \xd7 {booking.total_nights} night(s)", s["td"]), Paragraph(_fmt_money(booking.subtotal), s["td_r"])],
+
+    # ── Two columns: Guest Info | Stay Details ──────────────────────────────
+    def mini_table(rows):
+        data = [[Paragraph(k, ParagraphStyle("mk", fontSize=7.5, textColor=MUTED, fontName="Helvetica")),
+                 Paragraph(v, ParagraphStyle("mv", fontSize=8.5, textColor=DARK, fontName="Helvetica-Bold"))]
+                for k, v in rows]
+        t = Table(data, colWidths=[3.0*cm, 5.4*cm])
+        t.setStyle(TableStyle([
+            ("TOPPADDING",    (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+            ("LEFTPADDING",   (0,0), (-1,-1), 0),
+            ("RIGHTPADDING",  (0,0), (-1,-1), 4),
+            ("LINEBELOW",     (0,0), (-1,-2), 0.2, colors.HexColor("#EEEEEE")),
+        ]))
+        return t
+
+    try:
+        room_type = booking.room.category.name if booking.room.category_id else "—"
+    except Exception:
+        room_type = "—"
+
+    guest_block = [
+        Paragraph("GUEST INFORMATION", ParagraphStyle("sh", fontSize=8, textColor=GOLD, fontName="Helvetica-Bold", spaceAfter=4)),
+        mini_table([
+            ("Full Name",    booking.guest.get_full_name() or "—"),
+            ("Email",        booking.guest.email),
+            ("Phone",        getattr(booking.guest, 'phone_number', None) or "—"),
+            ("Source",       booking.get_source_display()),
+        ]),
+    ]
+    stay_block = [
+        Paragraph("STAY DETAILS", ParagraphStyle("sh2", fontSize=8, textColor=GOLD, fontName="Helvetica-Bold", spaceAfter=4)),
+        mini_table([
+            ("Branch",       branch.replace("Enayi Hotels & Suites — ","")),
+            ("Room",         f"Room {booking.room.room_number}  |  {room_type}"),
+            ("Check-In",     _fmt_date(booking.check_in)),
+            ("Check-Out",    _fmt_date(booking.check_out)),
+            ("Nights",       str(booking.total_nights)),
+            ("Guests",       f"{booking.adults} adult(s)" + (f", {booking.children} child(ren)" if booking.children else "")),
+            ("Breakfast",    "Included" if booking.breakfast_included else "Not included"),
+        ]),
+    ]
+
+    two_col = Table(
+        [[guest_block, Spacer(0.4*cm, 1), stay_block]],
+        colWidths=[8.0*cm, 0.4*cm, 8.0*cm],
+    )
+    two_col.setStyle(TableStyle([
+        ("VALIGN",   (0,0), (-1,-1), "TOP"),
+        ("LEFTPADDING",  (0,0), (-1,-1), 0),
+        ("RIGHTPADDING", (0,0), (-1,-1), 0),
+    ]))
+    story.append(two_col)
+    story.append(Spacer(1, 4*mm))
+
+    # ── Charges table ───────────────────────────────────────────────────────
+    story.append(Paragraph("CHARGES", ParagraphStyle("sh3", fontSize=8, textColor=GOLD, fontName="Helvetica-Bold", spaceAfter=4)))
+
+    BOLD_R = ParagraphStyle("br", fontSize=9, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=DARK)
+    NORM_R = ParagraphStyle("nr", fontSize=8.5, fontName="Helvetica", alignment=TA_RIGHT, textColor=DARK)
+    NORM_L = ParagraphStyle("nl", fontSize=8.5, fontName="Helvetica", textColor=DARK)
+
+    charge_rows = [
+        [Paragraph("Description", ParagraphStyle("th2", fontSize=8, textColor=WHITE, fontName="Helvetica-Bold")),
+         Paragraph("Amount", ParagraphStyle("th2r", fontSize=8, textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT))],
+        [Paragraph(f"Room rate \xd7 {booking.total_nights} night(s)  @  {_fmt_money(booking.room_rate_per_night)}/night", NORM_L),
+         Paragraph(_fmt_money(booking.subtotal), NORM_R)],
     ]
     if booking.discount_amount:
-        charge_data.append([Paragraph("Discount", s["td"]), Paragraph(f"- {_fmt_money(booking.discount_amount)}", s["td_r"])])
+        charge_rows.append([Paragraph("Discount", NORM_L), Paragraph(f"- {_fmt_money(booking.discount_amount)}", NORM_R)])
     if booking.tax_amount:
-        charge_data.append([Paragraph("Tax (7.5%)", s["td"]), Paragraph(_fmt_money(booking.tax_amount), s["td_r"])])
-    charge_data.append([
-        Paragraph("TOTAL", ParagraphStyle("tb", fontSize=10, fontName="Helvetica-Bold")),
-        Paragraph(_fmt_money(booking.total_amount), ParagraphStyle("tb_r", fontSize=10, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=GOLD)),
-    ])
-    charge_data.append([Paragraph("Amount Paid", s["td"]),  Paragraph(_fmt_money(booking.amount_paid), s["td_r"])])
-    charge_data.append([
-        Paragraph("Balance Due", ParagraphStyle("bal", fontSize=9, fontName="Helvetica-Bold", textColor=RED if booking.balance_due > 0 else GREEN)),
-        Paragraph(_fmt_money(booking.balance_due), ParagraphStyle("bal_r", fontSize=9, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=RED if booking.balance_due > 0 else GREEN)),
-    ])
+        charge_rows.append([Paragraph("Tax (7.5% VAT)", NORM_L), Paragraph(_fmt_money(booking.tax_amount), NORM_R)])
 
-    ct = Table(charge_data, colWidths=[12*cm, 4*cm])
+    charge_rows += [
+        [Paragraph("TOTAL", BOLD_R), Paragraph(_fmt_money(booking.total_amount), ParagraphStyle("tr", fontSize=10, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=GOLD))],
+        [Paragraph("Amount Paid", NORM_L), Paragraph(_fmt_money(booking.amount_paid), ParagraphStyle("ap", fontSize=8.5, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=GREEN))],
+        [Paragraph("Balance Due", ParagraphStyle("bd", fontSize=9, fontName="Helvetica-Bold", textColor=RED if booking.balance_due > 0 else GREEN)),
+         Paragraph(_fmt_money(booking.balance_due), ParagraphStyle("bdr", fontSize=9, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=RED if booking.balance_due > 0 else GREEN))],
+    ]
+
+    ct = Table(charge_rows, colWidths=[W_available - 4*cm, 4*cm])
     ct.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), DARK),
-        ("ROWBACKGROUNDS", (0,1), (-1,-4), [WHITE, colors.HexColor("#F8F9FA")]),
-        ("BACKGROUND", (0,-3), (-1,-3), colors.HexColor("#F0F0F0")),
-        ("LINEBELOW", (0,-3), (-1,-3), 1, GOLD),
-        ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#DDDDDD")),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("LEFTPADDING", (0,0), (-1,-1), 6),
+        ("BACKGROUND",    (0,0), (-1,0), DARK),
+        ("ROWBACKGROUNDS",(0,1), (-1,-4), [WHITE, colors.HexColor("#F8F9FA")]),
+        ("BACKGROUND",    (0,-3), (-1,-3), colors.HexColor("#F0F0E8")),
+        ("LINEABOVE",     (0,-3), (-1,-3), 1, GOLD),
+        ("LINEBELOW",     (0,-3), (-1,-3), 0.5, MUTED),
+        ("GRID",          (0,0), (-1,-1), 0.2, colors.HexColor("#E0E0E0")),
+        ("TOPPADDING",    (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 6),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 6),
     ]))
     story.append(ct)
 
-    # Payments — Payment model uses GenericFK (payable), query via ContentType
+    # ── Payment history (compact, only if payments exist) ──────────────────
     try:
         from django.contrib.contenttypes.models import ContentType
         from apps.payments.models import Payment as PaymentModel
-        ct_type = ContentType.objects.get_for_model(booking.__class__)
+        ct_type  = ContentType.objects.get_for_model(booking.__class__)
         payments = PaymentModel.objects.filter(
-            content_type=ct_type,
-            object_id=booking.id,
-            status="success",
+            content_type=ct_type, object_id=booking.id, status="success"
         ).order_by("created_at")
         if payments.exists():
-            story.append(Spacer(1, 4*mm))
-            story.append(Paragraph("PAYMENT HISTORY", s["section"]))
-            ph_data = [[Paragraph(h, s["th"]) for h in ["Date", "Method", "Reference", "Amount"]]]
+            story.append(Spacer(1, 3*mm))
+            story.append(Paragraph("PAYMENT HISTORY", ParagraphStyle("sh4", fontSize=8, textColor=GOLD, fontName="Helvetica-Bold", spaceAfter=3)))
+            ph = [[Paragraph(h, ParagraphStyle("ph", fontSize=7.5, textColor=WHITE, fontName="Helvetica-Bold"))
+                   for h in ["Date", "Method", "Reference", "Amount"]]]
             for p in payments:
-                ph_data.append([
-                    Paragraph(_fmt_date(p.created_at), s["td"]),
-                    Paragraph(p.get_method_display(), s["td"]),
-                    Paragraph(p.transaction_reference or "—", s["td"]),
-                    Paragraph(_fmt_money(p.amount), s["td_r"]),
+                ph.append([
+                    Paragraph(_fmt_date(p.created_at), ParagraphStyle("pd", fontSize=8, fontName="Helvetica", textColor=DARK)),
+                    Paragraph(p.get_method_display(), ParagraphStyle("pd", fontSize=8, fontName="Helvetica", textColor=DARK)),
+                    Paragraph(p.transaction_reference or "—", ParagraphStyle("pd", fontSize=7.5, fontName="Helvetica", textColor=DARK)),
+                    Paragraph(_fmt_money(p.amount), ParagraphStyle("pdr", fontSize=8, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=DARK)),
                 ])
-            pt = Table(ph_data, colWidths=[3.5*cm, 3*cm, 5*cm, 3.5*cm])
+            pt = Table(ph, colWidths=[3.5*cm, 2.8*cm, 6.5*cm, 3.6*cm])
             pt.setStyle(TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), DARK),
-                ("ROWBACKGROUNDS", (0,1), (-1,-1), [WHITE, colors.HexColor("#F8F9FA")]),
-                ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#DDDDDD")),
-                ("TOPPADDING", (0,0), (-1,-1), 5),
-                ("BOTTOMPADDING", (0,0), (-1,-1), 5),
-                ("LEFTPADDING", (0,0), (-1,-1), 6),
+                ("BACKGROUND",    (0,0), (-1,0), DARK),
+                ("ROWBACKGROUNDS",(0,1), (-1,-1), [WHITE, colors.HexColor("#F8F9FA")]),
+                ("GRID",          (0,0), (-1,-1), 0.2, colors.HexColor("#E0E0E0")),
+                ("TOPPADDING",    (0,0), (-1,-1), 4),
+                ("BOTTOMPADDING", (0,0), (-1,-1), 4),
+                ("LEFTPADDING",   (0,0), (-1,-1), 5),
             ]))
             story.append(pt)
     except Exception as e:
-        # Payment history is best-effort — don't crash the receipt if it fails
-        import logging
-        logging.getLogger("apps.reports").warning(f"Could not load payment history for booking {booking.id}: {e}")
+        import logging; logging.getLogger("apps.reports").warning(f"Payment history error: {e}")
 
-    story += _footer_block(s, "Thank you for your stay. We hope to welcome you again!")
+    # ── Footer ──────────────────────────────────────────────────────────────
+    story.append(Spacer(1, 5*mm))
+    story.append(HRFlowable(width="100%", thickness=1, color=GOLD, spaceAfter=3))
+    story.append(Paragraph(
+        "Thank you for choosing Enayi Hotels &amp; Suites. We hope to welcome you again!",
+        ParagraphStyle("ft", fontSize=8, textColor=MUTED, fontName="Helvetica", alignment=TA_CENTER)))
+    story.append(Paragraph(
+        f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}  |  Enayi Hotel Management System",
+        ParagraphStyle("ft2", fontSize=7.5, textColor=MUTED, fontName="Helvetica", alignment=TA_CENTER)))
+
     doc.build(story)
     return buffer.getvalue()
 
@@ -250,74 +348,146 @@ def _generate_booking_receipt(booking) -> bytes:
 # ═══════════════════════════════════════════════════════════════════════════
 def _generate_order_receipt(order) -> bytes:
     buffer = io.BytesIO()
-    doc    = _build_doc(buffer, f"Order Receipt — {order.order_number}")
-    s      = _styles()
-    story  = []
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        rightMargin=1.5*cm, leftMargin=1.5*cm,
+        topMargin=1.2*cm, bottomMargin=1.2*cm,
+        title=f"Order Receipt — {order.order_number}",
+    )
+    s = _styles()
+    story = []
+    W_available = A4[0] - 3*cm
 
     branch = order.hotel.name if order.hotel_id else "Enayi Hotels & Suites"
-    story += _header_block(s, branch, "FOOD & DRINKS RECEIPT")
 
-    story.append(Spacer(1, 5*mm))
-    story.append(Paragraph("ORDER DETAILS", s["section"]))
-    story.append(_kv_table([
-        ("Order Number",  order.order_number),
-        ("Guest",         order.guest.get_full_name() or order.guest.email),
-        ("Room",          f"Room {order.room.room_number}" if order.room_id else "—"),
-        ("Order Type",    order.get_source_display()),
-        ("Order Date",    _fmt_date(order.created_at)),
-        ("Status",        order.get_status_display()),
-        ("Payment",       "Paid" if order.is_paid else "Pending"),
-    ], s))
+    # Header banner — same 3-column style as booking receipt
+    header_data = [[
+        Paragraph("ENAYI\nHOTELS &amp;\nSUITES",
+                  ParagraphStyle("hb", fontSize=15, textColor=GOLD, fontName="Helvetica-Bold", leading=18)),
+        Paragraph(
+            f"<b>{branch}</b><br/>"
+            "Rayfield Zarmaganda Road, Jos, Plateau State, Nigeria<br/>"
+            "+234 (0) 913 894 3008 &nbsp;|&nbsp; info@enayihotels.com",
+            ParagraphStyle("hi", fontSize=8.5, textColor=DARK, fontName="Helvetica", leading=12)),
+        Paragraph("FOOD &amp; BAR\nRECEIPT",
+                  ParagraphStyle("rt", fontSize=16, textColor=WHITE, fontName="Helvetica-Bold",
+                                 alignment=TA_CENTER, leading=20)),
+    ]]
+    ht = Table(header_data, colWidths=[3.2*cm, 9.0*cm, 4.0*cm])
+    ht.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (0,0), DARK),
+        ("BACKGROUND",    (1,0), (1,0), colors.HexColor("#F5F5F0")),
+        ("BACKGROUND",    (2,0), (2,0), GOLD),
+        ("TOPPADDING",    (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ("LEFTPADDING",   (0,0), (-1,-1), 8),
+        ("RIGHTPADDING",  (0,0), (-1,-1), 8),
+        ("VALIGN",        (0,0), (-1,-1), "MIDDLE"),
+    ]))
+    story.append(ht)
+    story.append(Spacer(1, 3*mm))
+
+    # Reference strip
+    ref_data = [[
+        Paragraph(f"<b>Order:</b> {order.order_number}", ParagraphStyle("ref", fontSize=9, fontName="Helvetica", textColor=DARK)),
+        Paragraph(f"<b>Date:</b> {_fmt_date(order.created_at)}", ParagraphStyle("ref", fontSize=9, fontName="Helvetica", textColor=DARK, alignment=TA_CENTER)),
+        Paragraph(f"<b>Payment:</b> {'PAID' if order.is_paid else 'PENDING'}",
+                  ParagraphStyle("refs", fontSize=9, fontName="Helvetica-Bold",
+                                 textColor=GREEN if order.is_paid else RED, alignment=TA_RIGHT)),
+    ]]
+    rt = Table(ref_data, colWidths=[W_available/3]*3)
+    rt.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor("#F5F5F0")),
+        ("TOPPADDING",    (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 8),
+        ("BOX",           (0,0), (-1,-1), 0.5, GOLD),
+        ("LINEAFTER",     (0,0), (1,-1), 0.3, MUTED),
+    ]))
+    story.append(rt)
+    story.append(Spacer(1, 3*mm))
+
+    # Order info — compact 2-column
+    info_data = [[
+        Paragraph(f"<b>Guest:</b> {order.guest.get_full_name() or order.guest.email}",
+                  ParagraphStyle("oi", fontSize=8.5, fontName="Helvetica", textColor=DARK)),
+        Paragraph(f"<b>Room:</b> {'Room ' + str(order.room.room_number) if order.room_id else '—'}  &nbsp;&nbsp; <b>Type:</b> {order.get_source_display()}",
+                  ParagraphStyle("oi", fontSize=8.5, fontName="Helvetica", textColor=DARK, alignment=TA_RIGHT)),
+    ]]
+    it2 = Table(info_data, colWidths=[W_available/2, W_available/2])
+    it2.setStyle(TableStyle([
+        ("TOPPADDING",    (0,0), (-1,-1), 3),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ("LEFTPADDING",   (0,0), (0,-1), 0),
+    ]))
+    story.append(it2)
+    story.append(Spacer(1, 3*mm))
 
     # Items table
-    story.append(Spacer(1, 4*mm))
-    story.append(Paragraph("ITEMS ORDERED", s["section"]))
-    item_data = [[Paragraph(h, s["th"]) for h in ["Item", "Qty", "Unit Price", "Total"]]]
+    story.append(Paragraph("ITEMS ORDERED", ParagraphStyle("sh", fontSize=8, textColor=GOLD, fontName="Helvetica-Bold", spaceAfter=3)))
+    NORM_R = ParagraphStyle("nr", fontSize=8.5, fontName="Helvetica", alignment=TA_RIGHT, textColor=DARK)
+    NORM_L = ParagraphStyle("nl", fontSize=8.5, fontName="Helvetica", textColor=DARK)
+    TH     = ParagraphStyle("th", fontSize=8, textColor=WHITE, fontName="Helvetica-Bold")
+    THR    = ParagraphStyle("thr", fontSize=8, textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT)
+
+    item_data = [[Paragraph("Item", TH), Paragraph("Qty", THR), Paragraph("Unit Price", THR), Paragraph("Total", THR)]]
     for item in order.items.select_related("menu_item").all():
         item_data.append([
-            Paragraph(item.menu_item.name, s["td"]),
-            Paragraph(str(item.quantity), s["td"]),
-            Paragraph(_fmt_money(item.unit_price), s["td_r"]),
-            Paragraph(_fmt_money(item.total_price), s["td_r"]),
+            Paragraph(item.menu_item.name, NORM_L),
+            Paragraph(str(item.quantity), NORM_R),
+            Paragraph(_fmt_money(item.unit_price), NORM_R),
+            Paragraph(_fmt_money(item.total_price), NORM_R),
         ])
-    it = Table(item_data, colWidths=[8*cm, 2*cm, 3.5*cm, 3.5*cm])
+    it = Table(item_data, colWidths=[W_available - 8.5*cm, 1.5*cm, 3.5*cm, 3.5*cm])
     it.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), DARK),
-        ("ROWBACKGROUNDS", (0,1), (-1,-1), [WHITE, colors.HexColor("#F8F9FA")]),
-        ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#DDDDDD")),
-        ("ALIGN", (1,0), (-1,-1), "RIGHT"),
-        ("TOPPADDING", (0,0), (-1,-1), 6),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-        ("LEFTPADDING", (0,0), (-1,-1), 6),
+        ("BACKGROUND",    (0,0), (-1,0), DARK),
+        ("ROWBACKGROUNDS",(0,1), (-1,-1), [WHITE, colors.HexColor("#F8F9FA")]),
+        ("GRID",          (0,0), (-1,-1), 0.2, colors.HexColor("#E0E0E0")),
+        ("TOPPADDING",    (0,0), (-1,-1), 5),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ("LEFTPADDING",   (0,0), (-1,-1), 6),
     ]))
     story.append(it)
+    story.append(Spacer(1, 2*mm))
 
-    # Totals
-    story.append(Spacer(1, 4*mm))
-    totals = [
-        ("Subtotal",        _fmt_money(order.subtotal)),
-        ("Delivery Charge", _fmt_money(order.delivery_charge)),
-        ("Tax (7.5%)",      _fmt_money(order.tax)),
-        ("TOTAL",           _fmt_money(order.total_amount)),
-    ]
-    tt_data = [[Paragraph(k, ParagraphStyle("tl", fontSize=9 if k!="TOTAL" else 12, fontName="Helvetica-Bold" if k=="TOTAL" else "Helvetica", textColor=MUTED if k!="TOTAL" else DARK, alignment=TA_RIGHT)),
-                Paragraph(v, ParagraphStyle("tv", fontSize=9 if k!="TOTAL" else 12, fontName="Helvetica-Bold" if k=="TOTAL" else "Helvetica", textColor=GOLD if k=="TOTAL" else DARK, alignment=TA_RIGHT))]
-               for k, v in totals]
-    tt = Table(tt_data, colWidths=[12*cm, 4*cm])
-    tt.setStyle(TableStyle([
-        ("LINEABOVE", (0,-1), (-1,-1), 1, GOLD),
-        ("TOPPADDING", (0,0), (-1,-1), 4),
-        ("BOTTOMPADDING", (0,0), (-1,-1), 4),
-        ("RIGHTPADDING", (0,0), (-1,-1), 6),
-    ]))
-    story.append(tt)
+    # Totals strip — right-aligned compact rows
+    totals = [("Subtotal", _fmt_money(order.subtotal))]
+    if order.delivery_charge:
+        totals.append(("Delivery", _fmt_money(order.delivery_charge)))
+    if order.tax:
+        totals.append(("Tax (7.5%)", _fmt_money(order.tax)))
+    totals.append(("TOTAL", _fmt_money(order.total_amount)))
+
+    for label, amount in totals:
+        is_total = label == "TOTAL"
+        td = Table([[
+            Paragraph(label, ParagraphStyle("tl", fontSize=10 if is_total else 8.5,
+                                             fontName="Helvetica-Bold" if is_total else "Helvetica",
+                                             textColor=DARK if is_total else MUTED, alignment=TA_RIGHT)),
+            Paragraph(amount, ParagraphStyle("tv", fontSize=11 if is_total else 8.5,
+                                              fontName="Helvetica-Bold",
+                                              textColor=GOLD if is_total else DARK, alignment=TA_RIGHT)),
+        ]], colWidths=[W_available - 4*cm, 4*cm])
+        td.setStyle(TableStyle([
+            ("TOPPADDING",    (0,0), (-1,-1), 2 if not is_total else 4),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 2 if not is_total else 4),
+            ("LINEABOVE",     (0,0), (-1,0), 1.5 if is_total else 0, GOLD),
+        ]))
+        story.append(td)
 
     if order.special_instructions:
-        story.append(Spacer(1, 4*mm))
-        story.append(Paragraph("SPECIAL INSTRUCTIONS", s["section"]))
-        story.append(Paragraph(order.special_instructions, s["body"]))
+        story.append(Spacer(1, 3*mm))
+        story.append(Paragraph(f"<b>Special instructions:</b> {order.special_instructions}",
+                               ParagraphStyle("si", fontSize=8, fontName="Helvetica", textColor=MUTED)))
 
-    story += _footer_block(s, "Thank you for your order. Enjoy your meal!")
+    # Footer
+    story.append(Spacer(1, 5*mm))
+    story.append(HRFlowable(width="100%", thickness=1, color=GOLD, spaceAfter=3))
+    story.append(Paragraph("Thank you for your order. Enjoy your meal!",
+                            ParagraphStyle("ft", fontSize=8, textColor=MUTED, fontName="Helvetica", alignment=TA_CENTER)))
+    story.append(Paragraph(f"Generated: {datetime.now().strftime('%d %b %Y, %I:%M %p')}  |  Enayi Hotel Management System",
+                            ParagraphStyle("ft2", fontSize=7.5, textColor=MUTED, fontName="Helvetica", alignment=TA_CENTER)))
+
     doc.build(story)
     return buffer.getvalue()
 
