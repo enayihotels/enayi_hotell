@@ -284,7 +284,7 @@ export default function RoomsPage() {
                   <p className={`font-display text-xl mt-2 ${selectedHotel === h.id ? 'text-enayi-gold' : 'text-enayi-text'}`}>
                     {h.name.replace(/enayi hotels.*?—\s*/i,'').replace(/enayi hotels.*?-\s*/i,'')}
                   </p>
-                  <p className="text-enayi-muted text-sm mt-0.5 capitalize">{h.branch} Branch</p>
+                  <p className="text-enayi-muted text-sm mt-0.5">{h.name.replace(/enayi hotels.*?—\s*/i,'').replace(/enayi hotels.*?-\s*/i,'')} Branch</p>
                   {selectedHotel === h.id && (
                     <span className="inline-flex items-center gap-1 mt-2 text-xs text-enayi-gold font-semibold">
                       <CheckCircle size={11}/> Selected
