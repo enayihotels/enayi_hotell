@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   BedDouble, CheckCircle, XCircle, Loader2,
   Building2, ChevronDown, AlertCircle, RefreshCw,
-  Eye, Maximize2, Wind,
+  Eye, Maximize2, Wind, ZoomIn,
 } from 'lucide-react'
 import api from '@/utils/api'
+import { Lightbox } from '@/components/Lightbox'
 
 interface RoomEntry {
   id: string
@@ -62,6 +63,7 @@ function RoomModal({ room, catName, catSlug, branchName, hotelId, imageUrl, onCl
   room: RoomEntry; catName: string; catSlug: string;
   branchName?: string; hotelId?: string; imageUrl: string; onClose: () => void
 }) {
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
@@ -70,22 +72,33 @@ function RoomModal({ room, catName, catSlug, branchName, hotelId, imageUrl, onCl
         exit={{ scale: 0.92, opacity: 0 }} transition={{ duration: 0.22 }}
         onClick={e => e.stopPropagation()}
         className="bg-enayi-surface border border-enayi-gold/30 rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl">
-        <div className="relative aspect-video">
+        <div className="relative aspect-video cursor-zoom-in group" onClick={() => setLightboxOpen(true)}>
           <img src={imageUrl} alt={catName}
-               className="w-full h-full object-cover"/>
-          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/90 via-transparent to-transparent"/>
+               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+              <ZoomIn size={18} className="text-white" />
+            </div>
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/90 via-transparent to-transparent pointer-events-none"/>
           <div className="absolute top-4 right-4">
             <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border
               ${STATUS_STYLE[room.status] ?? STATUS_STYLE.occupied}`}>
               {room.is_available ? <><CheckCircle size={12}/> Available</> : <><XCircle size={12}/> {room.status}</>}
             </span>
           </div>
-          <div className="absolute bottom-4 left-4">
+          <div className="absolute bottom-4 left-4 pointer-events-none">
             {branchName && <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest mb-0.5">{branchName}</p>}
             <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest mb-1">Room Number</p>
             <p className="font-display font-bold text-4xl text-white">{room.room_number}</p>
           </div>
         </div>
+        {lightboxOpen && (
+          <Lightbox
+            images={[{ src: imageUrl, alt: catName, caption: `${catName} — Room ${room.room_number}` }]}
+            onClose={() => setLightboxOpen(false)}
+          />
+        )}
         <div className="p-6">
           <h3 className="font-display text-2xl text-enayi-text mb-1">{catName}</h3>
           <div className="h-px w-12 mb-4" style={{background:'linear-gradient(90deg,#C9A227,transparent)'}}/>
@@ -143,6 +156,7 @@ function mergeCategories(branches: BranchData[]): CategoryGroup[] {
 export default function RoomsPage() {
   const [selectedHotel, setSelectedHotel] = useState<string | 'all'>('all')
   const [openCat, setOpenCat]   = useState<string | null>(null)
+  const [imgLightbox, setImgLightbox] = useState<{ src: string; caption?: string } | null>(null)
   const [selectedRoom, setSelectedRoom] = useState<{
     room: RoomEntry; catName: string; catSlug: string; branchName?: string; hotelId?: string
   } | null>(null)
@@ -375,12 +389,18 @@ export default function RoomsPage() {
                       exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
                       className="overflow-hidden border-t border-enayi-border">
                       <div className="p-5">
-                        {/* Category image */}
-                        <div className="relative rounded-xl overflow-hidden mb-5 aspect-video max-h-52">
+                        {/* Category image — click to fullscreen */}
+                        <div className="relative rounded-xl overflow-hidden mb-5 aspect-video max-h-52 cursor-zoom-in group"
+                          onClick={() => setImgLightbox({ src: resolveRoomImage(cat.category_slug, cat.category), caption: cat.category })}>
                           <img src={resolveRoomImage(cat.category_slug, cat.category)}
-                               alt={cat.category} className="w-full h-full object-cover"/>
-                          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/80 via-transparent to-transparent"/>
-                          <div className="absolute bottom-3 left-4">
+                               alt={cat.category} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                              <ZoomIn size={16} className="text-white" />
+                            </div>
+                          </div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/80 via-transparent to-transparent pointer-events-none"/>
+                          <div className="absolute bottom-3 left-4 pointer-events-none">
                             <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest">{cat.category}</p>
                             <p className="text-white/70 text-xs">Click a room number to see details</p>
                           </div>
@@ -437,6 +457,14 @@ export default function RoomsPage() {
             onClose={() => setSelectedRoom(null)}/>
         )}
       </AnimatePresence>
+
+      {/* Lightbox for category accordion images */}
+      {imgLightbox && (
+        <Lightbox
+          images={[{ src: imgLightbox.src, caption: imgLightbox.caption }]}
+          onClose={() => setImgLightbox(null)}
+        />
+      )}
     </div>
   )
 }
