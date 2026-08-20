@@ -13,6 +13,7 @@ from decimal import Decimal
 
 from django.http import HttpResponse
 from django.utils import timezone
+from django.db.models import Q, Sum, Count
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
@@ -327,12 +328,8 @@ def _generate_order_receipt(order) -> bytes:
 def _generate_daily_report(report_date, hotel=None) -> bytes:
     from apps.bookings.models import Booking
     from apps.orders.models   import Order
-    from django.db.models     import Sum, Count, Q
     from django.contrib.contenttypes.models import ContentType
     from apps.payments.models import Payment as PaymentModel
-    from apps.bookings.models import Booking as BookingModel
-    from apps.orders.models   import Order    as OrderModel
-    import django.db.models as models
 
     buffer = io.BytesIO()
     doc    = _build_doc(buffer, f"Daily Sales Report — {_fmt_date(report_date)}")
@@ -547,7 +544,7 @@ class BookingReceiptView(APIView):
         try:
             booking = Booking.objects.select_related(
                 "guest", "room", "room__category", "hotel"
-            ).prefetch_related("payments").get(id=booking_id)
+            ).get(id=booking_id)
         except Booking.DoesNotExist:
             from rest_framework.response import Response
             return Response({"error": "Booking not found."}, status=404)
