@@ -186,7 +186,7 @@ export default function AdminBookings() {
   if (isLoading) return <PageSpinner />
 
   const BookingActions = ({ b }: { b: Booking }) => (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="flex flex-col gap-1.5">
       {!b.is_fully_paid && !NON_PAYABLE_STATUSES.includes(b.status) && (
         <Button size="sm" variant="surface" onClick={() => openPaymentModal(b)}>
           <Banknote size={13} /> Record Payment
@@ -207,6 +207,7 @@ export default function AdminBookings() {
           <LogOut size={13} /> {b.is_clear_to_checkout ? 'Check Out' : 'Check Out…'}
         </Button>
       )}
+      <ReceiptButton type="booking" id={b.id} reference={b.booking_reference} size="sm" />
     </div>
   )
 
@@ -274,12 +275,7 @@ export default function AdminBookings() {
                       )}
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={b.status}/></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <BookingActions b={b} />
-                        <ReceiptButton type="booking" id={b.id} reference={b.booking_reference} size="sm" />
-                      </div>
-                    </td>
+                    <td className="px-4 py-3"><BookingActions b={b} /></td>
                   </tr>
                 ))}
               </tbody>

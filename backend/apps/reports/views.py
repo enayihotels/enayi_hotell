@@ -144,12 +144,6 @@ def _generate_booking_receipt(booking) -> bytes:
     story += _header_block(s, branch, "BOOKING RECEIPT")
 
     # Status badge
-    status_color = {"checked_out": GREEN, "confirmed": GOLD, "checked_in": colors.HexColor("#3B82F6")}.get(booking.status, MUTED)
-    story.append(
-        Table([[Paragraph(booking.get_status_display().upper(), ParagraphStyle("badge", fontSize=10, textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_CENTER))]],
-              colWidths=[4*cm])
-    )
-    # Guest details
     story.append(Spacer(1, 5*mm))
     story.append(Paragraph("GUEST INFORMATION", s["section"]))
     story.append(_kv_table([
@@ -158,6 +152,7 @@ def _generate_booking_receipt(booking) -> bytes:
         ("Booking Reference", booking.booking_reference),
         ("Booking Date",      _fmt_date(booking.created_at)),
         ("Source",            booking.get_source_display()),
+        ("Status",            booking.get_status_display()),
     ], s))
 
     # Stay details
@@ -166,7 +161,7 @@ def _generate_booking_receipt(booking) -> bytes:
     story.append(_kv_table([
         ("Branch",            branch),
         ("Room Number",       f"Room {booking.room.room_number}"),
-        ("Room Type",         booking.room.category.name if hasattr(booking.room, 'category') else "—"),
+        ("Room Type",         booking.room.category.name if hasattr(booking.room, 'category') and booking.room.category else "—"),
         ("Check-In Date",     _fmt_date(booking.check_in)),
         ("Check-Out Date",    _fmt_date(booking.check_out)),
         ("Total Nights",      str(booking.total_nights)),
@@ -179,19 +174,21 @@ def _generate_booking_receipt(booking) -> bytes:
     story.append(Paragraph("CHARGES", s["section"]))
     charge_data = [
         [Paragraph("Description", s["th"]), Paragraph("Amount", ParagraphStyle("th_r", fontSize=9, textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT))],
-        [Paragraph(f"Room rate × {booking.total_nights} night(s)", s["td"]), Paragraph(_fmt_money(booking.subtotal), s["td_r"])],
+        [Paragraph(f"Room rate \xd7 {booking.total_nights} night(s)", s["td"]), Paragraph(_fmt_money(booking.subtotal), s["td_r"])],
     ]
-    if booking.breakfast_included:
-        charge_data.append([Paragraph("Breakfast surcharge", s["td"]), Paragraph(_fmt_money(booking.total_amount - booking.subtotal - booking.tax_amount), s["td_r"])])
     if booking.discount_amount:
         charge_data.append([Paragraph("Discount", s["td"]), Paragraph(f"- {_fmt_money(booking.discount_amount)}", s["td_r"])])
     if booking.tax_amount:
         charge_data.append([Paragraph("Tax (7.5%)", s["td"]), Paragraph(_fmt_money(booking.tax_amount), s["td_r"])])
-    charge_data.append([Paragraph("TOTAL", ParagraphStyle("tb", fontSize=10, fontName="Helvetica-Bold")),
-                        Paragraph(_fmt_money(booking.total_amount), ParagraphStyle("tb_r", fontSize=10, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=GOLD))])
+    charge_data.append([
+        Paragraph("TOTAL", ParagraphStyle("tb", fontSize=10, fontName="Helvetica-Bold")),
+        Paragraph(_fmt_money(booking.total_amount), ParagraphStyle("tb_r", fontSize=10, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=GOLD)),
+    ])
     charge_data.append([Paragraph("Amount Paid", s["td"]),  Paragraph(_fmt_money(booking.amount_paid), s["td_r"])])
-    charge_data.append([Paragraph("Balance Due", ParagraphStyle("bal", fontSize=9, fontName="Helvetica-Bold", textColor=RED if booking.balance_due > 0 else GREEN)),
-                        Paragraph(_fmt_money(booking.balance_due), ParagraphStyle("bal_r", fontSize=9, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=RED if booking.balance_due > 0 else GREEN))])
+    charge_data.append([
+        Paragraph("Balance Due", ParagraphStyle("bal", fontSize=9, fontName="Helvetica-Bold", textColor=RED if booking.balance_due > 0 else GREEN)),
+        Paragraph(_fmt_money(booking.balance_due), ParagraphStyle("bal_r", fontSize=9, fontName="Helvetica-Bold", alignment=TA_RIGHT, textColor=RED if booking.balance_due > 0 else GREEN)),
+    ])
 
     ct = Table(charge_data, colWidths=[12*cm, 4*cm])
     ct.setStyle(TableStyle([
@@ -206,9 +203,16 @@ def _generate_booking_receipt(booking) -> bytes:
     ]))
     story.append(ct)
 
-    # Payments
+    # Payments — Payment model uses GenericFK (payable), query via ContentType
     try:
-        payments = booking.payments.filter(status="success").order_by("created_at")
+        from django.contrib.contenttypes.models import ContentType
+        from apps.payments.models import Payment as PaymentModel
+        ct_type = ContentType.objects.get_for_model(booking.__class__)
+        payments = PaymentModel.objects.filter(
+            content_type=ct_type,
+            object_id=booking.id,
+            status="success",
+        ).order_by("created_at")
         if payments.exists():
             story.append(Spacer(1, 4*mm))
             story.append(Paragraph("PAYMENT HISTORY", s["section"]))
@@ -217,7 +221,7 @@ def _generate_booking_receipt(booking) -> bytes:
                 ph_data.append([
                     Paragraph(_fmt_date(p.created_at), s["td"]),
                     Paragraph(p.get_method_display(), s["td"]),
-                    Paragraph(p.reference or "—", s["td"]),
+                    Paragraph(p.transaction_reference or "—", s["td"]),
                     Paragraph(_fmt_money(p.amount), s["td_r"]),
                 ])
             pt = Table(ph_data, colWidths=[3.5*cm, 3*cm, 5*cm, 3.5*cm])
@@ -230,8 +234,10 @@ def _generate_booking_receipt(booking) -> bytes:
                 ("LEFTPADDING", (0,0), (-1,-1), 6),
             ]))
             story.append(pt)
-    except Exception:
-        pass
+    except Exception as e:
+        # Payment history is best-effort — don't crash the receipt if it fails
+        import logging
+        logging.getLogger("apps.reports").warning(f"Could not load payment history for booking {booking.id}: {e}")
 
     story += _footer_block(s, "Thank you for your stay. We hope to welcome you again!")
     doc.build(story)
@@ -321,8 +327,12 @@ def _generate_order_receipt(order) -> bytes:
 def _generate_daily_report(report_date, hotel=None) -> bytes:
     from apps.bookings.models import Booking
     from apps.orders.models   import Order
-    from apps.payments.models import Payment
     from django.db.models     import Sum, Count, Q
+    from django.contrib.contenttypes.models import ContentType
+    from apps.payments.models import Payment as PaymentModel
+    from apps.bookings.models import Booking as BookingModel
+    from apps.orders.models   import Order    as OrderModel
+    import django.db.models as models
 
     buffer = io.BytesIO()
     doc    = _build_doc(buffer, f"Daily Sales Report — {_fmt_date(report_date)}")
@@ -354,11 +364,28 @@ def _generate_daily_report(report_date, hotel=None) -> bytes:
 
     qs_kwargs = {"hotel": hotel} if hotel else {}
 
-    # ── Payments ────────────────────────────────────────────────────────────
-    payments = Payment.objects.filter(
+    # ── Payments — Payment uses GenericFK, filter via bookings/orders at branch ──
+    from django.contrib.contenttypes.models import ContentType
+    from apps.bookings.models import Booking as BookingModel
+    from apps.orders.models   import Order    as OrderModel
+    from apps.payments.models import Payment  as PaymentModel
+
+    booking_ct = ContentType.objects.get_for_model(BookingModel)
+    order_ct   = ContentType.objects.get_for_model(OrderModel)
+
+    # IDs of all bookings and orders at this branch on this date
+    booking_ids = list(Booking.objects.filter(created_at__date=report_date, **qs_kwargs).values_list("id", flat=True))
+    order_ids   = list(Order.objects.filter(created_at__date=report_date, **qs_kwargs).values_list("id", flat=True))
+
+    booking_ct = ContentType.objects.get_for_model(Booking)
+    order_ct   = ContentType.objects.get_for_model(Order)
+
+    payments = PaymentModel.objects.filter(
         status="success",
         created_at__date=report_date,
-        **qs_kwargs
+    ).filter(
+        Q(content_type=booking_ct, object_id__in=booking_ids) |
+        Q(content_type=order_ct,   object_id__in=order_ids)
     ).order_by("created_at")
 
     total_revenue = payments.aggregate(t=Sum("amount"))["t"] or Decimal("0")
@@ -525,8 +552,8 @@ class BookingReceiptView(APIView):
             from rest_framework.response import Response
             return Response({"error": "Booking not found."}, status=404)
 
-        # Guest can only download their own receipt; staff can download any
-        if not (request.user.is_staff or request.user.role in ["admin", "manager", "staff"] or
+        # Guest can only download their own receipt; staff/manager/admin can download any
+        if not (request.user.role in ["admin", "manager", "staff"] or
                 str(booking.guest_id) == str(request.user.id)):
             from rest_framework.response import Response
             return Response({"error": "Not authorised."}, status=403)
