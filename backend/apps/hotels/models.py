@@ -1,7 +1,7 @@
 """Enayi Hotels — Branches / Properties
 
 A `Hotel` is a physical branch of Enayi Hotels & Suites.
-Currently two branches exist: Zaramaganda and Fwawei.
+Currently two branches exist: Zaramaganda and Rayfield (formerly Fwawei).
 Room *classes* (RoomCategory) are shared across branches, but each branch
 prices them independently — see apps.rooms.models.RoomCategoryPrice.
 """
@@ -14,11 +14,11 @@ class Hotel(models.Model):
     FWAWEI      = "fwawei"
     BRANCHES = [
         (ZARAMAGANDA, "Zarmaganda"),
-        (FWAWEI,      "Fwavwei"),
+        (FWAWEI,      "Rayfield"),
     ]
 
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name        = models.CharField(max_length=120)                       # "Enayi Hotels & Suites — Fwawei"
+    name        = models.CharField(max_length=120)                       # "Enayi Hotels & Suites — Rayfield"
     branch      = models.CharField(max_length=20, choices=BRANCHES, unique=True)
     slug        = models.SlugField(unique=True)
     tagline     = models.CharField(max_length=200, blank=True)

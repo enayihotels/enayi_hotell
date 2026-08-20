@@ -54,7 +54,7 @@ export default function BranchShowcase() {
         <div className="badge-gold inline-flex mb-4">✦ Two Branches, One Standard of Luxury</div>
         <h2 className="font-display text-4xl text-enayi-text mb-4">Choose Your Enayi</h2>
         <p className="text-enayi-muted max-w-xl mx-auto mb-4">
-          Our Zarmaganda and Fwavwei branches each offer their own character and rates.
+          Our Zarmaganda and Rayfield branches each offer their own character and rates.
           Tap a branch to explore its spaces.
         </p>
         <div className="gold-line-center" />

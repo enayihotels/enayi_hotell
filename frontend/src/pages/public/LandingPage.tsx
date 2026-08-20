@@ -53,7 +53,7 @@ export default function LandingPage() {
         <div className="glow-orb w-[500px] h-[500px] -top-40 left-1/2 -translate-x-1/2 opacity-20"/>
         <div className="container-site text-center pt-20 pb-24 relative z-10">
           <motion.div initial={{opacity:0,y:24}} animate={{opacity:1,y:0}} transition={{duration:0.6}}>
-            <div className="badge-gold inline-flex mb-6">✦ Two Branches in Jos — Zarmaganda & Fwavwei</div>
+            <div className="badge-gold inline-flex mb-6">✦ Two Branches in Jos — Zarmaganda & Rayfield</div>
           </motion.div>
           <motion.h1 initial={{opacity:0,y:32}} animate={{opacity:1,y:0}} transition={{duration:0.9,delay:0.1}} className="font-display text-5xl md:text-7xl text-enayi-text leading-none mb-6">
             Experience the<br/>
@@ -80,7 +80,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Branches — both Zarmaganda & Fwavwei, with photo lightbox */}
+      {/* Branches — both Zarmaganda & Rayfield, with photo lightbox */}
       <BranchShowcase />
 
       {/* Stats */}
@@ -143,7 +143,7 @@ function BranchShowcase() {
         <div className="badge-gold inline-flex mb-4">✦ Two Branches, One Standard of Luxury</div>
         <h2 className="font-display text-4xl text-enayi-text mb-4">Choose Your Enayi</h2>
         <p className="text-enayi-muted max-w-xl mx-auto mb-4">
-          Our Zarmaganda and Fwavwei branches each offer their own character and rates.
+          Our Zarmaganda and Rayfield branches each offer their own character and rates.
           Tap a branch to explore its spaces.
         </p>
         <div className="gold-line-center" />
