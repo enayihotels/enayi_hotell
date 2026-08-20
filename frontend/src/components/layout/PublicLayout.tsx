@@ -48,7 +48,7 @@ export default function PublicLayout() {
         <nav className="container-site flex items-center justify-between h-28">
 
           {/* ── LOGO ── */}
-          <Link to="/" className="flex items-center gap-4 group">
+          <Link to="/home" className="flex items-center gap-4 group">
             <div className="relative">
               <img
                 src="/logo.png"

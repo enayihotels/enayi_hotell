@@ -14,7 +14,8 @@ import InstallPrompt   from '@/components/InstallPrompt'
 import UpdatePrompt    from '@/components/UpdatePrompt'
 
 // Public Pages
-const LandingPage    =lazy(() => import("@/pages/public/LandingPage"));
+const LandingPage    = lazy(() => import("@/pages/public/LandingPage"));
+const SplashScreen   = lazy(() => import("@/pages/public/SplashScreen"));
 const RoomsPage      = lazy(() => import('@/pages/public/RoomsPage'))
 const RoomDetailPage = lazy(() => import('@/pages/public/RoomDetailPage'))
 const GalleryPage    = lazy(() => import('@/pages/public/GalleryPage'))
@@ -110,9 +111,12 @@ export default function App() {
         <UpdatePrompt />
         <Suspense fallback={<Spinner />}>
           <Routes>
-            {/* Public */}
+            {/* Splash — fullscreen, outside PublicLayout (no nav/footer) */}
+            <Route path="/"    element={<SplashScreen key="splash" />} />
+
+            {/* Public — with nav + footer */}
             <Route element={<PublicLayout />}>
-              <Route path="/"         element={<LandingPage key="landing" />} />
+              <Route path="/home"    element={<LandingPage key="landing" />} />
               <Route path="/rooms"    element={<RoomsPage key="rooms" />} />
               <Route path="/rooms/:slug" element={<RoomDetailPage key="room-detail" />} />
               <Route path="/gallery"  element={<GalleryPage key="gallery" />} />
