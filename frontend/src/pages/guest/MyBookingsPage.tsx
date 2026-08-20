@@ -4,6 +4,7 @@ import { BedDouble, Calendar, Clock, ArrowRight, X, Loader2 } from 'lucide-react
 import { useMyBookings, useCancelBooking } from '@/hooks/useBooking'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { StatusBadge, EmptyState, Modal, PageSpinner } from '@/components/ui'
+import { ReceiptButton } from '@/components/ReceiptButton'
 import type { Booking } from '@/types'
 
 const TABS = ['all','confirmed','checked_in','checked_out','cancelled'] as const
@@ -58,9 +59,10 @@ export default function MyBookingsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <div className="text-right"><div className="text-enayi-gold font-display text-xl">{formatCurrency(b.total_amount)}</div><div className="text-xs text-enayi-muted mt-0.5">{b.is_fully_paid ? '✅ Paid' : `₦${formatCurrency(b.balance_due)} due`}</div></div>
                     <StatusBadge status={b.status} />
+                    <ReceiptButton type="booking" id={b.id} reference={b.booking_reference} size="sm" />
                   </div>
                 </div>
                 {['confirmed','pending'].includes(b.status) && (

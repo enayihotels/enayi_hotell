@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { StatusBadge, PageSpinner, EmptyState, Button, Modal, Textarea, Alert, Input, Select } from '@/components/ui'
+import { ReceiptButton } from '@/components/ReceiptButton'
 import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote, MailCheck, RefreshCw, ScanFace, Camera } from 'lucide-react'
 import type { Booking, CheckoutApprovalRequest } from '@/types'
 
@@ -273,7 +274,12 @@ export default function AdminBookings() {
                       )}
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={b.status}/></td>
-                    <td className="px-4 py-3"><BookingActions b={b} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <BookingActions b={b} />
+                        <ReceiptButton type="booking" id={b.id} reference={b.booking_reference} size="sm" />
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

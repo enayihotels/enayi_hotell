@@ -4,6 +4,7 @@ import { UtensilsCrossed, Clock, ArrowRight } from 'lucide-react'
 import { useMyOrders } from '@/hooks/useOrders'
 import { formatCurrency, formatDateTime } from '@/utils/helpers'
 import { StatusBadge, EmptyState, PageSpinner } from '@/components/ui'
+import { ReceiptButton } from '@/components/ReceiptButton'
 
 const TABS = ['all', 'pending', 'confirmed', 'preparing', 'ready', 'delivered', 'cancelled'] as const
 
@@ -66,6 +67,9 @@ export default function MyOrdersPage() {
                           <div className="text-xs text-enayi-muted">{o.is_paid ? '✅ Paid' : 'Pending'}</div>
                         </div>
                         <StatusBadge status={o.status} />
+                        {['delivered','confirmed'].includes(o.status) && (
+                          <ReceiptButton type="order" id={o.id} reference={o.order_number} size="sm" />
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
