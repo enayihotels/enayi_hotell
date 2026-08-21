@@ -127,40 +127,50 @@ export default function PublicLayout() {
         {/* ── Mobile menu ── */}
         <AnimatePresence>
           {open && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="lg:hidden overflow-hidden bg-enayi-surface border-t border-enayi-gold/20">
-              <div className="container-site py-8 flex flex-col gap-5">
-                {NAV.map(n => (
-                  <NavLink key={n.href} to={n.href} onClick={() => setOpen(false)}
-                    className={({ isActive }) => cn(
-                      'text-sm py-3 border-b border-enayi-border tracking-widest uppercase',
-                      isActive ? 'text-enayi-gold font-medium' : 'text-enayi-muted'
-                    )}>
-                    {n.label}
-                  </NavLink>
-                ))}
-                <div className="flex flex-col gap-3 pt-2">
-                  {isAuthenticated ? (
-                    <>
-                      <Link to="/concierge" onClick={() => setOpen(false)}
-                        className="flex items-center justify-center gap-2 border border-enayi-gold/40 text-enayi-gold rounded-lg py-3 text-sm font-medium tracking-wide">
-                        <Bot size={15} /> ENAYI AI Agent
+            <>
+              {/* Backdrop — tap anywhere outside to close */}
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
+                onClick={() => setOpen(false)}
+              />
+              {/* Drawer — fixed below the sticky header, never covers content */}
+              <motion.div
+                initial={{ y: -20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -20, opacity: 0 }}
+                transition={{ duration: 0.22 }}
+                className="fixed top-[72px] left-0 right-0 z-40 lg:hidden bg-enayi-surface border-t border-enayi-gold/20 border-b border-enayi-gold/20 shadow-2xl max-h-[80vh] overflow-y-auto">
+                <div className="container-site py-6 flex flex-col gap-4">
+                  {NAV.map(n => (
+                    <NavLink key={n.href} to={n.href} onClick={() => setOpen(false)}
+                      className={({ isActive }) => cn(
+                        'text-sm py-3 border-b border-enayi-border tracking-widest uppercase',
+                        isActive ? 'text-enayi-gold font-medium' : 'text-enayi-muted'
+                      )}>
+                      {n.label}
+                    </NavLink>
+                  ))}
+                  <div className="flex flex-col gap-3 pt-2 pb-2">
+                    {isAuthenticated ? (
+                      <>
+                        <Link to="/concierge" onClick={() => setOpen(false)}
+                          className="flex items-center justify-center gap-2 border border-enayi-gold/40 text-enayi-gold rounded-lg py-3 text-sm font-medium tracking-wide">
+                          <Bot size={15} /> ENAYI AI Agent
+                        </Link>
+                        <Link to="/dashboard" onClick={() => setOpen(false)} className="btn-surface">Dashboard</Link>
+                      </>
+                    ) : (
+                      <Link to="/login" onClick={() => setOpen(false)}
+                        className="flex items-center justify-center gap-2 bg-enayi-gold text-enayi-bg font-bold py-3.5 rounded-lg text-base tracking-wide w-full">
+                        Login / Sign In
                       </Link>
-                      <Link to="/dashboard" onClick={() => setOpen(false)} className="btn-surface">Dashboard</Link>
-                    </>
-                  ) : (
-                    <Link to="/login" onClick={() => setOpen(false)}
-                      className="flex items-center justify-center gap-2 bg-enayi-gold text-enayi-bg font-bold py-3.5 rounded-lg text-base tracking-wide w-full">
-                      Login / Sign In
-                    </Link>
-                  )}
-                  <Link to="/book" onClick={() => setOpen(false)} className="btn-gold">Book Now</Link>
+                    )}
+                    <Link to="/book" onClick={() => setOpen(false)} className="btn-gold">Book Now</Link>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
       </header>
