@@ -1,4 +1,4 @@
-import { Outlet, Link, NavLink } from 'react-router-dom'
+import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X, Phone, MapPin, Bot, Star, ChevronRight } from 'lucide-react'
@@ -17,12 +17,21 @@ export default function PublicLayout() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen]         = useState(false)
   const { isAuthenticated }     = useAuthStore()
+  const location                = useLocation()
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40)
     window.addEventListener('scroll', fn, { passive: true })
     return () => window.removeEventListener('scroll', fn)
   }, [])
+
+  // Close menu AND scroll to top on every route change — this is the
+  // fix for mobile: swiping was needed because the scroll position was
+  // being preserved from the previous page after navigation.
+  useEffect(() => {
+    setOpen(false)
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [location.pathname])
 
   return (
     <div className="min-h-screen flex flex-col bg-enayi-bg">
