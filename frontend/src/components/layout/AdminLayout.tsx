@@ -59,7 +59,7 @@ function AdminSidebarContent({ visibleNav, onNavigate, onLogout, fullName, roleL
             <div className="text-enayi-muted text-[11px] truncate">{roleLabel}</div>
           </div>
         </div>
-        <Link to="/home" className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all">
+        <Link to="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all">
           ← Main Website
         </Link>
         <button onClick={onLogout} className="flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 text-xs font-medium transition-all w-full">

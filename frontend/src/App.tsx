@@ -67,6 +67,12 @@ const Spinner = () => (
   </div>
 )
 
+// Everyone sees the splash — logged-in users see "Go to Dashboard" CTA instead of Login.
+// No auto-redirect here anymore.
+function SplashOrRedirect() {
+  return <SplashScreen />
+}
+
 function Guard({ children, adminOnly = false, inventoryOnly = false, conciergeOnly = false }: { children: React.ReactNode; adminOnly?: boolean; inventoryOnly?: boolean; conciergeOnly?: boolean }) {
   const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" replace />
@@ -112,7 +118,7 @@ export default function App() {
         <Suspense fallback={<Spinner />}>
           <Routes>
             {/* Splash — fullscreen, outside PublicLayout (no nav/footer) */}
-            <Route path="/"    element={<SplashScreen key="splash" />} />
+            <Route path="/"    element={<SplashOrRedirect />} />
 
             {/* Public — with nav + footer */}
             <Route element={<PublicLayout />}>

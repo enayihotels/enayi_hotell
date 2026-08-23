@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/utils/api'
 import { useAuthStore } from '@/store/authStore'
-import { Star, ChevronLeft, ChevronRight, ArrowRight, LogIn, UserPlus } from 'lucide-react'
+import { Star, ChevronLeft, ChevronRight, ArrowRight, LogIn, UserPlus, LayoutDashboard } from 'lucide-react'
 
 const FALLBACK_SLIDES = [
   { bg: 'linear-gradient(135deg, #0A0F1E 0%, #1a2744 60%, #0d1929 100%)', label: 'Enayi Hotels — Rayfield', sub: 'Where luxury meets Nigerian warmth' },
@@ -22,15 +22,23 @@ export default function SplashScreen() {
   const [paused, setPaused] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  // Redirect authenticated users to correct dashboard
-  useEffect(() => {
-    if (!isAuthenticated || !user) return
-    const role = user.role
-    if (['store_keeper','bar_staff','kitchen_staff'].includes(role)) navigate('/inventory', { replace: true })
-    else if (role === 'housekeeper') navigate('/housekeeping', { replace: true })
-    else if (['manager','admin'].includes(role)) navigate('/admin', { replace: true })
-    else navigate('/dashboard', { replace: true })
-  }, [isAuthenticated, user, navigate])
+  // Work out the correct dashboard link for a logged-in user
+  const dashboardLink = (() => {
+    if (!isAuthenticated || !user) return null
+    const role = user.role ?? ''
+    if (['store_keeper','bar_staff','kitchen_staff'].includes(role)) return '/inventory'
+    if (role === 'housekeeper') return '/housekeeping'
+    if (['manager','admin'].includes(role)) return '/admin'
+    return '/dashboard'
+  })()
+
+  const ROLE_LABELS: Record<string, string> = {
+    admin: 'Owner', manager: 'Manager', staff: 'Front Desk',
+    store_keeper: 'Store Keeper', bar_staff: 'Bar Staff',
+    kitchen_staff: 'Kitchen Staff', housekeeper: 'Housekeeper', guest: 'Guest',
+  }
+  const roleLabel = ROLE_LABELS[user?.role ?? ''] ?? ''
+  const userName = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email : ''
 
   const { data: galleryImages } = useQuery<any[]>({
     queryKey: ['splash-gallery'],
@@ -159,25 +167,42 @@ export default function SplashScreen() {
             {slide.sub}
           </p>
 
-          {/* CTA buttons */}
+          {/* CTA buttons — changes based on auth state */}
           <div
             className="flex flex-col sm:flex-row gap-3"
             style={{ opacity: fading ? 0 : 1, transition: 'opacity 0.4s ease', transitionDelay: '0.15s' }}>
-            <Link to="/login"
-              className="flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm tracking-wide"
-              style={{ background: '#C9A227', color: '#0A0F1E', boxShadow: '0 8px 32px rgba(201,162,39,0.4)' }}>
-              <LogIn size={16} /> Login / Sign In
-            </Link>
-            <Link to="/register"
-              className="flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm tracking-wide border"
-              style={{ border: '1.5px solid rgba(255,255,255,0.35)', color: 'white', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
-              <UserPlus size={16} /> Create Account
-            </Link>
-            <Link to="/home"
-              className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-sm"
-              style={{ color: 'rgba(255,255,255,0.55)' }}>
-              Explore <ArrowRight size={14} />
-            </Link>
+            {isAuthenticated && dashboardLink ? (
+              <>
+                <Link to={dashboardLink}
+                  className="flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm tracking-wide"
+                  style={{ background: '#C9A227', color: '#0A0F1E', boxShadow: '0 8px 32px rgba(201,162,39,0.4)' }}>
+                  <LayoutDashboard size={16} /> Go to Dashboard
+                </Link>
+                <Link to="/home"
+                  className="flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm tracking-wide border"
+                  style={{ border: '1.5px solid rgba(255,255,255,0.35)', color: 'white', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
+                  Explore the Hotel <ArrowRight size={14} />
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/login"
+                  className="flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm tracking-wide"
+                  style={{ background: '#C9A227', color: '#0A0F1E', boxShadow: '0 8px 32px rgba(201,162,39,0.4)' }}>
+                  <LogIn size={16} /> Login / Sign In
+                </Link>
+                <Link to="/register"
+                  className="flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm tracking-wide border"
+                  style={{ border: '1.5px solid rgba(255,255,255,0.35)', color: 'white', background: 'rgba(255,255,255,0.08)', backdropFilter: 'blur(8px)' }}>
+                  <UserPlus size={16} /> Create Account
+                </Link>
+                <Link to="/home"
+                  className="flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-sm"
+                  style={{ color: 'rgba(255,255,255,0.55)' }}>
+                  Explore <ArrowRight size={14} />
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -189,13 +214,35 @@ export default function SplashScreen() {
           <div className="text-white text-xl font-bold mb-1">Enayi Hotels & Suites</div>
           <div className="text-white/50 text-xs mb-5">Jos, Plateau State · Nigeria</div>
           <div className="flex flex-col gap-2.5">
-            <Link to="/login" className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold" style={{ background: '#C9A227', color: '#0A0F1E' }}>
-              <LogIn size={15} /> Login / Sign In
-            </Link>
-            <Link to="/register" className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold border" style={{ border: '1px solid rgba(255,255,255,0.25)', color: 'white' }}>
-              <UserPlus size={15} /> Create Account
-            </Link>
-            <Link to="/home" className="text-center text-white/45 hover:text-white/75 text-xs py-1" style={{ transition: 'color 0.2s' }}>Browse as Guest →</Link>
+            {isAuthenticated && dashboardLink ? (
+              <>
+                <div className="flex items-center gap-2.5 mb-1 p-2.5 rounded-xl" style={{ background: 'rgba(201,162,39,0.08)', border: '1px solid rgba(201,162,39,0.2)' }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: '#C9A227', color: '#0A0F1E' }}>
+                    {(user?.first_name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-white text-xs font-semibold truncate">{userName}</div>
+                    <div style={{ color: '#C9A227', fontSize: '10px' }}>{roleLabel}</div>
+                  </div>
+                </div>
+                <Link to={dashboardLink} className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold" style={{ background: '#C9A227', color: '#0A0F1E' }}>
+                  <LayoutDashboard size={15} /> Go to Dashboard
+                </Link>
+                <Link to="/home" className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold border" style={{ border: '1px solid rgba(255,255,255,0.25)', color: 'white' }}>
+                  Explore the Hotel
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/login" className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold" style={{ background: '#C9A227', color: '#0A0F1E' }}>
+                  <LogIn size={15} /> Login / Sign In
+                </Link>
+                <Link to="/register" className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold border" style={{ border: '1px solid rgba(255,255,255,0.25)', color: 'white' }}>
+                  <UserPlus size={15} /> Create Account
+                </Link>
+                <Link to="/home" className="text-center text-white/45 hover:text-white/75 text-xs py-1" style={{ transition: 'color 0.2s' }}>Browse as Guest →</Link>
+              </>
+            )}
           </div>
           <div className="mt-5 pt-4 space-y-2" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
             {[['🛏️','37 premium rooms'],['🍽️','110+ menu items'],['🎉','Event halls for 500+'],['🤖','ENAYI AI concierge 24/7']].map(([ic, tx]) => (

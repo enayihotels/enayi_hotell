@@ -57,7 +57,7 @@ function GuestSidebarContent({ collapsed, user, onNavigate, onLogout }: {
             <Package size={14} />{!collapsed && 'Inventory'}
           </Link>
         )}
-        <Link to="/home" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all', collapsed && 'justify-center')}><Home size={14} />{!collapsed && 'Main Site'}</Link>
+        <Link to="/" className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all', collapsed && 'justify-center')}><Home size={14} />{!collapsed && 'Main Site'}</Link>
         <button onClick={onLogout} className={cn('w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 text-xs transition-all', collapsed && 'justify-center')}><LogOut size={14} />{!collapsed && 'Sign Out'}</button>
       </div>
     </div>

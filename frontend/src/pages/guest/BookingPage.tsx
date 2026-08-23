@@ -82,6 +82,25 @@ function cleanCatName(name: string): string {
     .replace(/^[-\s]+|[-\s]+$/g, '')
 }
 
+// Truncated text with expand/collapse toggle
+function ExpandableText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const isLong = text.length > 160
+  return (
+    <div className="mb-4">
+      <p className="text-enayi-muted text-sm leading-relaxed">
+        {isLong && !expanded ? text.slice(0, 160) + '…' : text}
+      </p>
+      {isLong && (
+        <button onClick={() => setExpanded(e => !e)}
+          className="text-enayi-gold text-xs font-medium mt-1 hover:underline">
+          {expanded ? 'Show less ↑' : 'Read more ↓'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function BookingPage() {
   const { slug } = useParams()
   const urlHotel = new URLSearchParams(window.location.search).get('hotel') ?? ''
@@ -286,28 +305,27 @@ export default function BookingPage() {
                 const displayName = cleanCatName(r.name)
                 return (
                   <div key={r.id} className={`card overflow-hidden transition-all ${isExpanded ? 'border-enayi-gold' : ''}`}>
+                    {/* ── Collapsed card header — big image + price ── */}
                     <button type="button"
                       onClick={() => { setSelectedCat(prev => prev === r.id ? '' : r.id); setSelectedRoomId('') }}
-                      className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors text-left">
-                      <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 border border-enayi-gold/20">
-                        <img src={thumb} alt={displayName} className="w-full h-full object-cover"/>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-enayi-text font-semibold text-base">{displayName}</p>
-                        <p className="text-enayi-muted text-xs mt-0.5">{ra ? `${ra.total_count} rooms total` : '—'}</p>
-                      </div>
-                      <div className="text-right hidden md:block">
-                        <div className="text-enayi-gold font-semibold">{formatCurrency(rprice)}</div>
-                        <div className="text-xs text-enayi-muted">per night</div>
-                      </div>
-                      <div className="flex items-center gap-4 shrink-0">
-                        {ra && (
-                          <div className="text-right whitespace-nowrap">
-                            <span className="text-emerald-400 font-bold text-xl">{ra.free_count}</span>
-                            <span className="text-enayi-muted text-sm"> / {ra.total_count} free</span>
-                          </div>
-                        )}
-                        <ChevronDown size={16} className={`text-enayi-muted transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}/>
+                      className="w-full text-left hover:bg-white/5 transition-colors">
+                      {/* Room image — full width, tall on mobile */}
+                      <div className="relative w-full h-40 sm:h-36 overflow-hidden">
+                        <img src={thumb} alt={displayName} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"/>
+                        {/* Price badge on image */}
+                        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-bold" style={{ background: '#C9A227', color: '#0A0F1E' }}>
+                          {formatCurrency(rprice)}<span className="font-normal opacity-80">/night</span>
+                        </div>
+                        {/* Room name on image */}
+                        <div className="absolute bottom-3 left-4">
+                          <p className="text-white font-bold text-base leading-tight">{displayName}</p>
+                          <p className="text-white/70 text-xs mt-0.5">{ra ? `${ra.free_count} / ${ra.total_count} rooms free` : '—'}</p>
+                        </div>
+                        {/* Expand chevron */}
+                        <div className="absolute bottom-3 right-3">
+                          <ChevronDown size={18} className={`text-white/80 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}/>
+                        </div>
                       </div>
                     </button>
 
@@ -320,28 +338,16 @@ export default function BookingPage() {
                           transition={{ duration: 0.25 }}
                           className="overflow-hidden border-t border-enayi-border"
                         >
-                          <div className="p-5">
-                            {/* Hero image (same as rooms page) */}
-                            <div className="relative rounded-xl overflow-hidden mb-5 aspect-video max-h-52">
-                              <img src={thumb} alt={displayName} className="w-full h-full object-cover"/>
-                              <div className="absolute inset-0 bg-gradient-to-t from-enayi-bg/80 via-transparent to-transparent"/>
-                              <div className="absolute bottom-3 left-4">
-                                <p className="text-enayi-gold text-xs font-semibold uppercase tracking-widest">{displayName}</p>
-                                <p className="text-white/70 text-xs">{formatCurrency(rprice)} per night</p>
-                              </div>
+                          <div className="p-4">
+                            {/* Compact details row */}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-enayi-muted mb-4">
+                              {r.bed_type && <span className="flex items-center gap-1"><BedDouble size={12} className="text-enayi-gold"/>{r.bed_type}</span>}
+                              {r.room_size_sqm && <span className="flex items-center gap-1"><Maximize2 size={12} className="text-enayi-gold"/>{r.room_size_sqm}m²</span>}
+                              <span className="flex items-center gap-1"><Users size={12} className="text-enayi-gold"/>{r.max_adults} adults · {r.max_children} children</span>
                             </div>
 
-                            {/* Booking-specific class details */}
-                            {(r.description || r.bed_type || r.room_size_sqm) && (
-                              <div className="mb-5">
-                                {r.description && <p className="text-enayi-muted text-sm mb-3">{r.description}</p>}
-                                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-enayi-muted">
-                                  {r.bed_type && <span className="flex items-center gap-1"><BedDouble size={12} className="text-enayi-gold"/>{r.bed_type}</span>}
-                                  {r.room_size_sqm && <span className="flex items-center gap-1"><Maximize2 size={12} className="text-enayi-gold"/>{r.room_size_sqm}m²</span>}
-                                  <span className="flex items-center gap-1"><Users size={12} className="text-enayi-gold"/>{r.max_adults} adults · {r.max_children} children</span>
-                                </div>
-                              </div>
-                            )}
+                            {/* Description — truncated with expand toggle */}
+                            {r.description && <ExpandableText text={r.description} />}
 
                             {/* Room numbers — same look as rooms page */}
                             <p className="text-enayi-muted text-xs uppercase tracking-widest mb-3 font-semibold">
