@@ -12,23 +12,37 @@ const FALLBACK_SLIDES = [
     bg: 'linear-gradient(135deg, #0A0F1E 0%, #1a2744 40%, #0d1929 100%)',
     label: 'Enayi Hotels — Rayfield',
     sub: 'Where luxury meets Nigerian warmth',
+    isVideo: false,
   },
   {
     bg: 'linear-gradient(135deg, #1a1000 0%, #3d2800 40%, #1a1000 100%)',
     label: 'Enayi Hotels — Zarmaganda',
     sub: 'Premier hospitality in the highlands of Jos',
+    isVideo: false,
   },
   {
     bg: 'linear-gradient(135deg, #0f1a0f 0%, #1a3320 40%, #0f1a0f 100%)',
     label: 'World-Class Dining',
     sub: '110+ dishes from kitchen to your door',
+    isVideo: false,
   },
   {
     bg: 'linear-gradient(135deg, #1a0a1a 0%, #2d1044 40%, #1a0a1a 100%)',
     label: 'Events & Celebrations',
     sub: 'From intimate gatherings to grand events',
+    isVideo: false,
   },
 ]
+
+// The promotional hotel video — always the FIRST slide
+const VIDEO_SLIDE = {
+  isVideo: true,
+  videoMp4: '/videos/enayi-promo.mp4',
+  videoWebm: '/videos/enayi-promo.webm',
+  label: 'Welcome to Enayi Hotels & Suites',
+  sub: 'Experience world-class hospitality in the heart of Jos',
+  bg: 'linear-gradient(135deg, #0A0F1E 0%, #1a2744 100%)',
+}
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
 
@@ -71,27 +85,33 @@ export default function SplashScreen() {
     staleTime: 5 * 60 * 1000,
   })
 
-  // Build slides from real gallery images, or use fallback
-  const slides = galleryImages && galleryImages.length >= 2
-    ? galleryImages.slice(0, 6).map((img: any, i: number) => ({
-        imageUrl: img.image_url || img.image,
-        label: img.caption || img.category_name || FALLBACK_SLIDES[i % FALLBACK_SLIDES.length].label,
-        sub: FALLBACK_SLIDES[i % FALLBACK_SLIDES.length].sub,
-        bg: FALLBACK_SLIDES[i % FALLBACK_SLIDES.length].bg,
-      }))
-    : FALLBACK_SLIDES.map(s => ({ ...s, imageUrl: undefined }))
+  // Build slides: video first, then real gallery images, then fallback gradients
+  const slides = [
+    VIDEO_SLIDE,
+    ...(galleryImages && galleryImages.length >= 2
+      ? galleryImages.slice(0, 5).map((img: any, i: number) => ({
+          isVideo: false,
+          imageUrl: img.image_url || img.image,
+          label: img.caption || img.category_name || FALLBACK_SLIDES[i % FALLBACK_SLIDES.length].label,
+          sub: FALLBACK_SLIDES[i % FALLBACK_SLIDES.length].sub,
+          bg: FALLBACK_SLIDES[i % FALLBACK_SLIDES.length].bg,
+        }))
+      : FALLBACK_SLIDES.map(s => ({ isVideo: false, imageUrl: undefined, ...s }))
+    ),
+  ]
 
   const total = slides.length
 
   const next = useCallback(() => setCurrent(c => (c + 1) % total), [total])
   const prev = useCallback(() => setCurrent(c => (c - 1 + total) % total), [total])
 
-  // Auto-advance every 5 seconds unless paused
+  // Auto-advance every 5 seconds unless paused OR on the video slide
+  // (video advances itself via onEnded)
   useEffect(() => {
-    if (paused) return
+    if (paused || slide.isVideo) return
     const t = setInterval(next, 5000)
     return () => clearInterval(t)
-  }, [next, paused])
+  }, [next, paused, slide.isVideo])
 
   const slide = slides[current]
 
@@ -110,9 +130,20 @@ export default function SplashScreen() {
           exit="exit"
           className="absolute inset-0 w-full h-full"
         >
-          {slide.imageUrl ? (
+          {slide.isVideo ? (
+            // Video slide — muted+autoplay required for browser autoplay policy
+            <video
+              key="hotel-promo-video"
+              className="w-full h-full object-cover"
+              autoPlay muted playsInline preload="auto"
+              onEnded={next}
+            >
+              <source src={(slide as any).videoWebm} type="video/webm" />
+              <source src={(slide as any).videoMp4}  type="video/mp4"  />
+            </video>
+          ) : (slide as any).imageUrl ? (
             <img
-              src={slide.imageUrl}
+              src={(slide as any).imageUrl}
               alt={slide.label}
               className="w-full h-full object-cover"
               draggable={false}
