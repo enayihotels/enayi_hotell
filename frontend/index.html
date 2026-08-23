@@ -4,6 +4,15 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Fix for mobile 100vh including browser chrome bars -->
+    <script>
+      function setVh() {
+        document.documentElement.style.setProperty('--vh', window.innerHeight * 0.01 + 'px');
+      }
+      setVh();
+      window.addEventListener('resize', setVh);
+      window.addEventListener('orientationchange', setVh);
+    </script>
     <meta name="theme-color" content="#0B1120" />
     <meta name="description" content="Enayi Hotels & Suites — Luxury 5-Star Hotel in Jos, Plateau State, Nigeria" />
     <title>Enayi Hotels & Suites · Jos, Nigeria</title>
