@@ -42,6 +42,7 @@ const PaymentPage       = lazy(() => import('@/pages/guest/PaymentPage'))
 const PaymentCallback   = lazy(() => import('@/pages/guest/PaymentCallback'))
 const ProfilePage       = lazy(() => import('@/pages/guest/ProfilePage'))
 const AIConcierge       = lazy(() => import('@/pages/guest/AIConcierge'))
+const LaundryPricesPage = lazy(() => import('@/pages/guest/LaundryPricesPage'))
 
 // Admin Pages
 const AdminDashboard    = lazy(() => import('@/pages/admin/AdminDashboard'))
@@ -60,6 +61,7 @@ const HousekeepingPage  = lazy(() => import('@/pages/admin/HousekeepingPage'))
 const MenuManagerPage   = lazy(() => import('@/pages/admin/MenuManagerPage'))
 const MyAssetsPage      = lazy(() => import('@/pages/admin/MyAssetsPage'))
 const DailyReportPage   = lazy(() => import('@/pages/admin/DailyReportPage'))
+const LaundryPage       = lazy(() => import('@/pages/admin/LaundryPage'))
 
 const Spinner = () => (
   <div className="flex items-center justify-center h-screen bg-enayi-bg">
@@ -151,6 +153,7 @@ export default function App() {
               <Route path="/payment/:id"     element={<PaymentPage key="payment-id" />} />
               <Route path="/payment/callback" element={<PaymentCallback key="payment-callback" />} />
               <Route path="/profile"         element={<ProfilePage key="profile" />} />
+              <Route path="/laundry"         element={<LaundryPricesPage key="laundry-prices" />} />
             </Route>
 
             {/* ENAYI AI Agent — standalone, accessible to ALL authenticated
@@ -187,6 +190,7 @@ export default function App() {
               <Route path="/inventory/orders" element={<AdminOrders key="inventory-orders" />} />
               <Route path="/inventory/menu" element={<MenuManagerPage key="inventory-menu" />} />
               <Route path="/inventory/assets" element={<MyAssetsPage key="inventory-assets" />} />
+              <Route path="/inventory/laundry" element={<LaundryPage key="inventory-laundry" />} />
               <Route path="/housekeeping" element={<HousekeepingPage key="housekeeping" />} />
             </Route>
 

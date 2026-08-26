@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard, ShieldCheck, Package, ClipboardList } from 'lucide-react'
+import { LayoutDashboard, BedDouble, Utensils, CalendarDays, Bot, User, LogOut, Menu, Home, CreditCard, ShieldCheck, Package, ClipboardList, Shirt } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/utils/api'
 import toast from 'react-hot-toast'
@@ -16,6 +16,7 @@ const NAV = [
   { href:'/payment/callback', icon:CreditCard,  label:'Payments' },
   { href:'/concierge',    icon:Bot,             label:'ENAYI Concierge' },
   { href:'/profile',      icon:User,            label:'My Profile' },
+  { href:'/laundry',      icon:Shirt,           label:'Laundry' },
 ]
 
 type UserLite = { first_name?: string; full_name?: string; role?: string } | null
