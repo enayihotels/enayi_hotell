@@ -32,6 +32,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     BAR_STAFF     = "bar_staff"
     KITCHEN_STAFF = "kitchen_staff"
     HOUSEKEEPER   = "housekeeper"
+    LAUNDRY_STAFF = "laundry_staff"
     MANAGER       = "manager"
     ADMIN         = "admin"
 
@@ -42,6 +43,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         (BAR_STAFF,     "Bar Staff"),
         (KITCHEN_STAFF, "Kitchen Staff"),
         (HOUSEKEEPER,   "Housekeeper"),
+        (LAUNDRY_STAFF, "Laundry Staff"),
         (MANAGER,       "Manager"),
         (ADMIN,         "Admin"),
     ]
@@ -130,7 +132,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         request Housekeeping-tagged items (linens, toiletries,
         cleaning supplies) the same way Bar/Kitchen Staff already
         request their own."""
-        return self.role in [self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER]
+        return self.role in [self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER, self.LAUNDRY_STAFF]
 
     @property
     def inventory_department(self):
@@ -141,6 +143,7 @@ class User(AbstractBaseUser, PermissionsMixin):
             self.BAR_STAFF:     "bar",
             self.KITCHEN_STAFF: "kitchen",
             self.HOUSEKEEPER:   "housekeeping",
+            self.LAUNDRY_STAFF: "laundry",
         }.get(self.role)
 
     @property
@@ -149,7 +152,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         tied to one) needs a `hotel` set to actually see or manage
         anything branch-scoped — Manager, Front Desk Staff, Store
         Keeper, Bar Staff, Kitchen Staff, Housekeeper."""
-        return self.role in [self.STAFF, self.MANAGER, self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER]
+        return self.role in [self.STAFF, self.MANAGER, self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER, self.LAUNDRY_STAFF]
 
     @property
     def is_branch_scoped(self):

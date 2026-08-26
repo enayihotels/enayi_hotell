@@ -24,6 +24,7 @@ ROLE_DEPARTMENTS = {
     "bar_staff":     [PropertyAsset.BAR],
     "kitchen_staff": [PropertyAsset.KITCHEN],
     "housekeeper":   [PropertyAsset.HOUSEKEEPING],
+    "laundry_staff": [PropertyAsset.LAUNDRY],
 }
 
 

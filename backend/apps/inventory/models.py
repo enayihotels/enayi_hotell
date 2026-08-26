@@ -23,11 +23,13 @@ class InventoryCategory(models.Model):
     BAR         = "bar"
     KITCHEN     = "kitchen"
     HOUSEKEEPING = "housekeeping"
+    LAUNDRY     = "laundry"
     SHARED      = "shared"
     DEPARTMENT_CHOICES = [
         (BAR,          "Bar only"),
         (KITCHEN,      "Kitchen only"),
         (HOUSEKEEPING, "Housekeeping only"),
+        (LAUNDRY,      "Laundry only"),
         (SHARED,       "Shared / Store only"),
     ]
 
@@ -124,11 +126,13 @@ class StockBalance(models.Model):
     BAR          = "bar"
     KITCHEN      = "kitchen"
     HOUSEKEEPING = "housekeeping"
+    LAUNDRY      = "laundry"
     LOCATION_CHOICES = [
         (STORE,        "Store"),
         (BAR,          "Bar"),
         (KITCHEN,      "Kitchen"),
         (HOUSEKEEPING, "Housekeeping"),
+        (LAUNDRY,      "Laundry"),
     ]
 
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -211,6 +215,7 @@ class StockRequisition(models.Model):
         (StockBalance.BAR,          "Bar"),
         (StockBalance.KITCHEN,      "Kitchen"),
         (StockBalance.HOUSEKEEPING, "Housekeeping"),
+        (StockBalance.LAUNDRY,      "Laundry"),
     ]
 
     id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

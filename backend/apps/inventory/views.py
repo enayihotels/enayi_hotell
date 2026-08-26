@@ -37,6 +37,7 @@ def _can_adjust_location(user, location):
         "bar_staff":     StockBalance.BAR,
         "kitchen_staff": StockBalance.KITCHEN,
         "housekeeper":   StockBalance.HOUSEKEEPING,
+        "laundry_staff": StockBalance.LAUNDRY,
     }.get(user.role) == location
 
 def _effective_hotel(user, requested_hotel_id=None):
@@ -84,6 +85,7 @@ ROLE_DEPARTMENT = {
     "bar_staff":     InventoryCategory.BAR,
     "kitchen_staff": InventoryCategory.KITCHEN,
     "housekeeper":   InventoryCategory.HOUSEKEEPING,
+    "laundry_staff": InventoryCategory.LAUNDRY,
 }
 
 
@@ -505,6 +507,8 @@ class StockRequisitionListCreateView(generics.ListCreateAPIView):
             return qs.filter(destination=StockBalance.KITCHEN)
         if user.role == "housekeeper":
             return qs.filter(destination=StockBalance.HOUSEKEEPING)
+        if user.role == "laundry_staff":
+            return qs.filter(destination=StockBalance.LAUNDRY)
         return StockRequisition.objects.none()
 
     def create(self, request, *args, **kwargs):
@@ -513,9 +517,10 @@ class StockRequisitionListCreateView(generics.ListCreateAPIView):
             "bar_staff":     StockBalance.BAR,
             "kitchen_staff": StockBalance.KITCHEN,
             "housekeeper":   StockBalance.HOUSEKEEPING,
+            "laundry_staff": StockBalance.LAUNDRY,
         }.get(user.role)
         if not destination:
-            return Response({"error": "Only Bar Staff, Kitchen Staff, or Housekeeper can request items from the Store."}, status=403)
+            return Response({"error": "Only Bar Staff, Kitchen Staff, Housekeeper, or Laundry Staff can request items from the Store."}, status=403)
         if not user.hotel_id:
             return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can request stock."}, status=403)
 

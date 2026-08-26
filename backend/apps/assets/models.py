@@ -46,12 +46,14 @@ class PropertyAsset(models.Model):
     KITCHEN      = "kitchen"
     BAR          = "bar"
     HOUSEKEEPING = "housekeeping"
+    LAUNDRY      = "laundry"
     SHARED       = "shared"
     DEPARTMENT_CHOICES = [
         (FRONTDESK,    "Front Desk"),
         (KITCHEN,      "Kitchen"),
         (BAR,          "Bar"),
         (HOUSEKEEPING, "Housekeeping (incl. all guest rooms)"),
+        (LAUNDRY,      "Laundry"),
         (SHARED,       "Shared / Common Area — visible centrally only"),
     ]
 
