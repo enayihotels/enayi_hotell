@@ -73,6 +73,7 @@ _PAYABLE_MODELS = {
     "booking": ("bookings", "Booking"),
     "order":   ("orders",   "Order"),
     "event":   ("events",   "EventBooking"),
+    "laundry": ("laundry",  "LaundryTicket"),
 }
 
 
@@ -121,6 +122,13 @@ def fulfill_payment(payment: Payment) -> None:
             order = payment.payable
             order.is_paid = True
             order.save(update_fields=["is_paid"])
+
+        elif payment.purpose == "laundry" and payment.payable:
+            from django.utils import timezone as _tz
+            ticket = payment.payable
+            ticket.is_paid = True
+            ticket.paid_at = _tz.now()
+            ticket.save(update_fields=["is_paid", "paid_at"])
 
         elif payment.purpose == "event" and payment.payable:
             event = payment.payable

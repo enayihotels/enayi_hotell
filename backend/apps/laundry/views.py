@@ -12,6 +12,8 @@ from .serializers import (
 )
 from .email_utils import send_laundry_ready_email
 
+from apps.accounts.models import User
+
 
 def _can_manage_laundry(user):
     """Laundry Staff, Manager, Owner — same tier every other
@@ -162,6 +164,26 @@ class LaundryTicketListCreateView(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         items_data = serializer.validated_data.pop("items")
 
+        # If Laundry Staff picked a real guest account, snapshot
+        # name/email/phone FROM that account — never trust typed text
+        # once a real account is linked, so what's shown always matches
+        # who can actually pay for it. A mismatched or missing account
+        # id is a hard error, not a silent fall-through to guest_name.
+        guest_account_id = serializer.validated_data.pop("guest_account", None)
+        guest_account = None
+        if guest_account_id:
+            try:
+                guest_account = User.objects.get(id=guest_account_id, role=User.GUEST)
+            except User.DoesNotExist:
+                return Response({"error": "That guest account wasn't found."}, status=400)
+            guest_name = guest_account.get_full_name() or guest_account.email
+            guest_email = guest_account.email
+            guest_phone = str(guest_account.phone) if guest_account.phone else ""
+        else:
+            guest_name = serializer.validated_data.get("guest_name", "")
+            guest_email = serializer.validated_data.get("guest_email", "")
+            guest_phone = serializer.validated_data.get("guest_phone", "")
+
         # Resolve every price_item against THIS branch's own catalog —
         # never trust a client-supplied name/price, and never let one
         # branch's ticket reference another branch's price item.
@@ -176,9 +198,10 @@ class LaundryTicketListCreateView(generics.ListCreateAPIView):
             ticket = LaundryTicket.objects.create(
                 hotel_id=hotel_id,
                 room=serializer.validated_data.get("room"),
-                guest_name=serializer.validated_data["guest_name"],
-                guest_email=serializer.validated_data.get("guest_email", ""),
-                guest_phone=serializer.validated_data.get("guest_phone", ""),
+                guest_account=guest_account,
+                guest_name=guest_name,
+                guest_email=guest_email,
+                guest_phone=guest_phone,
                 notes=serializer.validated_data.get("notes", ""),
                 logged_by=user,
             )
@@ -195,6 +218,24 @@ class LaundryTicketListCreateView(generics.ListCreateAPIView):
             ticket.save(update_fields=["total_price"])
 
         return Response(LaundryTicketSerializer(ticket).data, status=201)
+
+
+class MyLaundryTicketsView(generics.ListAPIView):
+    """GET /api/v1/laundry/my-tickets/
+    A guest's own tickets — only ones a real account was matched to at
+    creation time show up here (tickets logged with typed-only info and
+    no matched account simply can't be seen or paid for in-app; staff
+    would need to collect payment another way for those)."""
+    serializer_class = LaundryTicketSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        return (LaundryTicket.objects
+                .filter(guest_account=self.request.user)
+                .select_related("room")
+                .prefetch_related("line_items")
+                .order_by("-created_at"))
 
 
 class MarkLaundryReadyView(APIView):

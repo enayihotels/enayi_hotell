@@ -56,6 +56,12 @@ class LaundryTicket(models.Model):
         "rooms.Room", on_delete=models.SET_NULL, null=True, blank=True, related_name="laundry_tickets",
         help_text="Which room the guest is staying in, if known.",
     )
+    guest_account = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="laundry_tickets",
+        help_text="The guest's real account, if Laundry Staff found one — required for the guest to see and pay "
+                   "for this ticket in-app. name/email/phone below are a snapshot taken from this account at "
+                   "creation time (or typed manually if no account was matched).",
+    )
     guest_name  = models.CharField(max_length=150, help_text="Who to address in the ready notification.")
     guest_email = models.EmailField(blank=True, help_text="If left blank, no notification email can be sent — staff must tell the guest directly.")
     guest_phone = models.CharField(max_length=30, blank=True, help_text="Informational only — no SMS is sent from this field.")
@@ -64,6 +70,9 @@ class LaundryTicket(models.Model):
     total_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Sum of all line items — computed when the ticket is created.")
 
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING, db_index=True)
+
+    is_paid = models.BooleanField(default=False, help_text="Set True by the payments app once an in-app payment for this ticket succeeds.")
+    paid_at = models.DateTimeField(null=True, blank=True)
 
     logged_by       = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, related_name="laundry_tickets_logged")
     ready_marked_by = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="laundry_tickets_marked_ready")

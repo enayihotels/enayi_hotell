@@ -28,37 +28,52 @@ class LaundryTicketItemSerializer(serializers.ModelSerializer):
 
 class LaundryTicketSerializer(serializers.ModelSerializer):
     """Read serializer — what the ticket list/detail actually shows."""
-    room_number    = serializers.CharField(source="room.room_number", read_only=True, default=None)
-    logged_by_name = serializers.CharField(source="logged_by.get_full_name", read_only=True, default=None)
-    status_display = serializers.CharField(source="get_status_display", read_only=True)
-    line_items     = LaundryTicketItemSerializer(many=True, read_only=True)
+    room_number       = serializers.CharField(source="room.room_number", read_only=True, default=None)
+    logged_by_name    = serializers.CharField(source="logged_by.get_full_name", read_only=True, default=None)
+    status_display    = serializers.CharField(source="get_status_display", read_only=True)
+    line_items        = LaundryTicketItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = LaundryTicket
         fields = [
-            "id", "room", "room_number", "guest_name", "guest_email", "guest_phone",
+            "id", "room", "room_number", "guest_account", "guest_name", "guest_email", "guest_phone",
             "notes", "total_price", "status", "status_display", "line_items",
-            "logged_by_name", "notified", "created_at", "ready_at",
+            "is_paid", "paid_at", "logged_by_name", "notified", "created_at", "ready_at",
         ]
-        read_only_fields = ["id", "total_price", "status", "notified", "created_at", "ready_at"]
+        read_only_fields = ["id", "guest_account", "total_price", "status", "is_paid", "paid_at", "notified", "created_at", "ready_at"]
 
 
 class LaundryTicketWriteSerializer(serializers.ModelSerializer):
     """Create serializer. Body shape:
         {
           "room": "<uuid or null>",
+          "guest_account": "<uuid, optional>",
           "guest_name": "...", "guest_email": "...", "guest_phone": "...",
           "notes": "...",
           "items": [{"price_item": "<uuid>", "quantity": 3}, ...]
         }
+    `guest_account` should be a real guest User id, found via the guest
+    search — the view snapshots name/email/phone FROM that account,
+    overriding anything typed here, so payment (which requires a real
+    account) always matches what's shown. If `guest_account` isn't
+    given (no match found, e.g. a non-account walk-in), guest_name is
+    required instead and the ticket just can't be paid for in-app.
+
     `items` must reference this branch's own LaundryPriceItem rows —
     total_price and each line's name/unit_price snapshot are computed
     server-side from the catalog, never trusted from the client."""
     items = serializers.ListField(child=serializers.DictField(), write_only=True, allow_empty=False)
+    guest_account = serializers.UUIDField(required=False, allow_null=True)
+    guest_name = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
         model = LaundryTicket
-        fields = ["room", "guest_name", "guest_email", "guest_phone", "notes", "items"]
+        fields = ["room", "guest_account", "guest_name", "guest_email", "guest_phone", "notes", "items"]
+
+    def validate(self, data):
+        if not data.get("guest_account") and not (data.get("guest_name") or "").strip():
+            raise serializers.ValidationError("Either pick a guest account or type a guest name.")
+        return data
 
     def validate_items(self, value):
         for line in value:

@@ -43,6 +43,7 @@ class Payment(models.Model):
         ("order",   "Food/Drink Order"),
         ("event",   "Event Hall"),
         ("gym",     "Gym Session"),
+        ("laundry", "Laundry Service"),
     ]
 
     id                    = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

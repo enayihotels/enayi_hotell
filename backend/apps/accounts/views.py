@@ -153,7 +153,12 @@ class GuestListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class   = UserSerializer
     def get_queryset(self):
-        if self.request.user.is_hotel_staff:
+        # Laundry Staff needs to look guests up by name/email when
+        # logging a ticket, so a real account (not just typed text)
+        # backs the payment later — narrow addition here only;
+        # is_hotel_staff itself stays untouched since broadening THAT
+        # would silently affect every other is_hotel_staff-gated view.
+        if self.request.user.is_hotel_staff or self.request.user.role == "laundry_staff":
             return User.objects.filter(role=User.GUEST).order_by("-date_joined")
         return User.objects.none()
 
