@@ -59,6 +59,7 @@ class InitiatePaymentSerializer(serializers.Serializer):
         ("order",   "Order"),
         ("event",   "Event"),
         ("gym",     "Gym"),
+        ("laundry", "Laundry"),
     ]
     # ── CHANGE: Monnify added to METHOD_CHOICES ──────────────────────────────
     METHOD_CHOICES = [
