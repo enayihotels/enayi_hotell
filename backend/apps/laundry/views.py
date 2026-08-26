@@ -1,0 +1,235 @@
+"""Enayi Hotels — Laundry Service Views"""
+from django.db import transaction
+from django.utils import timezone
+from rest_framework import generics
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+
+from .models import LaundryPriceItem, LaundryTicket, LaundryTicketItem
+from .serializers import (
+    LaundryPriceItemSerializer, LaundryTicketSerializer, LaundryTicketWriteSerializer,
+)
+from .email_utils import send_laundry_ready_email
+
+
+def _can_manage_laundry(user):
+    """Laundry Staff, Manager, Owner — same tier every other
+    department's own-work views use. Guests are NOT in this set —
+    they only ever get read access to the price list, never tickets."""
+    return user.role in ["laundry_staff", "manager", "admin"]
+
+
+def _can_manage_prices(user):
+    """Only Manager/Owner can add or edit price catalog entries — same
+    tier as who manages the room catalog or adds Property Assets.
+    Laundry Staff reads prices when logging a ticket but doesn't edit
+    the catalog."""
+    return user.role in ["manager", "admin"]
+
+
+def _effective_hotel(user, requested_hotel_id=None):
+    """Same branch-scoping rule as everywhere else in this codebase —
+    Owner sees every branch (optionally narrowed via ?hotel=), everyone
+    else is locked to their own account's branch regardless of what's
+    requested."""
+    if user.role == "admin":
+        return requested_hotel_id or None
+    if user.requires_branch:
+        return str(user.hotel_id) if user.hotel_id else False
+    return None
+
+
+class LaundryPriceItemListView(generics.ListCreateAPIView):
+    """GET — anyone logged in (guest included) can see the active
+    price list for their branch, or ?hotel= if they're Admin. POST —
+    Manager/Owner only.
+
+    Guests browsing this need SOME branch context to know whose prices
+    they're looking at — same as the guest room-availability screen,
+    this expects ?hotel=<branch> for guest accounts (who aren't
+    themselves branch-scoped the way staff are); staff/Manager just
+    see their own branch automatically.
+    """
+    serializer_class = LaundryPriceItemSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_queryset(self):
+        user = self.request.user
+        requested = self.request.query_params.get("hotel")
+
+        if user.role == "admin":
+            effective = requested or None
+        elif user.requires_branch:
+            effective = str(user.hotel_id) if user.hotel_id else False
+        else:
+            # Guest — not branch-scoped by account, so a branch must be
+            # requested explicitly to know whose price list to show.
+            effective = requested or False
+
+        if effective is False:
+            return LaundryPriceItem.objects.none()
+
+        qs = LaundryPriceItem.objects.filter(is_active=True)
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        if not _can_manage_prices(user):
+            return Response({"error": "Only a Manager or the Owner can add a laundry price."}, status=403)
+
+        if user.role == "admin":
+            hotel_id = request.data.get("hotel")
+            if not hotel_id:
+                return Response({"error": "hotel is required."}, status=400)
+        else:
+            if not user.hotel_id:
+                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can add laundry prices."}, status=403)
+            hotel_id = user.hotel_id
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        item = serializer.save(hotel_id=hotel_id)
+        return Response(LaundryPriceItemSerializer(item).data, status=201)
+
+
+class LaundryPriceItemDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """PATCH/DELETE — Manager/Owner only, own branch (Admin: any)."""
+    serializer_class = LaundryPriceItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = LaundryPriceItem.objects.all()
+        if user.role != "admin" and user.hotel_id:
+            qs = qs.filter(hotel_id=user.hotel_id)
+        return qs
+
+    def update(self, request, *args, **kwargs):
+        if not _can_manage_prices(request.user):
+            return Response({"error": "Only a Manager or the Owner can edit laundry prices."}, status=403)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not _can_manage_prices(request.user):
+            return Response({"error": "Only a Manager or the Owner can remove a laundry price."}, status=403)
+        return super().destroy(request, *args, **kwargs)
+
+
+class LaundryTicketListCreateView(generics.ListCreateAPIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_serializer_class(self):
+        return LaundryTicketWriteSerializer if self.request.method == "POST" else LaundryTicketSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if not _can_manage_laundry(user):
+            return LaundryTicket.objects.none()
+
+        effective = _effective_hotel(user, self.request.query_params.get("hotel"))
+        if effective is False:
+            return LaundryTicket.objects.none()
+
+        qs = LaundryTicket.objects.select_related("room", "logged_by").prefetch_related("line_items")
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        user = request.user
+        if not _can_manage_laundry(user):
+            return Response({"error": "Only Laundry Staff, a Manager, or the Owner can log a laundry ticket."}, status=403)
+
+        if user.role == "admin":
+            hotel_id = request.data.get("hotel")
+            if not hotel_id:
+                return Response({"error": "hotel is required."}, status=400)
+        else:
+            if not user.hotel_id:
+                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can log a laundry ticket."}, status=403)
+            hotel_id = user.hotel_id
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        items_data = serializer.validated_data.pop("items")
+
+        # Resolve every price_item against THIS branch's own catalog —
+        # never trust a client-supplied name/price, and never let one
+        # branch's ticket reference another branch's price item.
+        price_items = {
+            str(p.id): p for p in LaundryPriceItem.objects.filter(hotel_id=hotel_id, id__in=[i["price_item"] for i in items_data])
+        }
+        missing = [i["price_item"] for i in items_data if str(i["price_item"]) not in price_items]
+        if missing:
+            return Response({"error": f"These items aren't in this branch's price list: {missing}"}, status=400)
+
+        with transaction.atomic():
+            ticket = LaundryTicket.objects.create(
+                hotel_id=hotel_id,
+                room=serializer.validated_data.get("room"),
+                guest_name=serializer.validated_data["guest_name"],
+                guest_email=serializer.validated_data.get("guest_email", ""),
+                guest_phone=serializer.validated_data.get("guest_phone", ""),
+                notes=serializer.validated_data.get("notes", ""),
+                logged_by=user,
+            )
+            total = 0
+            for line in items_data:
+                price_item = price_items[str(line["price_item"])]
+                qty = int(line["quantity"])
+                LaundryTicketItem.objects.create(
+                    ticket=ticket, price_item=price_item,
+                    item_name=price_item.name, unit_price=price_item.price, quantity=qty,
+                )
+                total += price_item.price * qty
+            ticket.total_price = total
+            ticket.save(update_fields=["total_price"])
+
+        return Response(LaundryTicketSerializer(ticket).data, status=201)
+
+
+class MarkLaundryReadyView(APIView):
+    """POST /api/v1/laundry/tickets/<id>/mark-ready/
+    Sets the ticket to Ready and emails the guest if an address is on
+    file. No wash/iron stage tracking in between — a load is either
+    still in progress or it's ready, and this is the moment it becomes
+    ready.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        user = request.user
+        if not _can_manage_laundry(user):
+            return Response({"error": "Only Laundry Staff, a Manager, or the Owner can mark a ticket ready."}, status=403)
+
+        try:
+            ticket = LaundryTicket.objects.select_related("room", "hotel").get(id=pk)
+        except LaundryTicket.DoesNotExist:
+            return Response({"error": "Ticket not found."}, status=404)
+
+        if user.role != "admin" and user.hotel_id and str(ticket.hotel_id) != str(user.hotel_id):
+            return Response({"error": "That ticket belongs to a different branch than your account."}, status=403)
+
+        if ticket.status == LaundryTicket.READY:
+            return Response({"error": "This ticket is already marked ready."}, status=400)
+
+        ticket.status = LaundryTicket.READY
+        ticket.ready_at = timezone.now()
+        ticket.ready_marked_by = user
+        sent = send_laundry_ready_email(ticket)
+        ticket.notified = sent
+        ticket.save(update_fields=["status", "ready_at", "ready_marked_by", "notified"])
+
+        return Response({
+            **LaundryTicketSerializer(ticket).data,
+            "email_sent": sent,
+        })

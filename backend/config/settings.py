@@ -83,6 +83,7 @@ LOCAL_APPS = [
     "apps.dashboard",
     "apps.inventory",
     "apps.assets",
+    "apps.laundry",
     "apps.reports",
 ]
 
