@@ -152,7 +152,10 @@ class RoomListView(generics.ListCreateAPIView):
         Room.release_stale_cleaning_rooms()
         user = self.request.user
         if user.is_hotel_staff or user.role == "housekeeper":
-            return Room.objects.select_related("category").all()
+            qs = Room.objects.select_related("category").all()
+            if user.role != "admin" and getattr(user, "hotel_id", None):
+                qs = qs.filter(hotel_id=user.hotel_id)
+            return qs
         return Room.objects.filter(status="available").select_related("category")
 
     def create(self, request, *args, **kwargs):
@@ -161,10 +164,18 @@ class RoomListView(generics.ListCreateAPIView):
         return super().create(request, *args, **kwargs)
 
 class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
-    """Staff-only retrieve/update/delete for an individual room."""
+    """Staff-only retrieve/update/delete for an individual room.
+    Non-admin staff only ever see rooms in their own branch — a room
+    belonging to a different branch 404s instead of being returned."""
     serializer_class = RoomSerializer
     permission_classes = [IsAuthenticated]
-    queryset = Room.objects.select_related("category")
+
+    def get_queryset(self):
+        qs = Room.objects.select_related("category")
+        user = self.request.user
+        if user.role != "admin" and getattr(user, "hotel_id", None):
+            qs = qs.filter(hotel_id=user.hotel_id)
+        return qs
 
     def update(self, request, *args, **kwargs):
         if request.user.role not in ["manager","admin"]:
