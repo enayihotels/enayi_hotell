@@ -10,26 +10,31 @@ from .serializers import (
     PropertyAssetSerializer, PropertyAssetWriteSerializer, AssetIssueReportSerializer,
 )
 
-# Which department a role's dedicated Assets view is scoped to. Bar/
-# Kitchen/Housekeeping each see ONLY assets tagged for their
-# department — mirrors apps.inventory.views.ROLE_DEPARTMENT exactly in
-# spirit (not shared code, since PropertyAsset.DEPARTMENT_CHOICES is
-# its own field on a different model). Front Desk/Manager/Admin are
-# NOT in this dict on purpose — they get the full, unrestricted
-# "central place" view across every department, which is what makes
-# it central.
-ROLE_DEPARTMENT = {
-    "bar_staff":     PropertyAsset.BAR,
-    "kitchen_staff": PropertyAsset.KITCHEN,
-    "housekeeper":   PropertyAsset.HOUSEKEEPING,
+# Which department(s) a role's dedicated Assets view is scoped to.
+# Bar/Kitchen see ONLY their own department. Housekeeper sees ONLY
+# room-tied (Housekeeping) assets. Front Desk sees its own tag PLUS
+# room-tied assets (Adrian confirmed Front Desk should see room items,
+# same as Housekeeper) PLUS Shared/common-area assets, since Front
+# Desk physically works those spaces (Adrian confirmed this too).
+# Manager/Admin are NOT in this dict on purpose — they get the full,
+# unrestricted "central place" view across every department, which is
+# what makes it central.
+ROLE_DEPARTMENTS = {
+    "staff":         [PropertyAsset.FRONTDESK, PropertyAsset.HOUSEKEEPING, PropertyAsset.SHARED],
+    "bar_staff":     [PropertyAsset.BAR],
+    "kitchen_staff": [PropertyAsset.KITCHEN],
+    "housekeeper":   [PropertyAsset.HOUSEKEEPING],
 }
 
 
 def _can_view_assets(user):
-    """Front Desk Staff, Manager, Owner (unrestricted central view) —
-    plus Bar/Kitchen/Housekeeping now too, scoped to their own
-    department only via ROLE_DEPARTMENT below."""
-    return user.is_hotel_staff or user.role in ["manager", "admin"] or user.role in ROLE_DEPARTMENT
+    """Manager, Owner (unrestricted central view) — plus Front
+    Desk/Bar/Kitchen/Housekeeping, each scoped to their own
+    department(s) via ROLE_DEPARTMENTS below. Front Desk used to be
+    lumped in with Manager/Owner as "unrestricted" via is_hotel_staff
+    — that was the bug that let Front Desk see Bar/Kitchen assets. It
+    is now scoped the same way as the other department roles."""
+    return user.role in ["manager", "admin"] or user.role in ROLE_DEPARTMENTS
 
 
 def _can_report_issue(user):
@@ -51,13 +56,14 @@ def _can_clear_or_reject(user):
 
 
 def _can_mark_fixed(user):
-    """Front Desk/Manager/Owner (matches the original _can_manage
-    tier), OR the specific department role that owns the asset being
-    closed out — a Kitchen Staff member should be able to confirm
-    "yes, the fridge repair guy came and fixed it" without needing
-    Front Desk to do it for her. Checked per-asset in the view itself,
-    not here, since it depends on which asset's issue is being closed."""
-    return user.is_hotel_staff or user.role in ["manager", "admin"] or user.role in ROLE_DEPARTMENT
+    """Manager/Owner, OR the specific department role that owns the
+    asset being closed out — a Kitchen Staff member should be able to
+    confirm "yes, the fridge repair guy came and fixed it" without
+    needing a Manager to do it for her. Front Desk is included via
+    ROLE_DEPARTMENTS now, same as Bar/Kitchen/Housekeeping. Checked
+    per-asset in the view itself, not here, since it depends on which
+    asset's issue is being closed."""
+    return user.role in ["manager", "admin"] or user.role in ROLE_DEPARTMENTS
 
 
 def _effective_hotel(user, requested_hotel_id=None):
@@ -90,12 +96,14 @@ class PropertyAssetListView(generics.ListCreateAPIView):
         if effective:
             qs = qs.filter(hotel_id=effective)
 
-        # Bar/Kitchen/Housekeeping only ever see their own department's
-        # assets — Front Desk/Manager/Admin see everything (the central,
-        # unrestricted view this whole system is meant to also provide).
-        dept = ROLE_DEPARTMENT.get(user.role)
-        if dept:
-            qs = qs.filter(department=dept)
+        # Front Desk/Bar/Kitchen/Housekeeping only ever see their own
+        # department's assets (Front Desk's set includes Shared and
+        # room-tied Housekeeping assets too, see ROLE_DEPARTMENTS) —
+        # Manager/Admin see everything (the central, unrestricted view
+        # this whole system is meant to also provide).
+        depts = ROLE_DEPARTMENTS.get(user.role)
+        if depts:
+            qs = qs.filter(department__in=depts)
 
         status_filter = self.request.query_params.get("status")
         if status_filter:
@@ -141,9 +149,9 @@ class PropertyAssetDetailView(generics.RetrieveUpdateDestroyAPIView):
         qs = PropertyAsset.objects.select_related("room", "hotel")
         if effective:
             qs = qs.filter(hotel_id=effective)
-        dept = ROLE_DEPARTMENT.get(user.role)
-        if dept:
-            qs = qs.filter(department=dept)
+        depts = ROLE_DEPARTMENTS.get(user.role)
+        if depts:
+            qs = qs.filter(department__in=depts)
         return qs
 
     def get_serializer_class(self):
@@ -279,8 +287,8 @@ class ResolveAssetIssueView(APIView):
             return Response({"error": "This issue needs to be cleared for repair by a Manager or the Owner before it can be marked fixed."}, status=400)
 
         asset = issue.asset
-        dept = ROLE_DEPARTMENT.get(user.role)
-        if dept and asset.department != dept and not user.role in ["manager", "admin"]:
+        depts = ROLE_DEPARTMENTS.get(user.role)
+        if depts and asset.department not in depts and not user.role in ["manager", "admin"]:
             return Response({"error": "That asset isn't in your department."}, status=403)
 
         issue.status = AssetIssueReport.FIXED
