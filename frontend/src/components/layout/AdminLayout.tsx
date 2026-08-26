@@ -75,7 +75,15 @@ export default function AdminLayout() {
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
-  const visibleNav = ADMIN_NAV.filter(item => !item.managerOnly || isManagerOrAdmin)
+  // Front Desk gets its own department/room/shared-scoped assets view
+  // (the same room drill-down UI Bar/Kitchen/Housekeeping use) instead
+  // of the unrestricted, all-departments Property & Assets admin page.
+  // Manager/Admin keep the original destination.
+  const visibleNav = ADMIN_NAV
+    .filter(item => !item.managerOnly || isManagerOrAdmin)
+    .map(item => item.href === '/admin/assets' && user?.role === 'staff'
+      ? { ...item, href: '/admin/my-assets' }
+      : item)
   const closeDrawer = () => setMobileOpen(false)
 
   const fullName = [user?.first_name, user?.last_name].filter(Boolean).join(' ') || 'Admin'

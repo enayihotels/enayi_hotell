@@ -7,7 +7,7 @@ import { PageSpinner, EmptyState, Button, Modal, Textarea, Badge } from '@/compo
 import { useAuthStore } from '@/store/authStore'
 import {
   Wrench, AlertTriangle, CheckCircle2, Clock,
-  Wine, UtensilsCrossed, BedDouble, ChevronRight, ArrowLeft,
+  Wine, UtensilsCrossed, BedDouble, ChevronRight, ArrowLeft, ConciergeBell,
 } from 'lucide-react'
 import type { PropertyAsset } from '@/types'
 
@@ -21,6 +21,7 @@ const ISSUE_STATUS_BADGE: Record<string, 'red' | 'gold' | 'gray' | 'green'> = {
 }
 
 const DEPT_META: Record<string, { icon: typeof Wine; title: string; empty: string }> = {
+  staff:         { icon: ConciergeBell,   title: 'Front Desk Assets',    empty: 'Nothing assigned to Front Desk yet.' },
   bar_staff:     { icon: Wine,            title: 'Bar Assets',           empty: 'Nothing assigned to Bar yet.' },
   kitchen_staff: { icon: UtensilsCrossed, title: 'Kitchen Assets',       empty: 'Nothing assigned to Kitchen yet.' },
   housekeeper:   { icon: BedDouble,       title: 'Housekeeping Assets',  empty: 'Nothing assigned to Housekeeping yet.' },

@@ -175,6 +175,7 @@ export default function App() {
               <Route path="/admin/payments"  element={<AdminPayments key="admin-payments" />} />
               <Route path="/admin/inventory" element={<AdminInventory key="admin-inventory" />} />
               <Route path="/admin/assets"    element={<AdminAssets key="admin-assets" />} />
+              <Route path="/admin/my-assets" element={<MyAssetsPage key="admin-my-assets" />} />
               <Route path="/admin/reports"   element={<DailyReportPage key="admin-reports" />} />
             </Route>
 
