@@ -11,7 +11,7 @@ const ADMIN_NAV = [
   {href:'/admin/bookings',icon:CalendarDays,label:'Bookings'},
   {href:'/admin/checkout-approvals',icon:ShieldCheck,label:'Checkout Approvals',managerOnly:true},
   {href:'/admin/fraud-reports',icon:ShieldAlert,label:'Fraud Audit',managerOnly:true},
-  {href:'/admin/orders',icon:Utensils,label:'Orders'},
+  {href:'/admin/orders',icon:Utensils,label:'Orders',managerOnly:true},
   {href:'/admin/events',icon:Calendar,label:'Events'},
   {href:'/admin/guests',icon:Users,label:'Guests'},
   {href:'/admin/gallery',icon:Image,label:'Gallery',managerOnly:true},
