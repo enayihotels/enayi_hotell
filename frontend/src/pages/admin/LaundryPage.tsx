@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
-import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Badge } from '@/components/ui'
+import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Badge, Select } from '@/components/ui'
 import { useAuthStore } from '@/store/authStore'
 import { Shirt, Plus, CheckCircle2, Mail, MailX, Minus, Settings, Trash2 } from 'lucide-react'
 
+interface HotelLite { id: string; name: string; branch: string; is_primary: boolean }
 interface PriceItem { id: string; name: string; price: string; is_active: boolean }
 interface TicketLine { id: string; item_name: string; unit_price: string; quantity: number; line_total: string }
 interface Ticket {
@@ -23,6 +24,28 @@ export default function LaundryPage() {
   const { user } = useAuthStore()
   const qc = useQueryClient()
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
+  const isAdmin = user?.role === 'admin'
+
+  // Only the Owner operates across every branch — Manager/Laundry Staff
+  // are already scoped server-side to their own account's branch, so
+  // this selector only ever renders for Admin. Same pattern as
+  // AdminAssets/AdminInventory. Every request below includes `hotel`
+  // for Admin — the backend requires it for that role specifically.
+  const [hotelId, setHotelId] = useState<string>('')
+
+  const { data: hotels } = useQuery<HotelLite[]>({
+    queryKey: ['hotels-for-laundry'],
+    queryFn: () => api.get('/hotels/').then(r => unwrapList(r.data)),
+    enabled: isAdmin,
+  })
+
+  useEffect(() => {
+    if (isAdmin && !hotelId && hotels && hotels.length > 0) {
+      setHotelId((hotels.find(h => h.is_primary) ?? hotels[0]).id)
+    }
+  }, [isAdmin, hotelId, hotels])
+
+  const hotelParams = isAdmin && hotelId ? { hotel: hotelId } : {}
 
   const [tab, setTab] = useState<'pending' | 'ready'>('pending')
   const [showForm, setShowForm] = useState(false)
@@ -31,13 +54,15 @@ export default function LaundryPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>({})
 
   const { data: tickets, isLoading } = useQuery<Ticket[]>({
-    queryKey: ['laundry-tickets'],
-    queryFn: () => api.get('/laundry/tickets/').then(r => unwrapList(r.data)),
+    queryKey: ['laundry-tickets', hotelId],
+    queryFn: () => api.get('/laundry/tickets/', { params: hotelParams }).then(r => unwrapList(r.data)),
+    enabled: !isAdmin || !!hotelId,
   })
 
   const { data: prices } = useQuery<PriceItem[]>({
-    queryKey: ['laundry-prices'],
-    queryFn: () => api.get('/laundry/prices/').then(r => unwrapList(r.data)),
+    queryKey: ['laundry-prices', hotelId],
+    queryFn: () => api.get('/laundry/prices/', { params: hotelParams }).then(r => unwrapList(r.data)),
+    enabled: !isAdmin || !!hotelId,
   })
 
   const createTicket = useMutation({
@@ -45,7 +70,7 @@ export default function LaundryPage() {
       const items = Object.entries(quantities)
         .filter(([, qty]) => qty > 0)
         .map(([price_item, quantity]) => ({ price_item, quantity }))
-      return api.post('/laundry/tickets/', { ...form, room: form.room || null, items })
+      return api.post('/laundry/tickets/', { ...form, room: form.room || null, items, ...(isAdmin ? { hotel: hotelId } : {}) })
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['laundry-tickets'] })
@@ -69,7 +94,7 @@ export default function LaundryPage() {
   // ── Price catalog management (Manager/Admin only) ──
   const [newPrice, setNewPrice] = useState({ name: '', price: '' })
   const addPrice = useMutation({
-    mutationFn: () => api.post('/laundry/prices/', newPrice),
+    mutationFn: () => api.post('/laundry/prices/', { ...newPrice, ...(isAdmin ? { hotel: hotelId } : {}) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['laundry-prices'] })
       toast.success(`Added "${newPrice.name}".`)
@@ -100,11 +125,16 @@ export default function LaundryPage() {
           </h1>
           <p className="text-enayi-muted text-sm">{pending.length} in progress · {ready.length} ready for pickup</p>
         </div>
-        <div className="flex gap-2">
-          {isManagerOrAdmin && (
-            <Button variant="surface" onClick={() => setShowPrices(true)}><Settings size={14} /> Prices</Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && hotels && hotels.length > 0 && (
+            <Select value={hotelId} onChange={e => setHotelId(e.target.value)} className="max-w-[220px]">
+              {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </Select>
           )}
-          <Button onClick={() => setShowForm(true)}><Plus size={14} /> New Ticket</Button>
+          {isManagerOrAdmin && (
+            <Button variant="surface" onClick={() => setShowPrices(true)} disabled={isAdmin && !hotelId}><Settings size={14} /> Prices</Button>
+          )}
+          <Button onClick={() => setShowForm(true)} disabled={isAdmin && !hotelId}><Plus size={14} /> New Ticket</Button>
         </div>
       </div>
 
@@ -232,7 +262,7 @@ export default function LaundryPage() {
             <div className="flex gap-2 items-end pt-2 border-t border-enayi-border">
               <Input label="Item name" placeholder="e.g. Shirt" value={newPrice.name} onChange={e => setNewPrice({ ...newPrice, name: e.target.value })} />
               <Input label="Price (₦)" type="number" min="0" step="0.01" placeholder="0.00" value={newPrice.price} onChange={e => setNewPrice({ ...newPrice, price: e.target.value })} />
-              <Button variant="gold" loading={addPrice.isPending} disabled={!newPrice.name.trim() || !newPrice.price}
+              <Button variant="gold" loading={addPrice.isPending} disabled={!newPrice.name.trim() || !newPrice.price || (isAdmin && !hotelId)}
                 onClick={() => addPrice.mutate()}>Add</Button>
             </div>
           </div>
