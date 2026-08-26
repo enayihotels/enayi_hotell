@@ -10,11 +10,12 @@ const ROLE_LABEL: Record<string, string> = {
   bar_staff:     'Bar Staff',
   kitchen_staff: 'Kitchen Staff',
   housekeeper:   'Housekeeper',
+  laundry_staff: 'Laundry Staff',
   manager:       'Manager',
   admin:         'Owner',
 }
 
-function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullName, isHousekeeper, showMenuManager, showAssets }: { onNavigate?: () => void; onLogout: () => void; roleLabel: string; firstInitial: string; fullName: string; isHousekeeper: boolean; showMenuManager: boolean; showAssets: boolean }) {
+function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullName, isHousekeeper, hidesOrdersAndMenu, showMenuManager, showAssets }: { onNavigate?: () => void; onLogout: () => void; roleLabel: string; firstInitial: string; fullName: string; isHousekeeper: boolean; hidesOrdersAndMenu: boolean; showMenuManager: boolean; showAssets: boolean }) {
   return (
     <>
       <div className="p-5 border-b border-enayi-border">
@@ -43,7 +44,7 @@ function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullNam
             <Wrench size={16} /> My Assets
           </NavLink>
         )}
-        {!isHousekeeper && (
+        {!hidesOrdersAndMenu && (
           <>
             <NavLink to="/inventory/orders" onClick={onNavigate}
               className={({isActive}) => `flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-enayi-gold/10 text-enayi-gold' : 'text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel'}`}>
@@ -87,18 +88,22 @@ export default function InventoryLayout() {
   const fullName = user?.full_name ?? ''
   const firstInitial = user?.first_name?.[0] ?? '?'
   const isHousekeeper = user?.role === 'housekeeper'
+  // Laundry Staff doesn't take Orders or manage the Menu either — she
+  // lives in this shell for Inventory requests and her own Assets
+  // view only, same reasoning as Housekeeper.
+  const hidesOrdersAndMenu = isHousekeeper || user?.role === 'laundry_staff'
   // Store Keeper doesn't own menu items (mirrors backend
   // _can_manage_menu_item — only Bar/Kitchen Staff, Manager, Admin can
   // touch a MenuItem); Manager/Admin already have full access via the
   // main Admin panel, so this stays scoped to the two staff roles who
   // actually live in this inventory-only shell day to day.
   const showMenuManager = user?.role === 'bar_staff' || user?.role === 'kitchen_staff'
-  // Bar/Kitchen/Housekeeping now have their own department-scoped
-  // Property & Assets view (report damage, confirm fixed once
+  // Bar/Kitchen/Housekeeping/Laundry now have their own department-
+  // scoped Property & Assets view (report damage, confirm fixed once
   // cleared) — Store Keeper is deliberately excluded, since she
   // manages the Inventory catalog itself rather than "owning" a
-  // department's assets the way Bar/Kitchen/Housekeeping do.
-  const showAssets = user?.role === 'bar_staff' || user?.role === 'kitchen_staff' || user?.role === 'housekeeper'
+  // department's assets the way the others do.
+  const showAssets = user?.role === 'bar_staff' || user?.role === 'kitchen_staff' || user?.role === 'housekeeper' || user?.role === 'laundry_staff'
 
   const handleLogout = async () => {
     try { await api.post('/auth/logout/', { refresh: localStorage.getItem('refresh_token') }) } catch {}
@@ -109,14 +114,14 @@ export default function InventoryLayout() {
     <div className="min-h-screen bg-enayi-bg flex">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-enayi-surface border-r border-enayi-border flex-shrink-0">
-        <SidebarContent onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} showMenuManager={showMenuManager} showAssets={showAssets} />
+        <SidebarContent onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} hidesOrdersAndMenu={hidesOrdersAndMenu} showMenuManager={showMenuManager} showAssets={showAssets} />
       </aside>
 
       {/* Mobile drawer */}
       <div className={`md:hidden fixed inset-0 z-40 ${drawerOpen ? '' : 'pointer-events-none'}`}>
         <div onClick={() => setDrawerOpen(false)} className={`absolute inset-0 bg-black/60 transition-opacity ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} />
         <aside className={`absolute left-0 top-0 bottom-0 w-64 bg-enayi-surface border-r border-enayi-border flex flex-col transition-transform ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} showMenuManager={showMenuManager} showAssets={showAssets} />
+          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} hidesOrdersAndMenu={hidesOrdersAndMenu} showMenuManager={showMenuManager} showAssets={showAssets} />
         </aside>
       </div>
 

@@ -78,7 +78,7 @@ function Guard({ children, adminOnly = false, inventoryOnly = false, conciergeOn
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   const role = user?.role ?? ''
-  const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper']
+  const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper', 'laundry_staff']
   const ADMIN_ROLES = ['manager', 'admin', 'staff']
 
   // ENAYI AI Agent — all authenticated roles allowed, no redirect

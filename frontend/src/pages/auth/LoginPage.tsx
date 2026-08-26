@@ -42,7 +42,7 @@ export default function LoginPage() {
       // that live in the inventory shell should never land in the guest
       // portal, and front desk/manager who have both the admin panel and
       // their own entry points need to go to the right one too.
-      const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper']
+      const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper', 'laundry_staff']
       const ADMIN_ROLES = ['manager', 'admin', 'staff']
       if (INVENTORY_ROLES.includes(user.role)) {
         // Housekeeping → their own page; all others → inventory list

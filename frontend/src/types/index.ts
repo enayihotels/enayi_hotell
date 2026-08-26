@@ -529,7 +529,7 @@ export interface InventoryCategory {
   item_count: number
 }
 
-export type StockLocation = 'store' | 'bar' | 'kitchen' | 'housekeeping'
+export type StockLocation = 'store' | 'bar' | 'kitchen' | 'housekeeping' | 'laundry'
 
 export interface StockBalance {
   id: string

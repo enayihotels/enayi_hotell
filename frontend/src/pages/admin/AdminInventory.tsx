@@ -18,7 +18,7 @@ const emptyCategoryForm: CategoryForm = { name: '', slug: '', description: '', d
 type ItemForm = { name: string; category: string; unit: string; cost_price: string; sale_price: string; reorder_threshold: string; expiry_tracked: boolean; is_active: boolean }
 const emptyItemForm: ItemForm = { name: '', category: '', unit: 'piece', cost_price: '', sale_price: '', reorder_threshold: '5', expiry_tracked: false, is_active: true }
 
-const LOCATION_LABEL: Record<StockLocation, string> = { store: 'Store', bar: 'Bar', kitchen: 'Kitchen', housekeeping: 'Housekeeping' }
+const LOCATION_LABEL: Record<StockLocation, string> = { store: 'Store', bar: 'Bar', kitchen: 'Kitchen', housekeeping: 'Housekeeping', laundry: 'Laundry' }
 
 export default function AdminInventory() {
   const { user } = useAuthStore()
@@ -29,12 +29,13 @@ export default function AdminInventory() {
     user?.role === 'store_keeper' ? 'store' :
     user?.role === 'bar_staff'    ? 'bar' :
     user?.role === 'kitchen_staff' ? 'kitchen' :
-    user?.role === 'housekeeper'  ? 'housekeeping' : null
+    user?.role === 'housekeeper'  ? 'housekeeping' :
+    user?.role === 'laundry_staff' ? 'laundry' : null
 
   const isAdmin = user?.role === 'admin'
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   const canManageCatalog = user?.role === 'store_keeper' || isManagerOrAdmin
-  const canRequest = user?.role === 'bar_staff' || user?.role === 'kitchen_staff' || user?.role === 'housekeeper'
+  const canRequest = user?.role === 'bar_staff' || user?.role === 'kitchen_staff' || user?.role === 'housekeeper' || user?.role === 'laundry_staff'
   const canFulfill = user?.role === 'store_keeper' || isManagerOrAdmin
 
   const [tab, setTab] = useState<'stock' | 'categories' | 'requests'>('stock')

@@ -40,12 +40,12 @@ export default function SplashScreen() {
   const dashboardLink = (() => {
     if (!isAuthenticated || !user) return null
     const role = user.role ?? ''
-    if (['store_keeper','bar_staff','kitchen_staff'].includes(role)) return '/inventory'
+    if (['store_keeper','bar_staff','kitchen_staff','laundry_staff'].includes(role)) return '/inventory'
     if (role === 'housekeeper') return '/housekeeping'
     if (['manager','admin'].includes(role)) return '/admin'
     return '/dashboard'
   })()
-  const ROLE_LABELS: Record<string,string> = { admin:'Owner', manager:'Manager', staff:'Front Desk', store_keeper:'Store Keeper', bar_staff:'Bar Staff', kitchen_staff:'Kitchen Staff', housekeeper:'Housekeeper', guest:'Guest' }
+  const ROLE_LABELS: Record<string,string> = { admin:'Owner', manager:'Manager', staff:'Front Desk', store_keeper:'Store Keeper', bar_staff:'Bar Staff', kitchen_staff:'Kitchen Staff', housekeeper:'Housekeeper', laundry_staff:'Laundry Staff', guest:'Guest' }
   const roleLabel = ROLE_LABELS[user?.role ?? ''] ?? ''
   const userName = user ? [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email : ''
 
