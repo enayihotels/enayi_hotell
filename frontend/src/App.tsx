@@ -79,7 +79,7 @@ function Guard({ children, adminOnly = false, inventoryOnly = false, conciergeOn
 
   const role = user?.role ?? ''
   const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper']
-  const ADMIN_ROLES = ['manager', 'admin']
+  const ADMIN_ROLES = ['manager', 'admin', 'staff']
 
   // ENAYI AI Agent — all authenticated roles allowed, no redirect
   if (conciergeOnly) return <>{children}</>
