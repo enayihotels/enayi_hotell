@@ -161,7 +161,7 @@ class OrderListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.is_hotel_staff:
+        if request.user.role in ["manager", "admin"]:
             qs = Order.objects.all().select_related(
                 "guest",
                 "room"
@@ -366,7 +366,7 @@ class OrderDetailView(generics.RetrieveAPIView):
     serializer_class = OrderSerializer
 
     def get_queryset(self):
-        if self.request.user.is_hotel_staff:
+        if self.request.user.role in ["manager", "admin"]:
             return Order.objects.prefetch_related(
                 "items__menu_item"
             )
@@ -402,7 +402,7 @@ class UpdateOrderStatusView(APIView):
         # other. Only Admin/Owner bypasses the branch check entirely.
         user = request.user
         same_branch = user.role == "admin" or (user.hotel_id and str(user.hotel_id) == str(order.hotel_id))
-        can_update = same_branch and (user.is_hotel_staff or user.role in ["manager", "admin"])
+        can_update = same_branch and user.role in ["manager", "admin"]
         if not can_update and same_branch and user.role == "bar_staff" and order.source in ["bar", "room_service"]:
             can_update = True
         if not can_update and same_branch and user.role == "kitchen_staff" and order.source in ["kitchen", "room_service"]:
@@ -504,7 +504,7 @@ class KitchenOrdersView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if not (user.is_hotel_staff or user.role in ["manager", "admin", "kitchen_staff"]):
+        if not (user.role in ["manager", "admin", "kitchen_staff"]):
             return Order.objects.none()
 
         from apps.inventory.views import _effective_hotel
@@ -553,7 +553,7 @@ class BarOrdersView(generics.ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if not (user.is_hotel_staff or user.role in ["manager", "admin", "bar_staff"]):
+        if not (user.role in ["manager", "admin", "bar_staff"]):
             return Order.objects.none()
 
         from apps.inventory.views import _effective_hotel
