@@ -23,7 +23,7 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
 }
 
 const TEAM = [
-  { name: 'Engr. Emmanuel Enayi', role: 'Founder & Chairman', bio: 'A visionary entrepreneur with 25 years in Nigerian hospitality, who built Enayi Hotels from a dream into Plateau State\'s finest luxury destination.', initial: 'E' },
+  { name: 'Mr Patrick I. Ogwuche', role: 'Founder & Chairman', bio: 'A visionary entrepreneur with 25 years in Nigerian hospitality, who built Enayi Hotels from a dream into Plateau State\'s finest luxury destination.', initial: 'P' },
   { name: 'Mrs. Grace Enayi',     role: 'Managing Director',   bio: 'Combining warmth and world-class management expertise, Grace ensures every guest\'s experience exceeds all expectations.', initial: 'G' },
   { name: 'Mr. David Pam',        role: 'Executive Chef',       bio: 'A culinary master trained in Lagos, London, and Accra — David crafts extraordinary Nigerian and continental dining experiences.', initial: 'D' },
   { name: 'Ms. Sarah Jatau',      role: 'Head of Events',       bio: 'Jos\'s most celebrated event coordinator, Sarah turns every occasion at Enayi Hotels into a cherished memory.', initial: 'S' },
@@ -39,7 +39,7 @@ const VALUES = [
 ]
 
 const MILESTONES = [
-  { year: '2009', title: 'A Vision Is Born',        desc: 'Engr. Emmanuel Enayi breaks ground on Rayfield Road with a bold dream: to bring world-class luxury to the Plateau capital.' },
+  { year: '2009', title: 'A Vision Is Born',        desc: 'Mr Patrick I. Ogwuche breaks ground on Rayfield Road with a bold dream: to bring world-class luxury to the Plateau capital.' },
   { year: '2012', title: 'Grand Opening',            desc: 'Enayi Hotels & Suites opens its doors with 40 rooms, the Royal Banquet Hall, and a restaurant that immediately becomes Jos\'s finest.' },
   { year: '2015', title: 'Award-Winning Kitchen',   desc: 'Our Executive Chef wins the "Best Hotel Restaurant in North-Central Nigeria" award — the first of many national recognitions.' },
   { year: '2018', title: 'Expansion & Renewal',     desc: 'A ₦500M renovation adds 80 new premium rooms, the Executive Conference Centre, and our iconic rooftop bar.' },
@@ -207,7 +207,7 @@ export default function AboutPage() {
                 </p>
 
                 <p className="text-center text-enayi-gold font-semibold mt-4">
-                  — Engr. Emmanuel Enayi, Founder
+                  — Mr Patrick I. Ogwuche, Founder
                 </p>
               </motion.div>
             </Section>

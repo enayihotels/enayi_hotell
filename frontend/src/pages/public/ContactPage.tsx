@@ -1,13 +1,23 @@
 import { useState } from 'react'
 import { MapPin, Phone, Mail, Clock, Send, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import api, { getErrorMessage } from '@/utils/api'
 
 export default function ContactPage() {
   const [form, setForm] = useState({name:'',email:'',phone:'',subject:'',message:''})
   const [sending, setSending] = useState(false)
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); if(!form.name||!form.email||!form.message){toast.error('Fill all required fields');return}
-    setSending(true); await new Promise(r=>setTimeout(r,800)); toast.success("Message sent! We'll respond within 24 hours."); setForm({name:'',email:'',phone:'',subject:'',message:''}); setSending(false)
+    setSending(true)
+    try {
+      await api.post('/contact/', form)
+      toast.success("Message sent! We'll respond within 24 hours.")
+      setForm({name:'',email:'',phone:'',subject:'',message:''})
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setSending(false)
+    }
   }
   return (
     <div className="bg-enayi-bg min-h-screen">

@@ -1,7 +1,7 @@
 import { Outlet, Link, NavLink, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, Phone, MapPin, Bot, Star, ChevronRight } from 'lucide-react'
+import { Menu, X, Phone, MapPin, Bot, Star, ChevronRight, Facebook, Instagram, Twitter, MessageCircle, Music2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { cn } from '@/utils/helpers'
 
@@ -11,6 +11,16 @@ const NAV = [
   { label: 'Gallery',        href: '/gallery' },
   { label: 'About Us',       href: '/about'   },
   { label: 'Contact',        href: '/contact' },
+]
+
+// Handles assumed from the "enayihotels" name — confirm/update these
+// once the actual accounts exist on each platform.
+const SOCIAL_LINKS = [
+  { label: 'WhatsApp',  icon: MessageCircle, href: 'https://wa.me/2349138943008' },
+  { label: 'Facebook',  icon: Facebook,      href: 'https://facebook.com/enayihotels' },
+  { label: 'Instagram', icon: Instagram,     href: 'https://instagram.com/enayihotels' },
+  { label: 'Twitter',   icon: Twitter,       href: 'https://twitter.com/enayihotels' },
+  { label: 'TikTok',    icon: Music2,        href: 'https://tiktok.com/@enayihotels' },
 ]
 
 export default function PublicLayout() {
@@ -210,6 +220,14 @@ export default function PublicLayout() {
             <div className="flex items-center gap-2 mt-5">
               <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
               <span className="text-green-400 text-xs tracking-widest uppercase">Open 24/7 — All year round</span>
+            </div>
+            <div className="flex items-center gap-3 mt-5">
+              {SOCIAL_LINKS.map(s => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label}
+                   className="w-9 h-9 rounded-full bg-enayi-gold/10 border border-enayi-gold/20 flex items-center justify-center text-enayi-gold hover:bg-enayi-gold hover:text-enayi-bg transition-colors">
+                  <s.icon size={15} />
+                </a>
+              ))}
             </div>
           </div>
 
