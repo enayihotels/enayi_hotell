@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Badge, Select } from '@/components/ui'
 import { useAuthStore } from '@/store/authStore'
-import { Shirt, Plus, CheckCircle2, Mail, MailX, Minus, Settings, Trash2, X, UserCircle2 } from 'lucide-react'
+import { Shirt, Plus, CheckCircle2, Mail, MailX, Minus, Settings, Trash2, X, UserCircle2, BarChart3, AlertTriangle } from 'lucide-react'
 
 interface HotelLite { id: string; name: string; branch: string; is_primary: boolean }
 interface PriceItem { id: string; name: string; price: string; is_active: boolean }
@@ -18,9 +18,20 @@ interface Ticket {
   line_items: TicketLine[]; is_paid: boolean; logged_by_name: string | null; notified: boolean
   created_at: string; ready_at: string | null
 }
+interface ReconStaffRow {
+  logged_by_id: string | null; logged_by_name: string; tickets: number
+  total_amount: number; paid_amount: number; unpaid_amount: number
+  paid_count: number; unpaid_count: number
+}
+interface ReconData {
+  overall: { tickets: number; total_amount: number; paid_amount: number; unpaid_amount: number; paid_count: number; unpaid_count: number }
+  by_staff: ReconStaffRow[]
+}
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
 const emptyForm = { room: '', notes: '' }
+const unpaidRate = (row: { total_amount: number; unpaid_amount: number }) =>
+  row.total_amount > 0 ? Math.round((row.unpaid_amount / row.total_amount) * 100) : 0
 
 export default function LaundryPage() {
   const { user } = useAuthStore()
@@ -52,6 +63,7 @@ export default function LaundryPage() {
   const [tab, setTab] = useState<'pending' | 'ready'>('pending')
   const [showForm, setShowForm] = useState(false)
   const [showPrices, setShowPrices] = useState(false)
+  const [showRecon, setShowRecon] = useState(false)
   const [form, setForm] = useState(emptyForm)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
 
@@ -146,6 +158,19 @@ export default function LaundryPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
+  // ── Reconciliation (Manager/Admin only) — per-staff tickets logged
+  // vs. actually paid, over a chosen date range. ──
+  const [reconFrom, setReconFrom] = useState('')
+  const [reconTo, setReconTo] = useState('')
+
+  const { data: recon, isLoading: reconLoading } = useQuery<ReconData>({
+    queryKey: ['laundry-reconciliation', hotelId, reconFrom, reconTo],
+    queryFn: () => api.get('/laundry/reconciliation/', {
+      params: { ...hotelParams, ...(reconFrom ? { date_from: reconFrom } : {}), ...(reconTo ? { date_to: reconTo } : {}) },
+    }).then(r => r.data),
+    enabled: showRecon && isManagerOrAdmin && (!isAdmin || !!hotelId),
+  })
+
   if (isLoading) return <PageSpinner />
 
   const pending = (tickets || []).filter(t => t.status === 'pending')
@@ -168,6 +193,9 @@ export default function LaundryPage() {
             <Select value={hotelId} onChange={e => setHotelId(e.target.value)} className="max-w-[220px]">
               {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
             </Select>
+          )}
+          {isManagerOrAdmin && (
+            <Button variant="surface" onClick={() => setShowRecon(true)} disabled={isAdmin && !hotelId}><BarChart3 size={14} /> Reconciliation</Button>
           )}
           {isManagerOrAdmin && (
             <Button variant="surface" onClick={() => setShowPrices(true)} disabled={isAdmin && !hotelId}><Settings size={14} /> Prices</Button>
@@ -350,6 +378,74 @@ export default function LaundryPage() {
               <Button variant="gold" loading={addPrice.isPending} disabled={!newPrice.name.trim() || !newPrice.price || (isAdmin && !hotelId)}
                 onClick={() => addPrice.mutate()}>Add</Button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Reconciliation (Manager/Admin) ── */}
+      {isManagerOrAdmin && (
+        <Modal open={showRecon} onClose={() => setShowRecon(false)} title="Laundry Reconciliation" size="xl">
+          <div className="space-y-4">
+            <p className="text-xs text-enayi-muted">
+              Tickets logged vs. actually paid, per staff member. This spots patterns worth a closer
+              look — it doesn't prove anything by itself. A high unpaid amount can also just mean a
+              guest hasn't paid yet. Leave both dates blank for all-time.
+            </p>
+
+            <div className="flex gap-3 items-end">
+              <Input label="From" type="date" value={reconFrom} onChange={e => setReconFrom(e.target.value)} />
+              <Input label="To" type="date" value={reconTo} onChange={e => setReconTo(e.target.value)} />
+            </div>
+
+            {reconLoading ? (
+              <PageSpinner />
+            ) : !recon || recon.by_staff.length === 0 ? (
+              <p className="text-sm text-enayi-muted">No tickets logged in this range.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-4 gap-3 text-center">
+                  <div className="card p-3"><div className="text-enayi-muted text-xs">Tickets</div><div className="text-enayi-text font-semibold">{recon.overall.tickets}</div></div>
+                  <div className="card p-3"><div className="text-enayi-muted text-xs">Total</div><div className="text-enayi-text font-semibold">₦{recon.overall.total_amount.toLocaleString()}</div></div>
+                  <div className="card p-3"><div className="text-enayi-muted text-xs">Paid</div><div className="text-green-400 font-semibold">₦{recon.overall.paid_amount.toLocaleString()}</div></div>
+                  <div className="card p-3"><div className="text-enayi-muted text-xs">Unpaid</div><div className="text-red-400 font-semibold">₦{recon.overall.unpaid_amount.toLocaleString()}</div></div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-enayi-muted text-xs border-b border-enayi-border">
+                        <th className="py-2 pr-3">Staff</th>
+                        <th className="py-2 pr-3">Tickets</th>
+                        <th className="py-2 pr-3">Total</th>
+                        <th className="py-2 pr-3">Paid</th>
+                        <th className="py-2 pr-3">Unpaid</th>
+                        <th className="py-2 pr-3">Unpaid %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recon.by_staff.map(row => {
+                        const rate = unpaidRate(row)
+                        return (
+                          <tr key={row.logged_by_id ?? row.logged_by_name} className="border-b border-enayi-border last:border-b-0">
+                            <td className="py-2 pr-3 text-enayi-text">{row.logged_by_name}</td>
+                            <td className="py-2 pr-3 text-enayi-muted">{row.tickets}</td>
+                            <td className="py-2 pr-3 text-enayi-text">₦{row.total_amount.toLocaleString()}</td>
+                            <td className="py-2 pr-3 text-green-400">₦{row.paid_amount.toLocaleString()} <span className="text-enayi-muted text-xs">({row.paid_count})</span></td>
+                            <td className="py-2 pr-3 text-red-400">₦{row.unpaid_amount.toLocaleString()} <span className="text-enayi-muted text-xs">({row.unpaid_count})</span></td>
+                            <td className="py-2 pr-3">
+                              <span className={`flex items-center gap-1 ${rate >= 50 ? 'text-red-400' : rate >= 25 ? 'text-amber-400' : 'text-enayi-muted'}`}>
+                                {rate >= 50 && <AlertTriangle size={12} />}
+                                {rate}%
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}
