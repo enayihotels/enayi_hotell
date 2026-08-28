@@ -59,6 +59,7 @@ urlpatterns = [
     path("api/v1/inventory/", include("apps.inventory.urls")),
     path("api/v1/assets/",    include("apps.assets.urls")),
     path("api/v1/laundry/",   include("apps.laundry.urls")),
+    path("api/v1/contact/",   include("apps.contact.urls")),
 ]
 
 # ── Static & Media ─────────────────────────────────────
