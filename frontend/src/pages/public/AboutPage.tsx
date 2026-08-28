@@ -24,9 +24,8 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
 
 const TEAM = [
   { name: 'Mr Patrick I. Ogwuche', role: 'Founder & Chairman', bio: 'A visionary entrepreneur with 25 years in Nigerian hospitality, who built Enayi Hotels from a dream into Plateau State\'s finest luxury destination.', initial: 'P' },
-  { name: 'Mrs. Grace Enayi',     role: 'Managing Director',   bio: 'Combining warmth and world-class management expertise, Grace ensures every guest\'s experience exceeds all expectations.', initial: 'G' },
-  { name: 'Mr. David Pam',        role: 'Executive Chef',       bio: 'A culinary master trained in Lagos, London, and Accra — David crafts extraordinary Nigerian and continental dining experiences.', initial: 'D' },
-  { name: 'Ms. Sarah Jatau',      role: 'Head of Events',       bio: 'Jos\'s most celebrated event coordinator, Sarah turns every occasion at Enayi Hotels into a cherished memory.', initial: 'S' },
+  { name: 'Mr Linus Ogwuche',      role: 'Board Member',       bio: 'A dedicated member of the Enayi Hotels board, helping guide the hotel\'s continued growth and commitment to excellence.', initial: 'L' },
+  { name: 'Mr Oche Peter Joseph',  role: 'Board Member',       bio: 'A dedicated member of the Enayi Hotels board, helping guide the hotel\'s continued growth and commitment to excellence.', initial: 'O' },
 ]
 
 const VALUES = [
