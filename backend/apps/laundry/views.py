@@ -1,6 +1,8 @@
 """Enayi Hotels — Laundry Service Views"""
 from django.db import transaction
+from django.db.models import Sum, Count, Q
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -236,6 +238,84 @@ class MyLaundryTicketsView(generics.ListAPIView):
                 .select_related("room")
                 .prefetch_related("line_items")
                 .order_by("-created_at"))
+
+
+class LaundryReconciliationView(APIView):
+    """GET /api/v1/laundry/reconciliation/?hotel=<id>&date_from=&date_to=
+    Manager/Owner only — a per-staff breakdown of tickets logged, total
+    value, and how much of that is actually paid vs still outstanding.
+    Doesn't prove anything on its own (a guest simply hasn't paid yet
+    is the normal case for a fresh ticket), but a staff member whose
+    tickets sit unpaid at a consistently higher rate than everyone
+    else's — over a real date range, not one day — is worth a closer
+    look, since staff never handle the money themselves for in-app
+    payments; the only way value goes missing is at intake, before a
+    ticket is even logged accurately."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role not in ["manager", "admin"]:
+            return Response({"error": "Only a Manager or the Owner can view laundry reconciliation."}, status=403)
+
+        effective = _effective_hotel(user, request.query_params.get("hotel"))
+        if effective is False:
+            return Response({"error": "Your account has no branch assigned yet."}, status=403)
+
+        qs = LaundryTicket.objects.all()
+        if effective:
+            qs = qs.filter(hotel_id=effective)
+
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        if date_from:
+            qs = qs.filter(created_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(created_at__date__lte=date_to)
+
+        from django.db.models import Sum, Count, Q
+
+        overall = qs.aggregate(
+            tickets=Count("id"),
+            total_amount=Sum("total_price"),
+            paid_amount=Sum("total_price", filter=Q(is_paid=True)),
+            paid_count=Count("id", filter=Q(is_paid=True)),
+            unpaid_count=Count("id", filter=Q(is_paid=False)),
+        )
+        overall["total_amount"] = overall["total_amount"] or 0
+        overall["paid_amount"] = overall["paid_amount"] or 0
+        overall["unpaid_amount"] = overall["total_amount"] - overall["paid_amount"]
+
+        by_staff_rows = (
+            qs.values("logged_by_id", "logged_by__first_name", "logged_by__last_name")
+              .annotate(
+                  tickets=Count("id"),
+                  total_amount=Sum("total_price"),
+                  paid_amount=Sum("total_price", filter=Q(is_paid=True)),
+                  paid_count=Count("id", filter=Q(is_paid=True)),
+                  unpaid_count=Count("id", filter=Q(is_paid=False)),
+              )
+        )
+
+        by_staff = []
+        for row in by_staff_rows:
+            total = row["total_amount"] or 0
+            paid = row["paid_amount"] or 0
+            name = f"{row['logged_by__first_name'] or ''} {row['logged_by__last_name'] or ''}".strip() or "Unknown"
+            by_staff.append({
+                "logged_by_id": str(row["logged_by_id"]) if row["logged_by_id"] else None,
+                "logged_by_name": name,
+                "tickets": row["tickets"],
+                "total_amount": total,
+                "paid_amount": paid,
+                "unpaid_amount": total - paid,
+                "paid_count": row["paid_count"],
+                "unpaid_count": row["unpaid_count"],
+            })
+        # Highest outstanding value first — that's what's actually worth reviewing.
+        by_staff.sort(key=lambda r: r["unpaid_amount"], reverse=True)
+
+        return Response({"overall": overall, "by_staff": by_staff})
 
 
 class MarkLaundryReadyView(APIView):
