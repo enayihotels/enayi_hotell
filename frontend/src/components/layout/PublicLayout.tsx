@@ -17,7 +17,7 @@ const NAV = [
 // once the actual accounts exist on each platform.
 const SOCIAL_LINKS = [
   { label: 'WhatsApp',  icon: MessageCircle, href: 'https://wa.me/2349138943008' },
-  { label: 'Facebook',  icon: Facebook,      href: 'https://facebook.com/enayihotels' },
+  { label: 'Facebook',  icon: Facebook,      href: 'https://web.facebook.com/people/Enayi-Hotels-Suites/61594122142389/' },
   { label: 'Instagram', icon: Instagram,     href: 'https://instagram.com/enayihotels' },
   { label: 'Twitter',   icon: Twitter,       href: 'https://twitter.com/enayihotels' },
   { label: 'TikTok',    icon: Music2,        href: 'https://tiktok.com/@enayihotels' },
