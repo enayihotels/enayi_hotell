@@ -142,7 +142,7 @@ class Room(models.Model):
         ("cleaning","Cleaning"),("out_of_order","Out of Order"),
     ]
     id          = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    room_number = models.CharField(max_length=10, unique=True)
+    room_number = models.CharField(max_length=10)
     hotel       = models.ForeignKey("hotels.Hotel", on_delete=models.PROTECT, related_name="rooms", null=True, blank=True)
     category    = models.ForeignKey(RoomCategory, on_delete=models.PROTECT, related_name="rooms")
     floor       = models.PositiveIntegerField(default=1)
@@ -161,6 +161,11 @@ class Room(models.Model):
     class Meta:
         db_table = "rooms"
         ordering = ["floor", "room_number"]
+        constraints = [
+            # Room numbers only need to be unique WITHIN a branch — two
+            # different hotels can each have their own "Room 101".
+            models.UniqueConstraint(fields=["hotel", "room_number"], name="uniq_room_number_per_branch"),
+        ]
 
     def __str__(self): return f"Room {self.room_number} ({self.category.name})"
 
