@@ -56,6 +56,7 @@ export default function AdminRooms() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<'categories' | 'rooms' | 'amenities'>('categories')
   const [roomsCategoryFilter, setRoomsCategoryFilter] = useState<RoomCategory | null>(null)
+  const [roomsBranchFilter, setRoomsBranchFilter] = useState<{ id: string; name: string } | null>(null)
 
   const { data: categories, isLoading: catsLoading } = useQuery<RoomCategory[]>({
     queryKey: ['admin-room-categories'], queryFn: () => api.get('/rooms/categories/').then(r => unwrapList(r.data)),
@@ -201,7 +202,11 @@ export default function AdminRooms() {
 
   const openNewRoom = () => {
     setEditingRoom(null)
-    setRoomForm(roomsCategoryFilter ? { ...emptyRoomForm, category: roomsCategoryFilter.id } : emptyRoomForm)
+    setRoomForm({
+      ...emptyRoomForm,
+      ...(roomsCategoryFilter ? { category: roomsCategoryFilter.id } : {}),
+      ...(roomsBranchFilter ? { hotel: roomsBranchFilter.id } : {}),
+    })
     setRoomModalOpen(true)
   }
   const openEditRoom = (r: Room) => {
@@ -267,7 +272,7 @@ export default function AdminRooms() {
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='categories' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
           <LayoutGrid size={14} className="inline mr-1.5 -mt-0.5" /> Categories ({categories?.length ?? 0})
         </button>
-        <button onClick={() => setTab('rooms')}
+        <button onClick={() => { setTab('rooms'); setRoomsCategoryFilter(null); setRoomsBranchFilter(null) }}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='rooms' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
           <DoorOpen size={14} className="inline mr-1.5 -mt-0.5" /> Rooms ({rooms?.length ?? 0})
         </button>
@@ -318,7 +323,43 @@ export default function AdminRooms() {
       )}
 
       {tab === 'rooms' && (() => {
-        const filteredRooms = roomsCategoryFilter ? (rooms||[]).filter(r => r.category === roomsCategoryFilter.id) : (rooms||[])
+        // Nothing selected yet -> show a branch picker instead of dumping
+        // every room from every branch onto the screen at once.
+        if (!roomsCategoryFilter && !roomsBranchFilter) {
+          const roomsWithoutBranch = (rooms||[]).filter(r => !r.hotel)
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(hotels||[]).map(h => {
+                const count = (rooms||[]).filter(r => r.hotel === h.id).length
+                return (
+                  <div
+                    key={h.id}
+                    className="card p-5 space-y-1 cursor-pointer hover:border-enayi-gold/30 transition-colors"
+                    onClick={() => setRoomsBranchFilter({ id: h.id, name: h.name })}
+                    title={`View all rooms at ${h.name}`}
+                  >
+                    <div className="text-enayi-text font-medium text-lg">{h.name}</div>
+                    <div className="text-enayi-muted text-sm">{count} room{count===1?'':'s'}</div>
+                  </div>
+                )
+              })}
+              {roomsWithoutBranch.length > 0 && (
+                <div
+                  className="card p-5 space-y-1 cursor-pointer hover:border-enayi-gold/30 transition-colors"
+                  onClick={() => setRoomsBranchFilter({ id: '__none__', name: 'No specific branch' })}
+                  title="View rooms not assigned to a branch"
+                >
+                  <div className="text-enayi-text font-medium text-lg">No specific branch</div>
+                  <div className="text-enayi-muted text-sm">{roomsWithoutBranch.length} room{roomsWithoutBranch.length===1?'':'s'}</div>
+                </div>
+              )}
+            </div>
+          )
+        }
+
+        const filteredRooms = (rooms||[])
+          .filter(r => !roomsCategoryFilter || r.category === roomsCategoryFilter.id)
+          .filter(r => !roomsBranchFilter || (roomsBranchFilter.id === '__none__' ? !r.hotel : r.hotel === roomsBranchFilter.id))
         const branchGroups = new Map<string, Room[]>()
         filteredRooms.forEach(r => {
           const key = r.branch_name || 'No specific branch'
@@ -328,18 +369,26 @@ export default function AdminRooms() {
 
         return (
           <>
-            {roomsCategoryFilter && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-enayi-muted text-sm">Showing:</span>
+            <div className="flex items-center gap-2 flex-wrap">
+              {roomsBranchFilter && (
+                <button
+                  onClick={() => setRoomsBranchFilter(null)}
+                  className="flex items-center gap-1.5 bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20 rounded-full px-3 py-1 text-sm hover:bg-enayi-gold/20 transition-colors"
+                >
+                  {roomsBranchFilter.name}
+                  <span className="text-enayi-muted">✕</span>
+                </button>
+              )}
+              {roomsCategoryFilter && (
                 <button
                   onClick={() => setRoomsCategoryFilter(null)}
                   className="flex items-center gap-1.5 bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20 rounded-full px-3 py-1 text-sm hover:bg-enayi-gold/20 transition-colors"
                 >
-                  {roomsCategoryFilter.name} rooms · all branches
+                  {roomsCategoryFilter.name} rooms{!roomsBranchFilter ? ' · all branches' : ''}
                   <span className="text-enayi-muted">✕</span>
                 </button>
-              </div>
-            )}
+              )}
+            </div>
             {filteredRooms.length === 0 ? (
               <div className="card p-12 text-center"><EmptyState icon={DoorOpen} title="No rooms yet" desc={roomsCategoryFilter ? `No rooms in ${roomsCategoryFilter.name} yet.` : isManagerOrAdmin ? 'Add your first room to get started.' : 'None have been added yet.'} /></div>
             ) : (
