@@ -21,6 +21,7 @@ interface RoomEntry {
 interface CategoryGroup {
   category: string
   category_slug: string
+  photo_url?: string | null
   rooms: RoomEntry[]
   free_count: number
   total_count: number
@@ -158,7 +159,7 @@ export default function RoomsPage() {
   const [openCat, setOpenCat]   = useState<string | null>(null)
   const [imgLightbox, setImgLightbox] = useState<{ src: string; caption?: string } | null>(null)
   const [selectedRoom, setSelectedRoom] = useState<{
-    room: RoomEntry; catName: string; catSlug: string; branchName?: string; hotelId?: string
+    room: RoomEntry; catName: string; catSlug: string; branchName?: string; hotelId?: string; photoUrl?: string | null
   } | null>(null)
 
   const { data: hotels = [], isLoading: hotelsLoading } = useQuery<Hotel[]>({
@@ -186,8 +187,12 @@ export default function RoomsPage() {
     return map
   }, [roomCategories])
 
-  function resolveRoomImage(slug: string, name: string): string {
-    return categoryImageMap[slug] ?? getRoomImage(slug, name)
+  // Prefer an actual photo from a room at the branch being viewed (photoUrl,
+  // supplied per-category by the branch-availability endpoint) over the
+  // shared, branch-agnostic category stock photo — so switching branches
+  // shows that branch's real rooms instead of the same generic shot.
+  function resolveRoomImage(slug: string, name: string, photoUrl?: string | null): string {
+    return photoUrl ?? categoryImageMap[slug] ?? getRoomImage(slug, name)
   }
 
   // Query for each hotel individually — useQueries handles a dynamic-length
@@ -366,7 +371,7 @@ export default function RoomsPage() {
                   onClick={() => setOpenCat(openCat === cat.category_slug ? null : cat.category_slug)}
                   className="w-full flex items-center gap-4 p-4 hover:bg-white/3 transition-colors text-left">
                   <div className="w-20 h-14 rounded-xl overflow-hidden shrink-0 border border-enayi-gold/20">
-                    <img src={resolveRoomImage(cat.category_slug, cat.category)}
+                    <img src={resolveRoomImage(cat.category_slug, cat.category, cat.photo_url)}
                          alt={cat.category} className="w-full h-full object-cover"/>
                   </div>
                   <div className="flex-1 min-w-0">
@@ -391,8 +396,8 @@ export default function RoomsPage() {
                       <div className="p-5">
                         {/* Category image — click to fullscreen */}
                         <div className="relative rounded-xl overflow-hidden mb-5 aspect-video max-h-52 cursor-zoom-in group"
-                          onClick={() => setImgLightbox({ src: resolveRoomImage(cat.category_slug, cat.category), caption: cat.category })}>
-                          <img src={resolveRoomImage(cat.category_slug, cat.category)}
+                          onClick={() => setImgLightbox({ src: resolveRoomImage(cat.category_slug, cat.category, cat.photo_url), caption: cat.category })}>
+                          <img src={resolveRoomImage(cat.category_slug, cat.category, cat.photo_url)}
                                alt={cat.category} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-200 flex items-center justify-center">
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
@@ -415,7 +420,8 @@ export default function RoomsPage() {
                               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
                               onClick={() => setSelectedRoom({
                                 room, catName: cat.category, catSlug: cat.category_slug,
-                                hotelId: selectedHotel !== 'all' ? selectedHotel : undefined
+                                hotelId: selectedHotel !== 'all' ? selectedHotel : undefined,
+                                photoUrl: cat.photo_url,
                               })}
                               className={`rounded-xl border p-3 text-center transition-all cursor-pointer
                                 ${STATUS_STYLE[room.status] ?? STATUS_STYLE.occupied}
@@ -453,7 +459,7 @@ export default function RoomsPage() {
           <RoomModal room={selectedRoom.room} catName={selectedRoom.catName}
             catSlug={selectedRoom.catSlug} branchName={selectedRoom.branchName}
             hotelId={selectedRoom.hotelId}
-            imageUrl={resolveRoomImage(selectedRoom.catSlug, selectedRoom.catName)}
+            imageUrl={resolveRoomImage(selectedRoom.catSlug, selectedRoom.catName, selectedRoom.photoUrl)}
             onClose={() => setSelectedRoom(null)}/>
         )}
       </AnimatePresence>

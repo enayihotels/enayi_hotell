@@ -301,6 +301,21 @@ class BranchRoomsView(APIView):
         if cat_slug:
             rooms = rooms.filter(category__slug=cat_slug)
 
+        # One representative real photo per category, so guests browsing a
+        # specific branch see an actual room from THAT branch instead of a
+        # generic shared category stock photo. Picks the lowest room_number
+        # (with a photo) in each category; falls back to None if no room in
+        # that category/branch has a photo yet (frontend falls back to the
+        # generic category image in that case).
+        photo_by_category = {}
+        branch_photos = (RoomPhoto.objects.filter(room__hotel=hotel_obj)
+                          .select_related("room__category")
+                          .order_by("room__room_number", "-uploaded_at"))
+        for photo in branch_photos:
+            cslug = photo.room.category.slug
+            if cslug not in photo_by_category:
+                photo_by_category[cslug] = request.build_absolute_uri(photo.image.url)
+
         today = timezone.now().date()
         booked = set(Booking.objects.filter(
             status__in=["pending", "confirmed", "checked_in"],
@@ -313,6 +328,7 @@ class BranchRoomsView(APIView):
             entry = grouped.setdefault(room.category.slug, {
                 "category": room.category.name,
                 "category_slug": room.category.slug,
+                "photo_url": photo_by_category.get(room.category.slug),
                 "rooms": [], "free_count": 0, "total_count": 0,
             })
             entry["rooms"].append({

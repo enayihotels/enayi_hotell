@@ -31,6 +31,7 @@ interface RoomEntry {
 interface CategoryGroup {
   category: string
   category_slug: string
+  photo_url?: string | null
   rooms: RoomEntry[]
   free_count: number
   total_count: number
@@ -300,7 +301,11 @@ export default function BookingPage() {
                 const ra = availByCleanName[cleanName(r.name).toLowerCase()]
                 const rp = r.branch_prices?.find(p => p.hotel === branchId)
                 const rprice = Number(rp?.current_price ?? r.current_price ?? r.base_price)
-                const thumb = r.images?.find(i => i.is_primary)?.image_url || r.images?.[0]?.image_url || getRoomImage(r.slug, r.name)
+                // Prefer an actual photo from a room at the selected branch
+                // (ra.photo_url, from branch-availability) over the shared,
+                // branch-agnostic category stock photo — same behavior as
+                // the Rooms Directory page.
+                const thumb = ra?.photo_url || r.images?.find(i => i.is_primary)?.image_url || r.images?.[0]?.image_url || getRoomImage(r.slug, r.name)
                 const isExpanded = catId === r.id
                 const displayName = cleanCatName(r.name)
                 return (
