@@ -59,6 +59,18 @@ export interface RoomReview {
   created_at: string
 }
 
+export interface RoomCategoryBranchPrice {
+  hotel: string
+  branch: string
+  branch_name: string
+  base_price: string
+  weekend_price: string
+  holiday_price: string
+  breakfast_price: string
+  current_price: string
+  current_price_with_breakfast: string
+}
+
 export interface RoomCategory {
   id: string
   name: string
@@ -70,6 +82,7 @@ export interface RoomCategory {
   weekend_price: number
   holiday_price: number
   current_price: string
+  branch_prices: RoomCategoryBranchPrice[]
   max_adults: number
   max_children: number
   bed_type: string

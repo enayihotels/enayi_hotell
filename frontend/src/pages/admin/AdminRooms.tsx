@@ -57,6 +57,7 @@ export default function AdminRooms() {
   const [tab, setTab] = useState<'categories' | 'rooms' | 'amenities'>('categories')
   const [roomsCategoryFilter, setRoomsCategoryFilter] = useState<RoomCategory | null>(null)
   const [roomsBranchFilter, setRoomsBranchFilter] = useState<{ id: string; name: string } | null>(null)
+  const [catsBranchFilter, setCatsBranchFilter] = useState<{ id: string; name: string; branch: string } | null>(null)
 
   const { data: categories, isLoading: catsLoading } = useQuery<RoomCategory[]>({
     queryKey: ['admin-room-categories'], queryFn: () => api.get('/rooms/categories/').then(r => unwrapList(r.data)),
@@ -268,7 +269,7 @@ export default function AdminRooms() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => setTab('categories')}
+        <button onClick={() => { setTab('categories'); setCatsBranchFilter(null) }}
           className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${tab==='categories' ? 'bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20' : 'text-enayi-muted hover:text-enayi-text'}`}>
           <LayoutGrid size={14} className="inline mr-1.5 -mt-0.5" /> Categories ({categories?.length ?? 0})
         </button>
@@ -284,43 +285,90 @@ export default function AdminRooms() {
         )}
       </div>
 
-      {tab === 'categories' && (
-        (categories||[]).length === 0 ? (
-          <div className="card p-12 text-center"><EmptyState icon={BedDouble} title="No room categories yet" desc={isManagerOrAdmin ? "Add your first one to get started." : "None have been added yet."} /></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories!.map(c => (
-              <div
-                key={c.id}
-                className="card p-4 space-y-2 cursor-pointer hover:border-enayi-gold/30 transition-colors"
-                onClick={() => { setRoomsCategoryFilter(c); setTab('rooms') }}
-                title={`View all ${c.name} rooms across every branch`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="text-enayi-text font-medium">{c.name}</div>
-                    <div className="text-enayi-muted text-xs">{c.tagline}</div>
+      {tab === 'categories' && (() => {
+        if ((categories||[]).length === 0) {
+          return <div className="card p-12 text-center"><EmptyState icon={BedDouble} title="No room categories yet" desc={isManagerOrAdmin ? "Add your first one to get started." : "None have been added yet."} /></div>
+        }
+
+        // Nothing selected yet -> pick a branch first, since pricing
+        // (and which categories even have rooms) differs by branch.
+        if (!catsBranchFilter) {
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {(hotels||[]).map(h => {
+                const count = (rooms||[]).filter(r => r.hotel === h.id).length
+                return (
+                  <div
+                    key={h.id}
+                    className="card p-5 space-y-1 cursor-pointer hover:border-enayi-gold/30 transition-colors"
+                    onClick={() => setCatsBranchFilter({ id: h.id, name: h.name, branch: h.branch })}
+                    title={`View category pricing at ${h.name}`}
+                  >
+                    <div className="text-enayi-text font-medium text-lg">{h.name}</div>
+                    <div className="text-enayi-muted text-sm">{count} room{count===1?'':'s'}</div>
                   </div>
-                  {!c.is_active && <Badge variant="gray">Inactive</Badge>}
-                </div>
-                <div className="text-enayi-gold font-semibold">{formatCurrency(c.base_price)}<span className="text-enayi-muted text-xs font-normal"> / night</span></div>
-                <div className="text-enayi-muted text-xs">{c.max_adults} adults · {c.num_beds} bed(s) · {c.num_bathrooms} bath · {c.room_size_sqm}m² · {c.available_rooms} room(s) across both branches</div>
-                <div className="flex gap-2 pt-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                  {isManagerOrAdmin ? (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => openEditCategory(c)}><Pencil size={12} /> Edit</Button>
-                      <Button size="sm" variant="surface" onClick={() => openPhotoModal(c)}><ImageIcon size={12} /> Photos ({c.images?.length ?? 0})</Button>
-                      <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCategory.mutate(c.slug) }}><Trash2 size={12} /> Delete</Button>
-                    </>
-                  ) : (
-                    <span className="text-enayi-muted text-xs italic">View only</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                )
+              })}
+            </div>
+          )
+        }
+
+        const bf = catsBranchFilter
+        return (
+          <>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => setCatsBranchFilter(null)}
+                className="flex items-center gap-1.5 bg-enayi-gold/10 text-enayi-gold border border-enayi-gold/20 rounded-full px-3 py-1 text-sm hover:bg-enayi-gold/20 transition-colors"
+              >
+                {bf.name}
+                <span className="text-enayi-muted">✕</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {categories!.map(c => {
+                // Prefer this branch's actual override price; fall back to
+                // the category's global default if no override exists yet.
+                const bp = c.branch_prices?.find(p => p.hotel === bf.id)
+                const displayPrice = bp ? Number(bp.base_price) : c.base_price
+                const roomCount = (rooms||[]).filter(r => r.category === c.id && r.hotel === bf.id).length
+                return (
+                  <div
+                    key={c.id}
+                    className="card p-4 space-y-2 cursor-pointer hover:border-enayi-gold/30 transition-colors"
+                    onClick={() => { setRoomsCategoryFilter(c); setRoomsBranchFilter({ id: bf.id, name: bf.name }); setTab('rooms') }}
+                    title={`View all ${c.name} rooms at ${bf.name}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="text-enayi-text font-medium">{c.name}</div>
+                        <div className="text-enayi-muted text-xs">{c.tagline}</div>
+                      </div>
+                      {!c.is_active && <Badge variant="gray">Inactive</Badge>}
+                    </div>
+                    <div className="text-enayi-gold font-semibold">
+                      {formatCurrency(displayPrice)}<span className="text-enayi-muted text-xs font-normal"> / night</span>
+                      {!bp && <span className="text-enayi-muted text-xs font-normal"> (no {bf.name} override set — showing default)</span>}
+                    </div>
+                    <div className="text-enayi-muted text-xs">{c.max_adults} adults · {c.num_beds} bed(s) · {c.num_bathrooms} bath · {c.room_size_sqm}m² · {roomCount} room(s) at {bf.name}</div>
+                    <div className="flex gap-2 pt-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                      {isManagerOrAdmin ? (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => openEditCategory(c)}><Pencil size={12} /> Edit</Button>
+                          <Button size="sm" variant="surface" onClick={() => openPhotoModal(c)}><ImageIcon size={12} /> Photos ({c.images?.length ?? 0})</Button>
+                          <Button size="sm" variant="danger" onClick={() => { if (confirm(`Delete "${c.name}"?`)) deleteCategory.mutate(c.slug) }}><Trash2 size={12} /> Delete</Button>
+                        </>
+                      ) : (
+                        <span className="text-enayi-muted text-xs italic">View only</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
         )
-      )}
+      })()}
 
       {tab === 'rooms' && (() => {
         // Nothing selected yet -> show a branch picker instead of dumping
