@@ -111,7 +111,14 @@ api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
-    if (error.response?.status === 401 && !original._retry) {
+    // Auth endpoints returning 401 means "wrong credentials" — a normal,
+    // expected response the login/register pages already show as a
+    // friendly error message. That's NOT an expired session, so it must
+    // never trigger the refresh-then-redirect flow below (which was
+    // silently hard-reloading straight to /login, wiping out the error
+    // toast before it could ever render).
+    const isAuthEndpoint = /\/auth\/(login|register|google)\/?$/.test(original.url || '')
+    if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
       const refresh = localStorage.getItem('refresh_token')
       if (refresh) {
