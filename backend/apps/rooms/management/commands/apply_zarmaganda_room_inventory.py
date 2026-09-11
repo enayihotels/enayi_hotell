@@ -5,24 +5,33 @@ the original handwritten room roster and per-room inventory sheets
 
 WHAT THIS DOES, IN ORDER:
 
-1. Renumbers/recategorizes 5 rooms whose live room_number or category
-   didn't match the original roster:
-     - "2010"     -> "210"     (typo fix, category already correct)
-     - "Suitea 1" -> "Suite 1" (typo fix)
-     - "Suites 2" -> "Suite 2" (typo fix)
-     - "Deluxe 1" -> "VIP 1"   (recategorized: Executive Deluxe -> VIP)
-     - "Deluxe 2" -> "VIP 2"   (recategorized: Executive Deluxe -> VIP)
-   The other 15 rooms (101, 102, 103, 104, 105, 106, 201-209) already
+1. Deletes 2 duplicate rooms — "VIP 1" and "VIP 2" (category:
+   Executive Deluxe) — accidentally created via Admin as empty
+   placeholders. Confirmed with Adrian: these are the SAME physical
+   rooms as "Deluxe 1"/"Deluxe 2" below, not separate rooms. Skipped
+   automatically with a warning if either turns out to have booking
+   history that blocks deletion.
+2. Renumbers/recategorizes 4 rooms whose live room_number or category
+   didn't match the original roster (run AFTER the deletion above,
+   since "Deluxe 1" -> "VIP 1" would otherwise collide with the
+   duplicate room of the same number):
+     - "SUITE 1"  -> "Suite 1"  (typo fix)
+     - "Suites 2" -> "Suite 2"  (typo fix)
+     - "Deluxe 1" -> "VIP 1"    (recategorized: Executive Deluxe -> VIP)
+     - "Deluxe 2" -> "VIP 2"    (recategorized: Executive Deluxe -> VIP)
+   ("2010" was already fixed to "210" independently before this
+   command was written — no action needed there.)
+   The other 16 rooms (101-106, 201-210 except the above) already
    matched the roster exactly and are left untouched.
-2. Creates the "VIP" RoomCategory (didn't exist before — Rayfield has
+3. Creates the "VIP" RoomCategory (didn't exist before — Rayfield has
    no VIP tier). Price is a PLACEHOLDER pending Adrian's real figure —
    see PLACEHOLDER PRICE note below. Easy to change any time from
    Admin > Rooms > Categories > Edit, no re-run of this command needed.
-3. Creates PropertyAsset records (department=housekeeping) for every
+4. Creates PropertyAsset records (department=housekeeping) for every
    item listed against each room in the inventory sheets. Uses
    get_or_create keyed on (hotel, room, name) so it's safe to re-run
    without creating duplicates.
-4. 7 rooms have no itemized list in the source sheets yet (105, 202,
+5. 7 rooms have no itemized list in the source sheets yet (105, 202,
    206, 207, 208, VIP 2, Suite 2) — each gets a single placeholder
    asset flagging that, instead of invented item data. Same pattern
    as Rayfield's Room 203.
@@ -60,11 +69,14 @@ from apps.rooms.models import Room, RoomCategory
 from apps.assets.models import PropertyAsset
 
 
-# ── Step 1: renumber + recategorize map ──
+# ── Step 1: duplicate rooms to delete FIRST (before renumbering below,
+# to avoid a room_number collision — see module docstring) ──
+DELETE_ROOM_NUMBERS = ["VIP 1", "VIP 2"]  # duplicates of "Deluxe 1"/"Deluxe 2"
+
+# ── Step 2: renumber + recategorize map ──
 # old_room_number -> (new_room_number, category_name_as_in_db)
 RENUMBER_MAP = {
-    "2010":     ("210",     "Class Plus"),
-    "Suitea 1": ("Suite 1", "Suites"),
+    "SUITE 1":  ("Suite 1", "Suites"),
     "Suites 2": ("Suite 2", "Suites"),
     "Deluxe 1": ("VIP 1",   "VIP"),   # ⚠ recategorized, see ASSUMPTION above
     "Deluxe 2": ("VIP 2",   "VIP"),   # ⚠ recategorized, see ASSUMPTION above
@@ -334,8 +346,27 @@ class Command(BaseCommand):
                 if apply_changes:
                     vip_category = RoomCategory.objects.create(name="VIP", **VIP_CATEGORY_DEFAULTS)
 
-            # ── Step 1b: renumber + recategorize ──
-            self.stdout.write(self.style.MIGRATE_HEADING("\nStep 1 — Renumber & recategorize rooms"))
+            # ── Step 1b: delete duplicate rooms FIRST (before renumbering, to
+            # avoid a room_number collision with the rename below) ──
+            self.stdout.write(self.style.MIGRATE_HEADING("\nStep 1 — Remove duplicate room(s)"))
+            for dup_number in DELETE_ROOM_NUMBERS:
+                try:
+                    dup_room = Room.objects.get(hotel=hotel, room_number=dup_number)
+                except Room.DoesNotExist:
+                    self.stdout.write(f'  "{dup_number}" not found — nothing to remove.')
+                    continue
+                self.stdout.write(f'  Deleting Room "{dup_number}" (id={dup_room.id}, category={dup_room.category.name if dup_room.category_id else "none"}) — duplicate of "Deluxe {dup_number[-1]}"')
+                if apply_changes:
+                    try:
+                        dup_room.delete()
+                    except ProtectedError:
+                        self.stdout.write(self.style.ERROR(
+                            f'  BLOCKED: Room "{dup_number}" has booking history and can\'t be deleted. '
+                            f'Set it to "Out of Order" manually via Admin instead, and skip renaming "Deluxe" to this number.'
+                        ))
+
+            # ── Step 2: renumber + recategorize ──
+            self.stdout.write(self.style.MIGRATE_HEADING("\nStep 2 — Renumber & recategorize rooms"))
             new_room_by_number = {}
             for old_number, (new_number, category_name) in RENUMBER_MAP.items():
                 try:
@@ -362,8 +393,8 @@ class Command(BaseCommand):
                     room.save(update_fields=["room_number", "category"])
                 new_room_by_number[new_number] = room
 
-            # ── Step 2: populate per-room inventory ──
-            self.stdout.write(self.style.MIGRATE_HEADING("\nStep 2 — Populate room inventory"))
+            # ── Step 3: populate per-room inventory ──
+            self.stdout.write(self.style.MIGRATE_HEADING("\nStep 3 — Populate room inventory"))
             for room_number, items in ROOM_INVENTORY.items():
                 room = new_room_by_number.get(room_number)
                 if room is None:
@@ -395,8 +426,8 @@ class Command(BaseCommand):
                             defaults={"department": HOUSEKEEPING, "category": category, "quantity": qty, "notes": note or ""},
                         )
 
-            # ── Step 3: kitchen equipment (shared, not room-tied) ──
-            self.stdout.write(self.style.MIGRATE_HEADING("\nStep 3 — Populate kitchen inventory"))
+            # ── Step 4: kitchen equipment (shared, not room-tied) ──
+            self.stdout.write(self.style.MIGRATE_HEADING("\nStep 4 — Populate kitchen inventory"))
             self.stdout.write(f'  {len(KITCHEN_INVENTORY)} items -> department=kitchen, Main Kitchen (Zarmaganda)')
             for item_name, raw_qty, note in KITCHEN_INVENTORY:
                 qty, parsed_note = parse_quantity(raw_qty)
