@@ -370,13 +370,16 @@ class BranchRoomsView(APIView):
         # One representative real photo per category, so guests browsing a
         # specific branch see an actual room from THAT branch instead of a
         # generic shared category stock photo. Picks the lowest room_number
-        # (with a photo) in each category; falls back to None if no room in
-        # that category/branch has a photo yet (frontend falls back to the
-        # generic category image in that case).
+        # (with a photo) in each category, and within that room prefers its
+        # FIRST-uploaded photo ("View 1") as the representative shot — the
+        # most defensible default when multiple angles exist with no
+        # explicit "primary" flag (RoomPhoto has none, unlike RoomImage).
+        # Falls back to None if no room in that category/branch has a photo
+        # yet (frontend falls back to the generic category image then).
         photo_by_category = {}
         branch_photos = (RoomPhoto.objects.filter(room__hotel=hotel_obj)
                           .select_related("room__category")
-                          .order_by("room__room_number", "-uploaded_at"))
+                          .order_by("room__room_number", "uploaded_at"))
         for photo in branch_photos:
             cslug = photo.room.category.slug
             if cslug not in photo_by_category:
