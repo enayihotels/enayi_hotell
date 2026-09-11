@@ -7,6 +7,8 @@ import { motion } from 'framer-motion'
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, CheckCircle2, Star } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api, { getErrorMessage } from '@/utils/api'
+import { getPostLoginRoute } from '@/utils/authRouting'
+import { GoogleSignInButton } from '@/components/GoogleSignInButton'
 import toast from 'react-hot-toast'
 
 const schema = z.object({
@@ -42,17 +44,7 @@ export default function LoginPage() {
       // that live in the inventory shell should never land in the guest
       // portal, and front desk/manager who have both the admin panel and
       // their own entry points need to go to the right one too.
-      const INVENTORY_ROLES = ['store_keeper', 'bar_staff', 'kitchen_staff', 'housekeeper', 'laundry_staff']
-      const ADMIN_ROLES = ['manager', 'admin', 'staff']
-      if (INVENTORY_ROLES.includes(user.role)) {
-        // Housekeeping → their own page; all others → inventory list
-        navigate(user.role === 'housekeeper' ? '/housekeeping' : '/inventory', { replace: true })
-      } else if (ADMIN_ROLES.includes(user.role)) {
-        navigate('/admin', { replace: true })
-      } else {
-        // Guest (default)
-        navigate('/dashboard', { replace: true })
-      }
+      navigate(getPostLoginRoute(user.role), { replace: true })
     } catch (err) {
       toast.error(getErrorMessage(err))
     }
@@ -183,6 +175,8 @@ export default function LoginPage() {
               <span className="text-enayi-muted text-xs">or</span>
               <div className="flex-1 h-px bg-enayi-border" />
             </div>
+
+            <GoogleSignInButton />
 
             <p className="text-center text-sm text-enayi-muted">
               Don't have an account?{' '}

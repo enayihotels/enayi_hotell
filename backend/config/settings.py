@@ -301,6 +301,17 @@ FLUTTERWAVE_SECRET_KEY    = env("FLUTTERWAVE_SECRET_KEY",    default="")
 FLUTTERWAVE_ENCRYPTION_KEY= env("FLUTTERWAVE_ENCRYPTION_KEY",default="")
 FLUTTERWAVE_WEBHOOK_HASH  = env("FLUTTERWAVE_WEBHOOK_HASH",  default="")
 
+# ── Google Sign-In ───────────────────────────────────────
+# Client ID only — this is NOT secret and is safe to have as a fallback
+# default (it's sent to every browser anyway as part of normal Google
+# Sign-In). Only the Client SECRET would need to stay out of source
+# control, and we don't need it at all for this flow — verifying a
+# Google ID token only requires the Client ID.
+GOOGLE_OAUTH_CLIENT_ID = env(
+    "GOOGLE_OAUTH_CLIENT_ID",
+    default="264010123117-5933786t6kt7d8tngn8rehn3156dutmu.apps.googleusercontent.com",
+)
+
 PAYSTACK_PUBLIC_KEY      = env("PAYSTACK_PUBLIC_KEY",      default="")
 PAYSTACK_SECRET_KEY      = env("PAYSTACK_SECRET_KEY",      default="")
 PAYSTACK_WEBHOOK_SECRET  = env("PAYSTACK_WEBHOOK_SECRET",  default="")

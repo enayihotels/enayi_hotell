@@ -7,6 +7,7 @@ import { motion } from 'framer-motion'
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api, { getErrorMessage } from '@/utils/api'
+import { GoogleSignInButton } from '@/components/GoogleSignInButton'
 import toast from 'react-hot-toast'
 
 const schema = z.object({
@@ -187,6 +188,14 @@ export default function RegisterPage() {
                 : <>Create Account <ArrowRight size={16} /></>
               }
             </button>
+
+            <div className="relative flex items-center gap-4">
+              <div className="flex-1 h-px bg-enayi-border" />
+              <span className="text-enayi-muted text-xs">or</span>
+              <div className="flex-1 h-px bg-enayi-border" />
+            </div>
+
+            <GoogleSignInButton />
 
             <p className="text-center text-sm text-enayi-muted">
               Already have an account?{' '}

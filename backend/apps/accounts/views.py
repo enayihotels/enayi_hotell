@@ -55,6 +55,71 @@ class LoginView(APIView):
         user.save(update_fields=["last_login_ip"])
         return Response({"message": f"Welcome back, {user.first_name}! 🏨", "user": UserSerializer(user).data, **get_tokens(user)})
 
+class GoogleAuthView(APIView):
+    """POST /api/v1/auth/google/  — body: {"credential": "<Google ID token>"}
+
+    Verifies the ID token Google's Sign-In button hands back to the
+    frontend, then finds-or-creates a guest account by email (Google
+    guarantees the email in a valid ID token is verified, so it's safe
+    to trust as an identity match — same email-based linking every
+    "Sign in with Google" implementation uses). Returns the same shape
+    as LoginView/RegisterView so the frontend handles it identically.
+
+    Existing accounts (including ones created the normal way with a
+    password) sign in fine via Google as long as the email matches —
+    that's expected, not a bug: it's still proving the same verified
+    email address, just via a different method.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        credential = request.data.get("credential")
+        if not credential:
+            return Response({"error": "Missing Google credential."}, status=400)
+
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+
+        try:
+            idinfo = google_id_token.verify_oauth2_token(
+                credential, google_requests.Request(), settings.GOOGLE_OAUTH_CLIENT_ID,
+            )
+        except ValueError:
+            return Response({"error": "Google sign-in failed — the token could not be verified. Please try again."}, status=401)
+
+        if not idinfo.get("email_verified", False):
+            return Response({"error": "That Google account's email isn't verified. Please verify it with Google first."}, status=401)
+
+        email = idinfo["email"].lower()
+        user = User.objects.filter(email=email).first()
+
+        if user is None:
+            user = User.objects.create_user(
+                email=email,
+                password=None,  # Django's set_password(None) marks it unusable automatically
+                first_name=idinfo.get("given_name", "") or (idinfo.get("name", "Guest").split(" ")[0]),
+                last_name=idinfo.get("family_name", ""),
+                role=User.GUEST,
+                is_verified=True,
+            )
+        elif not user.is_active:
+            return Response({"error": "This account has been deactivated. Contact us if you think that's a mistake."}, status=403)
+        elif not user.is_verified:
+            # Signing in with Google proves the email either way — no
+            # reason to keep blocking them on our own OTP step.
+            user.is_verified = True
+            user.save(update_fields=["is_verified"])
+
+        user.last_login_ip = request.META.get("REMOTE_ADDR")
+        user.save(update_fields=["last_login_ip"])
+
+        return Response({
+            "message": f"Welcome, {user.first_name}! 🏨",
+            "user": UserSerializer(user).data,
+            **get_tokens(user),
+        })
+
+
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
     def post(self, request):
