@@ -17,6 +17,8 @@ class GalleryCategorySerializer(serializers.ModelSerializer):
 class GalleryImageSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     category_type = serializers.CharField(source="category.category_type", read_only=True)
+    hotel_name    = serializers.SerializerMethodField()
+    branch        = serializers.SerializerMethodField()
     image_url     = serializers.SerializerMethodField()
     uploaded_by_name = serializers.SerializerMethodField()
 
@@ -24,12 +26,19 @@ class GalleryImageSerializer(serializers.ModelSerializer):
         model  = GalleryImage
         fields = [
             "id", "category", "category_name", "category_type",
+            "hotel", "hotel_name", "branch",
             "title", "description", "image_url",
             "alt_text", "is_featured", "is_active", "sort_order",
             "width", "height", "file_size_kb",
             "uploaded_by_name", "uploaded_at",
         ]
         read_only_fields = ["id", "width", "height", "file_size_kb", "uploaded_at", "uploaded_by_name"]
+
+    def get_hotel_name(self, obj):
+        return obj.hotel.name if obj.hotel_id else None
+
+    def get_branch(self, obj):
+        return obj.hotel.branch if obj.hotel_id else None
 
     def get_image_url(self, obj):
         request = self.context.get("request")
@@ -43,6 +52,7 @@ class GalleryImageSerializer(serializers.ModelSerializer):
 
 class GalleryImageUploadSerializer(serializers.Serializer):
     category  = serializers.UUIDField()
+    hotel     = serializers.UUIDField(required=False, allow_null=True)
     title     = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
     alt_text  = serializers.CharField(max_length=300, required=False, allow_blank=True, default="")
     is_featured = serializers.BooleanField(default=False, required=False)

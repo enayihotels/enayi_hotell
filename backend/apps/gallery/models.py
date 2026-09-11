@@ -30,6 +30,9 @@ class GalleryCategory(models.Model):
 class GalleryImage(models.Model):
     id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     category     = models.ForeignKey(GalleryCategory, on_delete=models.PROTECT, related_name="images")
+    hotel        = models.ForeignKey("hotels.Hotel", on_delete=models.SET_NULL, null=True, blank=True,
+                                      related_name="gallery_images",
+                                      help_text="Which branch this photo is of. Blank = not yet assigned / applies to both.")
     title        = models.CharField(max_length=200, blank=True)
     description  = models.TextField(blank=True)
     image        = models.ImageField(upload_to="gallery/%Y/%m/")

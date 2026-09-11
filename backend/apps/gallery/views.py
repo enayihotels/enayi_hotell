@@ -78,6 +78,7 @@ class GalleryImageListView(generics.ListAPIView):
 
     filterset_fields = [
         "category",
+        "hotel",
         "is_featured",
         "category__category_type"
     ]
@@ -93,6 +94,7 @@ class GalleryImageListView(generics.ListAPIView):
             is_active=True
         ).select_related(
             "category",
+            "hotel",
             "uploaded_by"
         ).order_by(
             "-is_featured",
@@ -122,18 +124,28 @@ class FeaturedImagesView(generics.ListAPIView):
         return {"request": self.request}
 
 
-class GalleryImageDetailView(generics.RetrieveDestroyAPIView):
+class GalleryImageDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = GalleryImageSerializer
 
     def get_queryset(self):
         return GalleryImage.objects.select_related(
             "category",
+            "hotel",
             "uploaded_by"
         )
 
     def get_serializer_context(self):
         return {"request": self.request}
+
+    def update(self, request, *args, **kwargs):
+        if request.user.role not in ["manager","admin"]:
+            return Response({"error": "Only staff can edit images."}, status=403)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def perform_destroy(self, instance):
         if self.request.user.role not in ["manager","admin"]:
@@ -156,6 +168,7 @@ class GalleryImageUploadView(APIView):
             )
 
         cat_id = request.data.get("category")
+        hotel_id = request.data.get("hotel") or None
 
         if not cat_id:
             return Response(
@@ -172,6 +185,17 @@ class GalleryImageUploadView(APIView):
                 status=404
             )
 
+        hotel = None
+        if hotel_id:
+            from apps.hotels.models import Hotel
+            try:
+                hotel = Hotel.objects.get(id=hotel_id)
+            except Hotel.DoesNotExist:
+                return Response(
+                    {"error": "Branch not found."},
+                    status=404
+                )
+
         images = request.FILES.getlist("images")
 
         if not images:
@@ -187,6 +211,7 @@ class GalleryImageUploadView(APIView):
             img = optimize_image_file(img)
             gi = GalleryImage.objects.create(
                 category=category,
+                hotel=hotel,
                 image=img,
                 title=request.data.get("title", ""),
                 alt_text=request.data.get("alt_text", ""),

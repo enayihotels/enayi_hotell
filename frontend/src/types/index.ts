@@ -440,6 +440,9 @@ export interface GalleryImage {
   category: string
   category_name: string
   category_type: string
+  hotel: string | null
+  hotel_name: string | null
+  branch: string | null
   title: string
   description: string
   image_url: string
