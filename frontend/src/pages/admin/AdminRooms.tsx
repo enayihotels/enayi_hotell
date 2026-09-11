@@ -326,12 +326,14 @@ export default function AdminRooms() {
               </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {categories!.map(c => {
+              {categories!
+                .map(c => ({ c, roomCount: (rooms||[]).filter(r => r.category === c.id && r.hotel === bf.id).length }))
+                .filter(({ roomCount }) => roomCount > 0)
+                .map(({ c, roomCount }) => {
                 // Prefer this branch's actual override price; fall back to
                 // the category's global default if no override exists yet.
                 const bp = c.branch_prices?.find(p => p.hotel === bf.id)
                 const displayPrice = bp ? Number(bp.base_price) : c.base_price
-                const roomCount = (rooms||[]).filter(r => r.category === c.id && r.hotel === bf.id).length
                 return (
                   <div
                     key={c.id}
