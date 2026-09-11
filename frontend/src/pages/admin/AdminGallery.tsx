@@ -1,14 +1,19 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import api, { getErrorMessage } from '@/utils/api'
 import { PageSpinner, EmptyState, Button, Modal, Input, Textarea, Select, Badge, Alert } from '@/components/ui'
-import { Image as ImageIcon, LayoutGrid, Plus, Pencil, Trash2, Upload, Star, Expand } from 'lucide-react'
+import { Image as ImageIcon, LayoutGrid, Plus, Pencil, Trash2, Upload, Star, Expand, BedDouble } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { Lightbox } from '@/components/Lightbox'
 import type { GalleryCategory, GalleryImage } from '@/types'
 
 const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
+
+type BranchRoomPhoto = { id: string; image_url: string; caption: string }
+type BranchRoom = { room_id: string; room_number: string; category_name: string; photos: BranchRoomPhoto[] }
+type BranchRoomPhotosResponse = { hotel_id: string; hotel_name: string; rooms: BranchRoom[] }
 
 const CATEGORY_TYPES = ['lobby','rooms','restaurant','bar','events','pool','exterior','spa','amenities','surroundings']
 const UNASSIGNED = '__unassigned__'
@@ -31,6 +36,11 @@ export default function AdminGallery() {
   })
   const { data: hotels } = useQuery<{ id: string; name: string; branch: string }[]>({
     queryKey: ['hotels'], queryFn: () => api.get('/hotels/').then(r => unwrapList(r.data)),
+  })
+  const { data: branchRoomPhotos, isLoading: branchRoomPhotosLoading } = useQuery<BranchRoomPhotosResponse>({
+    queryKey: ['branch-room-photos', imagesBranchFilter?.id],
+    queryFn: () => api.get('/rooms/branch-photos/', { params: { hotel: imagesBranchFilter!.id } }).then(r => r.data),
+    enabled: !!imagesBranchFilter && imagesBranchFilter.id !== UNASSIGNED,
   })
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false)
@@ -93,6 +103,7 @@ export default function AdminGallery() {
   })
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+  const [roomLightbox, setRoomLightbox] = useState<{ photos: { src: string; alt: string; caption: string }[]; index: number } | null>(null)
 
   const openNewCategory = () => { setEditingCategory(null); setCategoryForm(emptyCategoryForm); setCategoryModalOpen(true) }
   const openEditCategory = (c: GalleryCategory) => {
@@ -194,6 +205,53 @@ export default function AdminGallery() {
                 <span className="text-enayi-muted">✕</span>
               </button>
             </div>
+
+            {bf.id !== UNASSIGNED && (
+              <div className="space-y-3">
+                <h2 className="text-enayi-text font-display text-lg flex items-center gap-2">
+                  <BedDouble size={18} className="text-enayi-gold" /> Rooms at {bf.name}
+                </h2>
+                {branchRoomPhotosLoading ? (
+                  <div className="text-enayi-muted text-sm">Loading rooms…</div>
+                ) : (branchRoomPhotos?.rooms.length ?? 0) === 0 ? (
+                  <div className="text-enayi-muted text-sm">No rooms found for {bf.name}.</div>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {branchRoomPhotos!.rooms.map(room => (
+                      <div key={room.room_id} className="card overflow-hidden">
+                        {room.photos.length > 0 ? (
+                          <div
+                            className="aspect-square cursor-zoom-in"
+                            onClick={() => setRoomLightbox({
+                              photos: room.photos.map(p => ({ src: p.image_url, alt: p.caption || `Room ${room.room_number}`, caption: `Room ${room.room_number}` })),
+                              index: 0,
+                            })}
+                          >
+                            <img src={room.photos[0].image_url} alt={`Room ${room.room_number}`} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="aspect-square bg-enayi-surface flex items-center justify-center text-enayi-muted text-[11px] text-center px-2">
+                            No photo yet
+                          </div>
+                        )}
+                        <div className="p-2.5 space-y-1">
+                          <div className="text-enayi-text text-xs font-medium">Room {room.room_number}</div>
+                          <div className="text-enayi-muted text-[11px]">{room.category_name} · {room.photos.length} photo{room.photos.length===1?'':'s'}</div>
+                          <Link to="/admin/rooms" className="block text-center text-[11px] text-enayi-gold hover:underline pt-1">
+                            Manage in Rooms →
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="text-enayi-muted text-xs italic">
+                  These come from each room's own photos (Admin → Rooms → Photos) — shown here so you don't have to re-upload them separately. Manage/add them from Rooms; this view is read-only.
+                </p>
+              </div>
+            )}
+
+            <h2 className="text-enayi-text font-display text-lg">{bf.id === UNASSIGNED ? 'Unassigned photos' : `Other ${bf.name} photos`}</h2>
             {filteredImages.length === 0 ? (
               <div className="card p-12 text-center"><EmptyState icon={ImageIcon} title="No photos here yet" desc={`No photos assigned to ${bf.name} yet.`} /></div>
             ) : (
@@ -236,6 +294,13 @@ export default function AdminGallery() {
                 images={filteredImages.map(img => ({ src: img.image_url, alt: img.alt_text || img.title, caption: img.title || img.category_name }))}
                 initialIndex={lightboxIndex}
                 onClose={() => setLightboxIndex(null)}
+              />
+            )}
+            {roomLightbox && (
+              <Lightbox
+                images={roomLightbox.photos}
+                initialIndex={roomLightbox.index}
+                onClose={() => setRoomLightbox(null)}
               />
             )}
           </>

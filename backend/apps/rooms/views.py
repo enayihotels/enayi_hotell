@@ -195,6 +195,55 @@ class RoomDetailView(generics.RetrieveUpdateDestroyAPIView):
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class BranchRoomPhotosView(APIView):
+    """GET /api/v1/rooms/branch-photos/?hotel=<branch-or-id>
+
+    Staff-only. Every room at a branch with its staff-reference photos
+    (RoomPhoto — the per-room photos uploaded via Admin > Rooms > Photos),
+    grouped by category. Used by the Admin Gallery page so "all the rooms
+    in this branch" can be shown there directly, without needing every
+    room photo to also be re-uploaded separately into the Gallery system.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_hotel_staff:
+            return Response({"error": "Staff only."}, status=403)
+
+        import uuid as _uuid
+        key = request.query_params.get("hotel") or request.query_params.get("branch")
+        if not key:
+            return Response({"detail": "Pass ?hotel=<branch>."}, status=400)
+
+        from apps.hotels.models import Hotel as _Hotel
+        hotel_obj_qs = _Hotel.objects.filter(is_active=True)
+        try:
+            uid = _uuid.UUID(str(key))
+            hotel_obj = hotel_obj_qs.filter(id=uid).first()
+        except (ValueError, TypeError, AttributeError):
+            hotel_obj = hotel_obj_qs.filter(branch=key).first()
+        if not hotel_obj:
+            hotel_obj = hotel_obj_qs.filter(name__icontains=key).first()
+        if not hotel_obj:
+            return Response({"detail": f"No active branch found for: {key}"}, status=404)
+
+        rooms = (Room.objects.filter(hotel=hotel_obj)
+                 .select_related("category")
+                 .prefetch_related("photos")
+                 .order_by("category__base_price", "floor", "room_number"))
+
+        data = []
+        for room in rooms:
+            data.append({
+                "room_id": str(room.id),
+                "room_number": room.room_number,
+                "category_name": room.category.name,
+                "photos": RoomPhotoSerializer(room.photos.all(), many=True, context={"request": request}).data,
+            })
+
+        return Response({"hotel_id": str(hotel_obj.id), "hotel_name": hotel_obj.name, "rooms": data})
+
+
 class RoomAvailabilityView(APIView):
     permission_classes = [AllowAny]
     def post(self, request):

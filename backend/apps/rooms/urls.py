@@ -14,4 +14,5 @@ urlpatterns = [
     path("photos/<uuid:pk>/",                 views.RoomPhotoDeleteView.as_view(),    name="room-photo-delete"),
     path("availability/",                     views.RoomAvailabilityView.as_view(),   name="room-availability"),
     path("branch-availability/",              views.BranchRoomsView.as_view(),        name="branch-availability"),
+    path("branch-photos/",                    views.BranchRoomPhotosView.as_view(),   name="branch-room-photos"),
 ]
