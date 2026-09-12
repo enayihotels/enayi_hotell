@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
@@ -22,7 +22,7 @@ export default function ResetPasswordPage() {
   const location = useLocation()
   const prefilledEmail = (location.state as { email?: string } | null)?.email || ''
   const [emailLocked, setEmailLocked] = useState(!!prefilledEmail)
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
+  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: { email: prefilledEmail },
   })
@@ -46,7 +46,7 @@ export default function ResetPasswordPage() {
         <p className="text-enayi-muted text-sm mb-8">Enter the code from your email and choose a new password.</p>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <div className="form-group"><label className="label">Email</label><div className="relative"><Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-enayi-muted"/><input {...register('email', { setValueAs: (v) => (v || '').trim().toLowerCase() })} type="email" name="reset_email_addr" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} readOnly={emailLocked} className={`input pl-9 ${emailLocked ? 'opacity-70 cursor-not-allowed' : ''}`} placeholder="your@email.com"/></div>{emailLocked ? <button type="button" onClick={()=>setEmailLocked(false)} className="text-xs text-enayi-gold hover:underline self-start mt-1">Not you? Change email</button> : null}{errors.email&&<p className="form-error">{errors.email.message}</p>}</div>
-          <div className="form-group"><label className="label">6-Digit Code</label><input {...register('otp', { setValueAs: (v) => (v || '').replace(/\D/g, '').slice(0, 6) })} name="reset_otp_code" autoComplete="off" inputMode="numeric" className="input text-center tracking-[0.5em] text-xl font-mono" placeholder="000000" maxLength={6}/>{errors.otp&&<p className="form-error">{errors.otp.message}</p>}</div>
+          <div className="form-group"><label className="label">6-Digit Code</label><Controller name="otp" control={control} render={({ field }) => (<input value={field.value || ''} onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 6))} onBlur={field.onBlur} name="reset_otp_code" autoComplete="off" inputMode="numeric" className="input text-center tracking-[0.5em] text-xl font-mono" placeholder="000000" maxLength={6}/>)}/>{errors.otp&&<p className="form-error">{errors.otp.message}</p>}</div>
           <div className="form-group"><label className="label">New Password</label><div className="relative"><Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-enayi-muted"/><input {...register('new_password')} type={showPass?'text':'password'} className="input pl-9 pr-9" placeholder="Min. 8 characters"/><button type="button" onClick={()=>setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-enayi-muted">{showPass?<EyeOff size={15}/>:<Eye size={15}/>}</button></div>{errors.new_password&&<p className="form-error">{errors.new_password.message}</p>}</div>
           <div className="form-group"><label className="label">Confirm Password</label><input {...register('new_password_confirm')} type={showPass?'text':'password'} className="input" placeholder="Repeat password"/>{errors.new_password_confirm&&<p className="form-error">{errors.new_password_confirm.message}</p>}</div>
           <button type="submit" disabled={isSubmitting} className="btn-gold w-full gap-2 mt-2">
