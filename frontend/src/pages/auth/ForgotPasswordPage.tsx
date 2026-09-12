@@ -13,10 +13,11 @@ type Form = z.infer<typeof schema>
 
 export default function ForgotPasswordPage() {
   const [sent, setSent] = useState(false)
+  const [sentEmail, setSentEmail] = useState('')
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({ resolver: zodResolver(schema) })
 
   const onSubmit = async (data: Form) => {
-    try { await api.post('/auth/forgot-password/', data); setSent(true) }
+    try { await api.post('/auth/forgot-password/', data); setSentEmail(data.email); setSent(true) }
     catch (err) { toast.error(getErrorMessage(err)) }
   }
 
@@ -32,7 +33,7 @@ export default function ForgotPasswordPage() {
             <CheckCircle2 size={48} className="text-green-400 mx-auto mb-4" />
             <h2 className="font-display text-2xl text-enayi-text mb-3">Check Your Email</h2>
             <p className="text-enayi-muted text-sm mb-6">We've sent a 6-digit reset code to your email. Check your inbox and spam folder.</p>
-            <Link to="/reset-password" className="btn-gold w-full gap-2 inline-flex justify-center">Enter Reset Code <ArrowRight size={15}/></Link>
+            <Link to="/reset-password" state={{ email: sentEmail }} className="btn-gold w-full gap-2 inline-flex justify-center">Enter Reset Code <ArrowRight size={15}/></Link>
           </div>
         ) : (
           <div>
