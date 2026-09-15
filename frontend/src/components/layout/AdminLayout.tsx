@@ -1,6 +1,6 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User, Package, Wrench, LogOut, FileText, Shirt } from 'lucide-react'
+import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User, Package, Wrench, LogOut, FileText, Shirt, UserCog } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
 import toast from 'react-hot-toast'
@@ -14,6 +14,7 @@ const ADMIN_NAV = [
   {href:'/admin/orders',icon:Utensils,label:'Orders',managerOnly:true},
   {href:'/admin/events',icon:Calendar,label:'Events'},
   {href:'/admin/guests',icon:Users,label:'Guests'},
+  {href:'/admin/staff-duty',icon:UserCog,label:'Staff Duty',managerOnly:true},
   {href:'/admin/gallery',icon:Image,label:'Gallery',managerOnly:true},
   {href:'/admin/payments',icon:CreditCard,label:'Payments',managerOnly:true},
   {href:'/admin/inventory',icon:Package,label:'Inventory',managerOnly:true},

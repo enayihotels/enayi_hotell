@@ -4,11 +4,12 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { motion } from 'framer-motion'
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, CheckCircle2, Star } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, CheckCircle2, Star, ShieldQuestion, ShieldOff, Send } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api, { getErrorMessage } from '@/utils/api'
 import { getPostLoginRoute } from '@/utils/authRouting'
 import { GoogleSignInButton } from '@/components/GoogleSignInButton'
+import { Modal, Button } from '@/components/ui'
 import toast from 'react-hot-toast'
 
 const schema = z.object({
@@ -30,23 +31,77 @@ export default function LoginPage() {
   const { login } = useAuthStore()
   const navigate  = useNavigate()
 
+  // Front Desk/Bar/Kitchen/Housekeeper credentials check out, but the
+  // backend wants a quick "are you actually on duty?" confirmation
+  // before it'll issue tokens — holds the already-verified credentials
+  // so we can resubmit with confirm_on_duty once they answer.
+  const [shiftPrompt, setShiftPrompt] = useState<Form | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
+  // Off-duty block — a dedicated screen instead of a generic error toast,
+  // since the only thing to do from here is ask a Manager to switch them
+  // back on, not "try the password again".
+  const [offDutyEmail, setOffDutyEmail] = useState<string | null>(null)
+  const [requestingAccess, setRequestingAccess] = useState(false)
+  const [accessRequested, setAccessRequested] = useState(false)
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Form>({
     resolver: zodResolver(schema),
   })
 
+  const completeLogin = (res: any) => {
+    const user = res.data.user
+    login(user, res.data.access, res.data.refresh)
+    toast.success(res.data.message || `Welcome back, ${user.first_name}! 🏨`)
+    // Route to the right landing page based on role — staff roles
+    // that live in the inventory shell should never land in the guest
+    // portal, and front desk/manager who have both the admin panel and
+    // their own entry points need to go to the right one too.
+    navigate(getPostLoginRoute(user.role), { replace: true })
+  }
+
   const onSubmit = async (data: Form) => {
     try {
       const res = await api.post('/auth/login/', data)
-      const user = res.data.user
-      login(user, res.data.access, res.data.refresh)
-      toast.success(res.data.message || `Welcome back, ${user.first_name}! 🏨`)
-      // Route to the right landing page based on role — staff roles
-      // that live in the inventory shell should never land in the guest
-      // portal, and front desk/manager who have both the admin panel and
-      // their own entry points need to go to the right one too.
-      navigate(getPostLoginRoute(user.role), { replace: true })
+      if (res.data?.requires_shift_confirmation) {
+        setShiftPrompt(data)
+        return
+      }
+      completeLogin(res)
+    } catch (err: any) {
+      if (err?.response?.data?.code === 'off_duty') {
+        setOffDutyEmail(data.email)
+        setAccessRequested(false)
+        return
+      }
+      toast.error(getErrorMessage(err))
+    }
+  }
+
+  const requestAccess = async () => {
+    if (!offDutyEmail) return
+    setRequestingAccess(true)
+    try {
+      await api.post('/auth/request-access/', { email: offDutyEmail })
+      setAccessRequested(true)
     } catch (err) {
       toast.error(getErrorMessage(err))
+    } finally {
+      setRequestingAccess(false)
+    }
+  }
+
+  const confirmOnDuty = async () => {
+    if (!shiftPrompt) return
+    setConfirming(true)
+    try {
+      const res = await api.post('/auth/login/', { ...shiftPrompt, confirm_on_duty: true })
+      completeLogin(res)
+    } catch (err) {
+      toast.error(getErrorMessage(err))
+    } finally {
+      setConfirming(false)
+      setShiftPrompt(null)
     }
   }
 
@@ -127,10 +182,46 @@ export default function LoginPage() {
           </Link>
 
           <div className="mb-8">
-            <h1 className="font-display text-3xl text-enayi-text mb-2">Welcome Back</h1>
-            <p className="text-enayi-muted text-sm">Sign in to manage your bookings, orders and more</p>
+            <h1 className="font-display text-3xl text-enayi-text mb-2">
+              {offDutyEmail ? 'Off Duty' : 'Welcome Back'}
+            </h1>
+            <p className="text-enayi-muted text-sm">
+              {offDutyEmail ? 'Your account is switched off duty right now.' : 'Sign in to manage your bookings, orders and more'}
+            </p>
           </div>
 
+          {offDutyEmail ? (
+            <div className="flex flex-col gap-5">
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-enayi-surface border border-enayi-border">
+                <ShieldOff size={22} className="text-enayi-gold flex-shrink-0 mt-0.5" />
+                <p className="text-enayi-text text-sm leading-relaxed">
+                  A Manager switched this account off duty — you can't sign in until they switch you back on.
+                  If you're covering a shift or this was a mistake, request access below and your Manager will be notified.
+                </p>
+              </div>
+
+              {accessRequested ? (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/30">
+                  <CheckCircle2 size={20} className="text-green-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-enayi-text text-sm leading-relaxed">
+                    Request sent. Your Manager has been emailed — try signing in again once they've approved it.
+                  </p>
+                </div>
+              ) : (
+                <Button variant="gold" className="w-full" loading={requestingAccess} onClick={requestAccess}>
+                  <Send size={15} /> Request Access
+                </Button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => { setOffDutyEmail(null); setAccessRequested(false) }}
+                className="text-enayi-muted text-sm hover:text-enayi-text transition-colors text-center"
+              >
+                Back to sign in
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
             {/* Email */}
             <div className="form-group">
@@ -185,6 +276,7 @@ export default function LoginPage() {
               </Link>
             </p>
           </form>
+          )}
 
           <div className="flex items-center gap-2 mt-8 p-3.5 rounded-xl bg-enayi-surface border border-enayi-border">
             <span className="text-enayi-gold">🔒</span>
@@ -194,6 +286,23 @@ export default function LoginPage() {
           </div>
         </motion.div>
       </div>
+
+      {/* Self-attestation for shift-based roles — a reminder, not a hard
+          control (the real enforcement is the Manager's on/off toggle). */}
+      <Modal open={!!shiftPrompt} onClose={() => setShiftPrompt(null)} title="Quick check" size="sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <ShieldQuestion size={22} className="text-enayi-gold flex-shrink-0 mt-0.5" />
+            <p className="text-enayi-text text-sm leading-relaxed">
+              Are you on duty right now? Only sign in if you're actually working this shift.
+            </p>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" onClick={() => setShiftPrompt(null)}>Not right now</Button>
+            <Button variant="gold" loading={confirming} onClick={confirmOnDuty}>Yes, I'm on duty</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

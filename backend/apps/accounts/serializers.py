@@ -1,23 +1,38 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import User
+from .models import User, AccessRequest
 
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     hotel_name = serializers.CharField(source="hotel.name", read_only=True, default=None)
     hotel_branch = serializers.CharField(source="hotel.branch", read_only=True, default=None)
+    is_shift_role = serializers.BooleanField(read_only=True)
 
     class Meta:
         model  = User
         fields = [
             "id","email","first_name","last_name","full_name","phone","role",
-            "hotel","hotel_name","hotel_branch",
+            "hotel","hotel_name","hotel_branch","is_shift_role","is_on_duty",
             "date_of_birth","nationality","is_verified","date_joined","loyalty_points","newsletter",
         ]
-        read_only_fields = ["id","role","date_joined","loyalty_points","is_verified"]
+        read_only_fields = ["id","role","date_joined","loyalty_points","is_verified","is_shift_role","is_on_duty"]
 
     def get_full_name(self, obj): return obj.get_full_name()
+
+
+class AccessRequestSerializer(serializers.ModelSerializer):
+    user_name    = serializers.CharField(source="user.get_full_name", read_only=True)
+    user_email   = serializers.CharField(source="user.email", read_only=True)
+    user_role    = serializers.CharField(source="user.role", read_only=True)
+    hotel_name   = serializers.CharField(source="user.hotel.name", read_only=True, default=None)
+    decided_by_name = serializers.CharField(source="decided_by.get_full_name", read_only=True, default=None)
+
+    class Meta:
+        model  = AccessRequest
+        fields = ["id", "user", "user_name", "user_email", "user_role", "hotel_name",
+                  "status", "note", "decided_by_name", "decided_at", "created_at"]
+        read_only_fields = fields
 
 
 class RegisterSerializer(serializers.ModelSerializer):

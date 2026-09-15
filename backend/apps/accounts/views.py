@@ -5,14 +5,16 @@ from django.utils import timezone
 from django.contrib.auth import authenticate
 from django.core.mail import send_mail
 from django.conf import settings
+from django.shortcuts import get_object_or_404
 from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from .models import User, OTPVerification
-from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, ChangePasswordSerializer, UpdateProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer
+from rest_framework_simplejwt.views import TokenRefreshView
+from .models import User, OTPVerification, AccessRequest
+from .serializers import UserSerializer, RegisterSerializer, LoginSerializer, ChangePasswordSerializer, UpdateProfileSerializer, ForgotPasswordSerializer, ResetPasswordSerializer, AccessRequestSerializer
 
 def get_tokens(user):
     refresh = RefreshToken.for_user(user)
@@ -51,6 +53,25 @@ class LoginView(APIView):
             return Response({"error": "Invalid email or password."}, status=401)
         if not user.is_active:
             return Response({"error": "Account deactivated."}, status=403)
+
+        if user.is_shift_role:
+            if not user.is_on_duty:
+                return Response({
+                    "error": "You've been switched off duty. Ask your Manager to switch you back on before you can log in.",
+                    "code": "off_duty",
+                }, status=403)
+            # Self-attestation: a reminder, not a hard control (anyone could
+            # answer "yes") — the real enforcement is is_on_duty above, which
+            # only a Manager/Admin can change. Credentials are already
+            # verified at this point; the frontend just needs to show this
+            # prompt and resubmit the exact same request with confirm_on_duty
+            # once the person says yes.
+            if not request.data.get("confirm_on_duty"):
+                return Response({
+                    "requires_shift_confirmation": True,
+                    "message": "Are you on duty right now?",
+                }, status=200)
+
         user.last_login_ip = request.META.get("REMOTE_ADDR")
         user.save(update_fields=["last_login_ip"])
         return Response({"message": f"Welcome back, {user.first_name}! 🏨", "user": UserSerializer(user).data, **get_tokens(user)})
@@ -118,6 +139,32 @@ class GoogleAuthView(APIView):
             "user": UserSerializer(user).data,
             **get_tokens(user),
         })
+
+
+class ShiftAwareTokenRefreshView(TokenRefreshView):
+    """Same off-duty check as ShiftAwareJWTAuthentication, but for the
+    token-refresh endpoint specifically — that endpoint authenticates
+    via the REFRESH token, not the access token, so it never goes
+    through ShiftAwareJWTAuthentication at all. Without this override,
+    someone switched off duty mid-session could just silently refresh
+    their way to a new access token and keep working, which would
+    defeat the whole point of the Manager's off-duty toggle taking
+    effect immediately rather than at next login.
+    """
+    def post(self, request, *args, **kwargs):
+        refresh_token = request.data.get("refresh")
+        if refresh_token:
+            try:
+                user_id = RefreshToken(refresh_token).get("user_id")
+                user = User.objects.filter(id=user_id).first()
+                if user and user.is_shift_role and not user.is_on_duty:
+                    return Response(
+                        {"error": "You've been switched off duty. Ask your Manager to switch you back on before you can log in."},
+                        status=401,
+                    )
+            except TokenError:
+                pass  # let the parent view produce its own normal invalid/expired-token error
+        return super().post(request, *args, **kwargs)
 
 
 class LogoutView(APIView):
@@ -231,6 +278,160 @@ class StaffListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class   = UserSerializer
     def get_queryset(self):
-        if self.request.user.role in [User.MANAGER, User.ADMIN]:
-            return User.objects.filter(role__in=[User.STAFF, User.MANAGER]).order_by("first_name")
-        return User.objects.none()
+        if self.request.user.role not in [User.MANAGER, User.ADMIN]:
+            return User.objects.none()
+        qs = User.objects.exclude(role=User.GUEST).order_by("role", "first_name")
+        # Manager sees their own branch's staff plus every other Manager/
+        # Admin (so they can see who else has access) — Admin sees everyone.
+        if self.request.user.role == User.MANAGER:
+            from django.db.models import Q
+            qs = qs.filter(Q(hotel_id=self.request.user.hotel_id) | Q(role__in=[User.MANAGER, User.ADMIN]))
+        return qs
+
+
+class ToggleDutyView(APIView):
+    """POST /api/v1/auth/staff/<id>/duty/  — body: {"is_on_duty": true|false}
+
+    Manager/Admin only. Manager is restricted to staff at their own
+    branch (can't toggle another branch's people, or another Manager/
+    Admin's account); Admin can toggle anyone. Switching someone off
+    takes effect immediately on their very next request — see
+    apps.accounts.authentication.ShiftAwareJWTAuthentication and the
+    matching check on token refresh below — not just their next login.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, user_id):
+        if request.user.role not in [User.MANAGER, User.ADMIN]:
+            return Response({"error": "Manager/Admin only."}, status=403)
+
+        target = get_object_or_404(User, id=user_id)
+        if not target.is_shift_role:
+            return Response({"error": "This account's role isn't a shift-based one — nothing to toggle."}, status=400)
+        if request.user.role == User.MANAGER and target.hotel_id != request.user.hotel_id:
+            return Response({"error": "You can only manage staff at your own branch."}, status=403)
+
+        is_on_duty = request.data.get("is_on_duty")
+        if not isinstance(is_on_duty, bool):
+            return Response({"error": "is_on_duty must be true or false."}, status=400)
+
+        target.is_on_duty = is_on_duty
+        target.save(update_fields=["is_on_duty"])
+        return Response({
+            "message": f"{target.get_full_name()} switched {'ON' if is_on_duty else 'OFF'} duty.",
+            "user": UserSerializer(target).data,
+        })
+
+
+class RequestAccessView(APIView):
+    """POST /api/v1/auth/request-access/  — body: {"email": "...", "note": "optional"}
+
+    Public (AllowAny) — the whole point is that an off-duty shift-role
+    account has no valid session to authenticate with. Only usable by
+    an account that's genuinely a shift role AND currently off duty
+    (silently no-ops for anyone else, rather than confirming/denying
+    whether an email exists — same reasoning as the login error message
+    never distinguishing "wrong email" from "wrong password").
+
+    Emails the requester's branch Manager(s) plus every Admin — this
+    reuses the existing send_mail/DEFAULT_FROM_EMAIL setup rather than
+    anything new (there's no SMS/WhatsApp channel yet — a separate,
+    larger piece of work).
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = (request.data.get("email") or "").strip().lower()
+        if not email:
+            return Response({"error": "Email is required."}, status=400)
+
+        user = User.objects.filter(email=email).first()
+        # Same non-committal response either way — don't reveal whether
+        # this email exists, is the wrong role, or is already on duty.
+        generic_ok = Response({"message": "If that account is off duty, your Manager has been notified."})
+
+        if not user or not user.is_shift_role or user.is_on_duty:
+            return generic_ok
+
+        existing = AccessRequest.objects.filter(user=user, status=AccessRequest.PENDING).first()
+        if not existing:
+            existing = AccessRequest.objects.create(user=user, note=(request.data.get("note") or "")[:300])
+
+            recipients = list(
+                User.objects.filter(role=User.ADMIN).values_list("email", flat=True)
+            )
+            if user.hotel_id:
+                recipients += list(
+                    User.objects.filter(role=User.MANAGER, hotel_id=user.hotel_id)
+                    .exclude(id=user.id)
+                    .values_list("email", flat=True)
+                )
+            recipients = list(dict.fromkeys(r for r in recipients if r))  # de-dupe, drop blanks
+
+            if recipients:
+                try:
+                    send_mail(
+                        "Enayi Hotels — Access Request",
+                        f"{user.get_full_name()} ({user.get_role_display()}"
+                        f"{', ' + user.hotel.name if user.hotel_id else ''}) has requested to be "
+                        f"switched back on duty so they can log in.\n\n"
+                        f"Review it in Admin \u2192 Staff Duty.\n\nEnayi Hotels & Suites",
+                        settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=True,
+                    )
+                except Exception:
+                    pass
+
+        return generic_ok
+
+
+class AccessRequestListView(generics.ListAPIView):
+    """GET /api/v1/auth/access-requests/  — Manager/Admin only.
+    Manager sees only their own branch's requests; Admin sees all."""
+    permission_classes = [IsAuthenticated]
+    serializer_class = AccessRequestSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role not in [User.MANAGER, User.ADMIN]:
+            return AccessRequest.objects.none()
+        qs = AccessRequest.objects.select_related("user", "user__hotel", "decided_by")
+        if user.role == User.MANAGER:
+            qs = qs.filter(user__hotel_id=user.hotel_id)
+        return qs
+
+
+class DecideAccessRequestView(APIView):
+    """POST /api/v1/auth/access-requests/<id>/decide/  — body: {"approve": true|false}
+
+    Manager/Admin only, same branch restriction as ToggleDutyView.
+    Approving switches the requester back on duty in the same step —
+    no separate manual toggle needed afterward."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, request_id):
+        if request.user.role not in [User.MANAGER, User.ADMIN]:
+            return Response({"error": "Manager/Admin only."}, status=403)
+
+        ar = get_object_or_404(AccessRequest.objects.select_related("user"), id=request_id)
+        if request.user.role == User.MANAGER and ar.user.hotel_id != request.user.hotel_id:
+            return Response({"error": "You can only decide requests for your own branch."}, status=403)
+        if ar.status != AccessRequest.PENDING:
+            return Response({"error": f"This request was already {ar.status}."}, status=400)
+
+        approve = request.data.get("approve")
+        if not isinstance(approve, bool):
+            return Response({"error": "approve must be true or false."}, status=400)
+
+        ar.status = AccessRequest.APPROVED if approve else AccessRequest.DENIED
+        ar.decided_by = request.user
+        ar.decided_at = timezone.now()
+        ar.save(update_fields=["status", "decided_by", "decided_at"])
+
+        if approve:
+            ar.user.is_on_duty = True
+            ar.user.save(update_fields=["is_on_duty"])
+
+        return Response({
+            "message": f"Request {'approved' if approve else 'denied'}.",
+            "access_request": AccessRequestSerializer(ar).data,
+        })

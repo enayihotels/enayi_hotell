@@ -3,7 +3,7 @@
 // Matches Django backend models exactly
 // ═══════════════════════════════════════════════════════
 
-export type UserRole = 'guest' | 'staff' | 'manager' | 'admin'
+export type UserRole = 'guest' | 'staff' | 'store_keeper' | 'bar_staff' | 'kitchen_staff' | 'housekeeper' | 'laundry_staff' | 'manager' | 'admin'
 
 export interface User {
   id: string
@@ -13,6 +13,11 @@ export interface User {
   full_name: string
   phone?: string
   role: UserRole
+  hotel?: string | null
+  hotel_name?: string | null
+  hotel_branch?: string | null
+  is_shift_role?: boolean
+  is_on_duty?: boolean
   avatar?: string
   date_of_birth?: string
   nationality?: string
@@ -20,6 +25,21 @@ export interface User {
   date_joined: string
   loyalty_points: number
   newsletter: boolean
+}
+
+// ── Access Requests (shift-role off-duty reinstatement) ──
+export interface AccessRequest {
+  id: string
+  user: string
+  user_name: string
+  user_email: string
+  user_role: UserRole
+  hotel_name: string | null
+  status: 'pending' | 'approved' | 'denied'
+  note: string
+  decided_by_name: string | null
+  decided_at: string | null
+  created_at: string
 }
 
 // ── Rooms ──────────────────────────────────────────────

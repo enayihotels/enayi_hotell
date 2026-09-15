@@ -88,6 +88,16 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_verified    = models.BooleanField(default=False)
     is_active      = models.BooleanField(default=True)
     is_staff       = models.BooleanField(default=False)
+    is_on_duty     = models.BooleanField(
+        default=True,
+        help_text="Only meaningful for Front Desk Staff, Bar Staff, Kitchen Staff, and Housekeeper "
+                   "(single-day-shift roles). When a Manager/Admin switches this off — e.g. the "
+                   "person called in sick or is traveling — that account is blocked from logging in "
+                   "and immediately signed out of any session already open, until switched back on. "
+                   "Every login by one of these roles also asks the person to confirm they're on "
+                   "duty right now — a reminder, not a hard control; the real enforcement is this "
+                   "field and who's allowed to flip it.",
+    )
     date_joined    = models.DateTimeField(default=timezone.now)
     last_login_ip  = models.GenericIPAddressField(blank=True, null=True)
     loyalty_points = models.PositiveIntegerField(default=0)
@@ -133,6 +143,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         cleaning supplies) the same way Bar/Kitchen Staff already
         request their own."""
         return self.role in [self.STORE_KEEPER, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER, self.LAUNDRY_STAFF]
+
+    @property
+    def is_shift_role(self):
+        """Front Desk Staff, Bar Staff, Kitchen Staff, Housekeeper — the
+        single-day-shift roles the on-duty login control applies to.
+        Deliberately NOT Store Keeper or Laundry Staff (not shift-based
+        the same way) and never Manager/Admin (who need to be able to
+        log in regardless, including to switch others on/off duty)."""
+        return self.role in [self.STAFF, self.BAR_STAFF, self.KITCHEN_STAFF, self.HOUSEKEEPER]
 
     @property
     def inventory_department(self):
@@ -243,3 +262,35 @@ class StaffProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} — {self.department}"
+
+
+class AccessRequest(models.Model):
+    """A shift-role staff member asking to be switched back to Available
+    after a Manager/Admin marked them Off Duty. Created from the
+    "Request Access" screen a blocked login attempt lands on — the
+    staff member can't reach the normal app at all until a Manager or
+    Admin approves it (or just flips their duty_status back directly,
+    without going through a request at all)."""
+    PENDING  = "pending"
+    APPROVED = "approved"
+    DENIED   = "denied"
+    STATUS_CHOICES = [
+        (PENDING,  "Pending"),
+        (APPROVED, "Approved"),
+        (DENIED,   "Denied"),
+    ]
+
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user         = models.ForeignKey(User, on_delete=models.CASCADE, related_name="access_requests")
+    status       = models.CharField(max_length=10, choices=STATUS_CHOICES, default=PENDING, db_index=True)
+    note         = models.CharField(max_length=300, blank=True, help_text="Optional note from the staff member, e.g. why they should be reinstated.")
+    decided_by   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="decided_access_requests")
+    decided_at   = models.DateTimeField(blank=True, null=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "access_requests"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.email} — {self.status}"
