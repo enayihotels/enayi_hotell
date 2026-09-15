@@ -5,8 +5,15 @@ import api, { getErrorMessage } from '@/utils/api'
 import { formatCurrency, formatDate } from '@/utils/helpers'
 import { StatusBadge, PageSpinner, EmptyState, Button, Modal, Textarea, Alert, Input, Select } from '@/components/ui'
 import { ReceiptButton } from '@/components/ReceiptButton'
-import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote, MailCheck, RefreshCw, ScanFace, Camera } from 'lucide-react'
-import type { Booking, CheckoutApprovalRequest } from '@/types'
+import { BedDouble, LogIn, LogOut, ShieldAlert, Banknote, MailCheck, RefreshCw, ScanFace, Camera, Plus } from 'lucide-react'
+import type { Booking, CheckoutApprovalRequest, RoomCategory } from '@/types'
+
+const unwrapList = (data: any) => Array.isArray(data) ? data : (data?.results ?? [])
+const emptyNewBooking = {
+  hotel_id: '', category_id: '', check_in: '', check_out: '', adults: '1', children: '0',
+  source: 'walk_in' as 'walk_in' | 'phone' | 'agent',
+  guest_email: '', guest_first_name: '', guest_last_name: '', guest_phone: '', special_requests: '',
+}
 
 const NON_PAYABLE_STATUSES: Booking['status'][] = ['cancelled', 'checked_out', 'no_show']
 
@@ -41,6 +48,43 @@ export default function AdminBookings() {
   const [selfieFile, setSelfieFile] = useState<File | null>(null)
   const [idPhotoFile, setIdPhotoFile] = useState<File | null>(null)
   const [identityResult, setIdentityResult] = useState<{ verdict: string; note: string; disclaimer: string } | null>(null)
+
+  // Booking a room on behalf of a guest — Front Desk/Manager/Admin only
+  // (this whole page already is), for phone/walk-in/travel-agent bookings.
+  const [newBookingOpen, setNewBookingOpen] = useState(false)
+  const [newBooking, setNewBooking] = useState(emptyNewBooking)
+  const { data: hotels } = useQuery<{ id: string; name: string; branch: string }[]>({
+    queryKey: ['hotels'], queryFn: () => api.get('/hotels/').then(r => unwrapList(r.data)),
+  })
+  const { data: categories } = useQuery<RoomCategory[]>({
+    queryKey: ['room-categories'], queryFn: () => api.get('/rooms/categories/').then(r => unwrapList(r.data)),
+  })
+
+  const openNewBooking = () => { setNewBooking(emptyNewBooking); setNewBookingOpen(true) }
+  const closeNewBooking = () => { setNewBookingOpen(false); setNewBooking(emptyNewBooking) }
+
+  const createBooking = useMutation({
+    mutationFn: () => api.post('/bookings/', {
+      hotel_id: newBooking.hotel_id || undefined,
+      category_id: newBooking.category_id,
+      check_in: newBooking.check_in,
+      check_out: newBooking.check_out,
+      adults: Number(newBooking.adults) || 1,
+      children: Number(newBooking.children) || 0,
+      source: newBooking.source,
+      guest_email: newBooking.guest_email,
+      guest_first_name: newBooking.guest_first_name,
+      guest_last_name: newBooking.guest_last_name,
+      guest_phone: newBooking.guest_phone || undefined,
+      special_requests: newBooking.special_requests || undefined,
+    }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['admin-bookings'] })
+      toast.success(`Booking ${res.data?.booking_reference ?? ''} created for ${newBooking.guest_first_name || newBooking.guest_email}.`)
+      closeNewBooking()
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
 
   const sendOtp = useMutation({
     mutationFn: (bookingId: string) => api.post(`/bookings/${bookingId}/checkin/send-otp/`),
@@ -213,7 +257,10 @@ export default function AdminBookings() {
 
   return (
     <div className="p-4 md:p-6 space-y-5">
-      <div><h1 className="font-display text-2xl md:text-3xl text-enayi-text">All Bookings</h1><p className="text-enayi-muted text-sm">{data?.length??0} total</p></div>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div><h1 className="font-display text-2xl md:text-3xl text-enayi-text">All Bookings</h1><p className="text-enayi-muted text-sm">{data?.length??0} total</p></div>
+        <Button variant="gold" onClick={openNewBooking}><Plus size={14} /> New Booking</Button>
+      </div>
 
       {(data||[]).length===0 ? (
         <div className="card p-12 text-center text-enayi-muted"><EmptyState icon={BedDouble} title="No bookings found" /></div>
@@ -228,6 +275,7 @@ export default function AdminBookings() {
                   <div>
                     <div className="font-mono text-xs text-enayi-gold">{b.booking_reference}</div>
                     <div className="text-enayi-text font-medium">{b.guest_name}</div>
+                    {b.assigned_by_name && <div className="text-enayi-muted text-[11px]">Booked by {b.assigned_by_name} · {b.source.replace('_',' ')}</div>}
                   </div>
                   <StatusBadge status={b.status} />
                 </div>
@@ -261,7 +309,10 @@ export default function AdminBookings() {
                 {(data||[]).map(b=>(
                   <tr key={b.id} className="hover:bg-enayi-panel transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-enayi-gold">{b.booking_reference}</td>
-                    <td className="px-4 py-3 text-enayi-text">{b.guest_name}</td>
+                    <td className="px-4 py-3 text-enayi-text">
+                      {b.guest_name}
+                      {b.assigned_by_name && <div className="text-enayi-muted text-[11px]">by {b.assigned_by_name} · {b.source.replace('_',' ')}</div>}
+                    </td>
                     <td className="px-4 py-3 text-enayi-muted">{b.room_detail?.room_number ?? '—'}</td>
                     <td className="px-4 py-3 text-enayi-muted">{formatDate(b.check_in)}</td>
                     <td className="px-4 py-3 text-enayi-muted">{formatDate(b.check_out)}</td>
@@ -446,6 +497,65 @@ export default function AdminBookings() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Book a room on behalf of a guest — phone bookings, walk-ins, travel agents. */}
+      <Modal open={newBookingOpen} onClose={closeNewBooking} title="New Booking" size="md">
+        <div className="space-y-4">
+          <Alert type="info">
+            If the guest's email doesn't have an account yet, one is created automatically — no password needed, they can set one later via "Forgot password".
+          </Alert>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input label="Guest email" type="email" value={newBooking.guest_email}
+              onChange={(e) => setNewBooking(v => ({ ...v, guest_email: e.target.value }))} placeholder="guest@email.com" />
+            <Input label="Guest phone (optional)" value={newBooking.guest_phone}
+              onChange={(e) => setNewBooking(v => ({ ...v, guest_phone: e.target.value }))} placeholder="0803..." />
+            <Input label="First name" value={newBooking.guest_first_name}
+              onChange={(e) => setNewBooking(v => ({ ...v, guest_first_name: e.target.value }))} />
+            <Input label="Last name" value={newBooking.guest_last_name}
+              onChange={(e) => setNewBooking(v => ({ ...v, guest_last_name: e.target.value }))} />
+          </div>
+          <p className="text-enayi-muted text-xs -mt-2">Name only needed if this email doesn't already have an account — harmless to leave blank otherwise.</p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Select label="Branch" value={newBooking.hotel_id} onChange={(e) => setNewBooking(v => ({ ...v, hotel_id: e.target.value }))}>
+              <option value="">Any branch</option>
+              {(hotels||[]).map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </Select>
+            <Select label="Room class" value={newBooking.category_id} onChange={(e) => setNewBooking(v => ({ ...v, category_id: e.target.value }))}>
+              <option value="">Select a room class</option>
+              {(categories||[]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+            <Input label="Check-in" type="date" value={newBooking.check_in}
+              onChange={(e) => setNewBooking(v => ({ ...v, check_in: e.target.value }))} />
+            <Input label="Check-out" type="date" value={newBooking.check_out}
+              onChange={(e) => setNewBooking(v => ({ ...v, check_out: e.target.value }))} />
+            <Input label="Adults" type="number" min={1} max={10} value={newBooking.adults}
+              onChange={(e) => setNewBooking(v => ({ ...v, adults: e.target.value }))} />
+            <Input label="Children" type="number" min={0} max={5} value={newBooking.children}
+              onChange={(e) => setNewBooking(v => ({ ...v, children: e.target.value }))} />
+            <Select label="Booked via" value={newBooking.source} onChange={(e) => setNewBooking(v => ({ ...v, source: e.target.value as any }))}>
+              <option value="walk_in">Walk-in</option>
+              <option value="phone">Phone</option>
+              <option value="agent">Travel Agent</option>
+            </Select>
+          </div>
+          <Textarea label="Special requests (optional)" value={newBooking.special_requests}
+            onChange={(e) => setNewBooking(v => ({ ...v, special_requests: e.target.value }))} />
+
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" onClick={closeNewBooking}>Cancel</Button>
+            <Button
+              variant="gold"
+              loading={createBooking.isPending}
+              disabled={!newBooking.guest_email || !newBooking.category_id || !newBooking.check_in || !newBooking.check_out}
+              onClick={() => createBooking.mutate()}
+            >
+              Create Booking
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

@@ -142,6 +142,7 @@ export interface Booking {
   children: number
   status: BookingStatus
   source: string
+  assigned_by_name?: string | null
   room_rate_per_night: number
   total_nights: number
   subtotal: number

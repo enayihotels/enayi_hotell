@@ -9,6 +9,7 @@ from apps.accounts.serializers import UserSerializer
 class BookingSerializer(serializers.ModelSerializer):
     guest_name  = serializers.SerializerMethodField()
     room_detail = serializers.SerializerMethodField()
+    assigned_by_name = serializers.SerializerMethodField()
     balance_due = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     is_fully_paid = serializers.BooleanField(read_only=True)
     unpaid_orders_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -20,7 +21,7 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             "id", "booking_reference", "guest", "guest_name", "room", "room_detail",
             "check_in", "check_out", "actual_check_in", "actual_check_out",
-            "adults", "children", "status", "source",
+            "adults", "children", "status", "source", "assigned_by_name",
             "room_rate_per_night", "total_nights", "subtotal",
             "tax_amount", "discount_amount", "total_amount",
             "amount_paid", "balance_due", "is_fully_paid",
@@ -31,7 +32,7 @@ class BookingSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
         ]
         read_only_fields = [
-            "id", "booking_reference", "guest_name", "room_detail",
+            "id", "booking_reference", "guest_name", "room_detail", "assigned_by_name",
             "total_nights", "subtotal", "tax_amount", "total_amount",
             "balance_due", "is_fully_paid", "unpaid_orders_total",
             "total_outstanding", "is_clear_to_checkout",
@@ -41,6 +42,9 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_guest_name(self, obj):
         return obj.guest.get_full_name() if obj.guest else ""
+
+    def get_assigned_by_name(self, obj):
+        return obj.assigned_by.get_full_name() if obj.assigned_by_id else None
 
     def get_room_detail(self, obj):
         if obj.room:
@@ -55,19 +59,37 @@ class BookingSerializer(serializers.ModelSerializer):
 
 
 class CreateBookingSerializer(serializers.Serializer):
-    """Create a booking — auto-assigns an available room in the chosen branch."""
+    """Create a booking — auto-assigns an available room in the chosen branch.
+
+    Normally books the logged-in guest themselves. Front Desk Staff,
+    Manager, and Admin can instead book ON BEHALF of a guest by also
+    passing guest_email (+ guest_first_name/guest_last_name/guest_phone
+    if that email has no account yet, which creates a minimal guest
+    account on the spot — the same pattern used for Google Sign-In
+    accounts: verified immediately, no password set, since staff are
+    vouching for the person in person or over the phone). A regular
+    guest passing guest_email is rejected outright — self-service
+    booking must always be for the account that's actually logged in.
+    """
     category_id        = serializers.UUIDField()
     hotel_id           = serializers.UUIDField(required=False)
     room_id            = serializers.UUIDField(required=False)
     check_in           = serializers.DateField()
     check_out          = serializers.DateField()
-    adults             = serializers.IntegerField(min_value=1, max_value=10, default=1)
-    children           = serializers.IntegerField(min_value=0, max_value=5, default=0)
-    special_requests   = serializers.CharField(max_length=1000, default="", required=False, allow_blank=True)
-    breakfast_included = serializers.BooleanField(default=False, required=False)
-    airport_pickup     = serializers.BooleanField(default=False, required=False)
-    late_checkout      = serializers.BooleanField(default=False, required=False)
-    early_checkin      = serializers.BooleanField(default=False, required=False)
+    adults              = serializers.IntegerField(min_value=1, max_value=10, default=1)
+    children            = serializers.IntegerField(min_value=0, max_value=5, default=0)
+    special_requests    = serializers.CharField(max_length=1000, default="", required=False, allow_blank=True)
+    breakfast_included  = serializers.BooleanField(default=False, required=False)
+    airport_pickup      = serializers.BooleanField(default=False, required=False)
+    late_checkout       = serializers.BooleanField(default=False, required=False)
+    early_checkin       = serializers.BooleanField(default=False, required=False)
+    source              = serializers.ChoiceField(choices=["website", "walk_in", "phone", "agent"], required=False)
+    guest_email         = serializers.EmailField(required=False, allow_null=True)
+    guest_first_name    = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    guest_last_name     = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    guest_phone         = serializers.CharField(max_length=30, required=False, allow_blank=True)
+
+    STAFF_BOOKING_ROLES = {"staff", "manager", "admin"}
 
     def validate(self, data):
         today = timezone.now().date()
@@ -75,7 +97,37 @@ class CreateBookingSerializer(serializers.Serializer):
             raise serializers.ValidationError({"check_in": "Check-in cannot be in the past."})
         if data["check_in"] >= data["check_out"]:
             raise serializers.ValidationError({"check_out": "Check-out must be after check-in."})
+
+        request = self.context.get("request")
+        is_staff_booking = bool(request and request.user.role in self.STAFF_BOOKING_ROLES)
+        if data.get("guest_email") and not is_staff_booking:
+            raise serializers.ValidationError({
+                "guest_email": "Only Front Desk, Manager, or Admin accounts can book on behalf of someone else."
+            })
         return data
+
+    def _resolve_guest(self, request, data):
+        """Who this booking is actually for. Staff booking on behalf of a
+        guest_email: find that account, or create a minimal one if it
+        doesn't exist yet. Everyone else: always themselves."""
+        is_staff_booking = request.user.role in self.STAFF_BOOKING_ROLES
+        email = (data.get("guest_email") or "").strip().lower()
+        if not (is_staff_booking and email):
+            return request.user, False
+
+        from apps.accounts.models import User
+        guest = User.objects.filter(email=email).first()
+        if guest is None:
+            guest = User.objects.create_user(
+                email=email,
+                password=None,  # unusable — same pattern as Google Sign-In accounts
+                first_name=data.get("guest_first_name", "") or "Guest",
+                last_name=data.get("guest_last_name", ""),
+                phone=data.get("guest_phone", "") or None,
+                role=User.GUEST,
+                is_verified=True,  # staff is vouching for them in person/by phone
+            )
+        return guest, True
 
     def create(self, validated_data):
         import re
@@ -85,6 +137,7 @@ class CreateBookingSerializer(serializers.Serializer):
         request   = self.context.get("request")
         check_in  = validated_data["check_in"]
         check_out = validated_data["check_out"]
+        guest_for_booking, is_staff_booking = self._resolve_guest(request, validated_data)
 
         # Resolve category
         try:
@@ -207,7 +260,7 @@ class CreateBookingSerializer(serializers.Serializer):
         rate = category.get_current_price(hotel or room.hotel)
 
         booking = Booking.objects.create(
-            guest=request.user,
+            guest=guest_for_booking,
             room=room,
             hotel=hotel or room.hotel,
             check_in=check_in,
@@ -221,6 +274,8 @@ class CreateBookingSerializer(serializers.Serializer):
             early_checkin=validated_data.get("early_checkin", False),
             room_rate_per_night=rate,
             status="pending",
+            source=validated_data.get("source") or ("walk_in" if is_staff_booking else "website"),
+            assigned_by=request.user if is_staff_booking else None,
         )
 
         room.status = "reserved"
