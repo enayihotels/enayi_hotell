@@ -9,22 +9,57 @@ import { StatusBadge, EmptyState, PageSpinner } from '@/components/ui'
 import toast from 'react-hot-toast'
 import type { MenuItem, Order } from '@/types'
 
+// Keep these in sync with apps.orders.views.FOOD_TYPES / DRINK_TYPES on
+// the backend — same two buckets, same job: deciding whether a menu
+// category is "food" or "drink" for browsing and for Kitchen vs Bar
+// routing.
+const FOOD_TYPES = ['food', 'breakfast', 'dessert', 'snack']
+const DRINK_TYPES = ['drink', 'cocktail', 'mocktail', 'wine']
+
 export default function OrdersPage() {
   const navigate = useNavigate()
   const [view, setView] = useState<'menu'|'orders'>('menu')
+  const [foodOrDrink, setFoodOrDrink] = useState<'food'|'drink'>('food')
   const [activeCategory, setActiveCategory] = useState<string>('')
-  const [source, setSource] = useState('room_service')
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
 
   const { data: cats, isLoading: catsLoading } = useMenuCategories()
-  const { data: items, isLoading: itemsLoading } = useMenuItems(activeCategory || undefined)
+  const { data: allItems, isLoading: itemsLoading } = useMenuItems(activeCategory || undefined)
   const { data: myOrders, isLoading: ordersLoading } = useMyOrders()
   const { items: cartItems, addItem, removeItem, updateQty, clearCart, total, itemCount } = useCartStore()
   const placeOrder = usePlaceOrder()
 
+  // Whichever tab is active (Food/Drinks), only show categories and
+  // items that actually belong to it — this is the actual fix: before,
+  // selecting a category here never filtered by food vs. drink at all,
+  // so everything from every category always showed up regardless of
+  // which tab looked selected.
+  const activeTypes = foodOrDrink === 'food' ? FOOD_TYPES : DRINK_TYPES
+  const visibleCats = (cats || []).filter(c => activeTypes.includes(c.type))
+  const items = (allItems || []).filter(i => activeTypes.includes(i.category_type))
+
+  const switchTab = (tab: 'food' | 'drink') => {
+    setFoodOrDrink(tab)
+    setActiveCategory('') // the previously active category may not exist in the other tab
+  }
+
   const handlePlaceOrder = async () => {
     if (cartItems.length === 0) { toast.error('Your cart is empty'); return }
+    // Which department actually handles this order is decided by
+    // what's really in the cart, not asked as a separate guess from
+    // the guest — a food-only cart routes to Kitchen, a drink-only
+    // cart to Bar, and a cart with both goes to Room Service, which
+    // both Kitchen and Bar staff (and Housekeeper, for delivery) can
+    // see and act on. This also matters for permissions: Bar/Kitchen
+    // staff can only update an order whose `source` matches what they
+    // handle — a mismatched guess here used to be able to leave an
+    // order stuck, visible on a staff member's screen but blocked from
+    // being updated.
+    const hasFood = cartItems.some(i => FOOD_TYPES.includes(i.menu_item.category_type))
+    const hasDrink = cartItems.some(i => DRINK_TYPES.includes(i.menu_item.category_type))
+    const source = hasFood && hasDrink ? 'room_service' : hasDrink ? 'bar' : 'kitchen'
+
     const order = await placeOrder.mutateAsync({
       source,
       items: cartItems.map(i => ({ menu_item: i.menu_item.id, quantity: i.quantity, customizations: i.customizations })),
@@ -92,27 +127,28 @@ export default function OrdersPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div className="lg:col-span-2 space-y-4">
 
-            {/* Category chips — single horizontal scroll row on mobile */}
+            {/* Food vs Drinks — the actual browsing filter */}
+            <div className="flex gap-2">
+              <button onClick={() => switchTab('food')}
+                className={`flex-1 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${foodOrDrink === 'food' ? 'bg-enayi-gold text-enayi-bg' : 'card text-enayi-muted'}`}>
+                🍽️ Food
+              </button>
+              <button onClick={() => switchTab('drink')}
+                className={`flex-1 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${foodOrDrink === 'drink' ? 'bg-enayi-gold text-enayi-bg' : 'card text-enayi-muted'}`}>
+                🍹 Drinks
+              </button>
+            </div>
+
+            {/* Category chips — single horizontal scroll row on mobile; only categories from the active Food/Drinks tab */}
             <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
               <button onClick={() => setActiveCategory('')}
                 className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${!activeCategory ? 'bg-enayi-gold text-enayi-bg' : 'card text-enayi-muted'}`}>
-                All
+                All {foodOrDrink === 'food' ? 'Food' : 'Drinks'}
               </button>
-              {(cats || []).map(c => (
+              {visibleCats.map(c => (
                 <button key={c.id} onClick={() => setActiveCategory(c.id)}
                   className={`flex-shrink-0 px-3.5 py-2 rounded-xl text-xs font-medium transition-all whitespace-nowrap capitalize ${activeCategory === c.id ? 'bg-enayi-gold text-enayi-bg' : 'card text-enayi-muted'}`}>
                   {c.name}
-                </button>
-              ))}
-            </div>
-
-            {/* Source chips — horizontal scroll */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
-              <span className="text-enayi-muted text-xs flex-shrink-0">Order from:</span>
-              {['room_service', 'kitchen', 'bar', 'restaurant'].map(s => (
-                <button key={s} onClick={() => setSource(s)}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize whitespace-nowrap ${source === s ? 'bg-enayi-gold text-enayi-bg' : 'card text-enayi-muted hover:text-enayi-gold'}`}>
-                  {s.replace('_', ' ')}
                 </button>
               ))}
             </div>
