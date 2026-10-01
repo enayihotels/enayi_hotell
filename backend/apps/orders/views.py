@@ -324,6 +324,15 @@ class OrderListCreateView(APIView):
         except ValueError as exc:
             return Response({"error": str(exc)}, status=400)
 
+        # Fire-and-forget — never let a notification hiccup affect the
+        # order the guest just successfully placed. See notifications.py.
+        try:
+            from .notifications import notify_new_order
+            notify_new_order(order)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("notify_new_order failed for order %s", order.order_number)
+
         response_data = OrderSerializer(order).data
         response_data["estimated_minutes"] = estimated_minutes
         response_data["friendly_message"] = _order_confirmation_message()

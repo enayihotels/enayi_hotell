@@ -316,6 +316,15 @@ PAYSTACK_PUBLIC_KEY      = env("PAYSTACK_PUBLIC_KEY",      default="")
 PAYSTACK_SECRET_KEY      = env("PAYSTACK_SECRET_KEY",      default="")
 PAYSTACK_WEBHOOK_SECRET  = env("PAYSTACK_WEBHOOK_SECRET",  default="")
 
+# ── Termii (SMS) ──────────────────────────────────────────
+# Secret — unlike GOOGLE_OAUTH_CLIENT_ID above, this must NEVER have a
+# real fallback default checked into source. No key set = SMS sending
+# silently no-ops (see apps.orders.notifications) rather than failing
+# the order itself; a guest's order must never be blocked by Termii
+# being down or unconfigured.
+TERMII_API_KEY   = env("TERMII_API_KEY",   default="")
+TERMII_SENDER_ID = env("TERMII_SENDER_ID", default="Termii")  # Termii's shared default until a custom Sender ID is approved
+
 STRIPE_PUBLIC_KEY        = env("STRIPE_PUBLIC_KEY",        default="")
 STRIPE_SECRET_KEY        = env("STRIPE_SECRET_KEY",        default="")
 STRIPE_WEBHOOK_SECRET    = env("STRIPE_WEBHOOK_SECRET",    default="")
