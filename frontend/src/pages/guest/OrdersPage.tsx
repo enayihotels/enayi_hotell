@@ -110,7 +110,7 @@ export default function OrdersPage() {
   )
 
   return (
-    <div className="space-y-4 pb-24 lg:pb-6">
+    <div className="space-y-4 pb-32 lg:pb-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
