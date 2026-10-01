@@ -1,9 +1,10 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { Package, User, LogOut, Menu, Utensils, BedDouble, Camera, Wrench, Shirt } from 'lucide-react'
+import { Package, User, LogOut, Menu, Utensils, BedDouble, Camera, Wrench, Shirt, KeyRound } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '@/utils/api'
 import { useAuthStore } from '@/store/authStore'
+import { ChangePasswordModal } from '@/components/ChangePasswordModal'
 
 const ROLE_LABEL: Record<string, string> = {
   store_keeper:  'Store Keeper',
@@ -15,7 +16,7 @@ const ROLE_LABEL: Record<string, string> = {
   admin:         'Owner',
 }
 
-function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullName, isHousekeeper, hidesOrdersAndMenu, showMenuManager, showAssets, showLaundry }: { onNavigate?: () => void; onLogout: () => void; roleLabel: string; firstInitial: string; fullName: string; isHousekeeper: boolean; hidesOrdersAndMenu: boolean; showMenuManager: boolean; showAssets: boolean; showLaundry: boolean }) {
+function SidebarContent({ onNavigate, onLogout, onChangePassword, roleLabel, firstInitial, fullName, isHousekeeper, hidesOrdersAndMenu, showMenuManager, showAssets, showLaundry }: { onNavigate?: () => void; onLogout: () => void; onChangePassword: () => void; roleLabel: string; firstInitial: string; fullName: string; isHousekeeper: boolean; hidesOrdersAndMenu: boolean; showMenuManager: boolean; showAssets: boolean; showLaundry: boolean }) {
   return (
     <>
       <div className="p-5 border-b border-enayi-border">
@@ -78,6 +79,9 @@ function SidebarContent({ onNavigate, onLogout, roleLabel, firstInitial, fullNam
         <Link to="/dashboard" onClick={onNavigate} className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all">
           <User size={14} /> My Account
         </Link>
+        <button onClick={onChangePassword} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all">
+          <KeyRound size={14} /> Change Password
+        </button>
         <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 text-xs transition-all">
           <LogOut size={14} /> Sign Out
         </button>
@@ -90,6 +94,7 @@ export default function InventoryLayout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const roleLabel = ROLE_LABEL[user?.role ?? ''] ?? 'Staff'
   const fullName = user?.full_name ?? ''
   const firstInitial = user?.first_name?.[0] ?? '?'
@@ -124,16 +129,18 @@ export default function InventoryLayout() {
     <div className="min-h-screen bg-enayi-bg flex">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-64 bg-enayi-surface border-r border-enayi-border flex-shrink-0">
-        <SidebarContent onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} hidesOrdersAndMenu={hidesOrdersAndMenu} showMenuManager={showMenuManager} showAssets={showAssets} showLaundry={showLaundry} />
+        <SidebarContent onLogout={handleLogout} onChangePassword={() => setChangePasswordOpen(true)} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} hidesOrdersAndMenu={hidesOrdersAndMenu} showMenuManager={showMenuManager} showAssets={showAssets} showLaundry={showLaundry} />
       </aside>
 
       {/* Mobile drawer */}
       <div className={`md:hidden fixed inset-0 z-40 ${drawerOpen ? '' : 'pointer-events-none'}`}>
         <div onClick={() => setDrawerOpen(false)} className={`absolute inset-0 bg-black/60 transition-opacity ${drawerOpen ? 'opacity-100' : 'opacity-0'}`} />
         <aside className={`absolute left-0 top-0 bottom-0 w-64 bg-enayi-surface border-r border-enayi-border flex flex-col transition-transform ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} hidesOrdersAndMenu={hidesOrdersAndMenu} showMenuManager={showMenuManager} showAssets={showAssets} showLaundry={showLaundry} />
+          <SidebarContent onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} onChangePassword={() => setChangePasswordOpen(true)} roleLabel={roleLabel} firstInitial={firstInitial} fullName={fullName} isHousekeeper={isHousekeeper} hidesOrdersAndMenu={hidesOrdersAndMenu} showMenuManager={showMenuManager} showAssets={showAssets} showLaundry={showLaundry} />
         </aside>
       </div>
+
+      <ChangePasswordModal open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-enayi-border bg-enayi-surface">

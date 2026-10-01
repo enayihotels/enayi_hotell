@@ -1,13 +1,15 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { User, Mail, Phone, Star, Shield, Loader2, Camera } from 'lucide-react'
+import { User, Mail, Phone, Star, Shield, Loader2, Camera, KeyRound } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import api, { getErrorMessage } from '@/utils/api'
-import { Alert } from '@/components/ui'
+import { Alert, Button } from '@/components/ui'
+import { ChangePasswordModal } from '@/components/ChangePasswordModal'
 import toast from 'react-hot-toast'
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuthStore()
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const { register, handleSubmit, reset, formState: { isSubmitting, isDirty } } = useForm({
     defaultValues: { first_name: '', last_name: '', phone: '', nationality: 'nigerian', newsletter: true }
   })
@@ -78,6 +80,13 @@ export default function ProfilePage() {
           {isSubmitting?<><Loader2 size={14} className="animate-spin"/>Saving…</>:'Save Changes'}
         </button>
       </form>
+      {/* Security */}
+      <div className="card p-5 space-y-3">
+        <h2 className="font-heading text-lg text-enayi-text">Security</h2>
+        <p className="text-enayi-muted text-sm">Change the password you use to sign in.</p>
+        <Button variant="surface" onClick={() => setChangePasswordOpen(true)}><KeyRound size={14}/> Change Password</Button>
+      </div>
+      <ChangePasswordModal open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </div>
   )
 }

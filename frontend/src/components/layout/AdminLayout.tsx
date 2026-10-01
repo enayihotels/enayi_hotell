@@ -1,8 +1,9 @@
 import { Outlet, Link, NavLink, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User, Package, Wrench, LogOut, FileText, Shirt, UserCog } from 'lucide-react'
+import { LayoutDashboard, BedDouble, CalendarDays, Utensils, Users, Image, CreditCard, Calendar, ShieldCheck, ShieldAlert, Menu, User, Package, Wrench, LogOut, FileText, Shirt, UserCog, KeyRound } from 'lucide-react'
 import { cn } from '@/utils/helpers'
 import { useAuthStore } from '@/store/authStore'
+import { ChangePasswordModal } from '@/components/ChangePasswordModal'
 import toast from 'react-hot-toast'
 
 const ADMIN_NAV = [
@@ -25,10 +26,11 @@ const ADMIN_NAV = [
 
 // Defined outside AdminLayout on purpose — a stable, module-level component
 // so React never treats it as a brand-new type on re-render.
-function AdminSidebarContent({ visibleNav, onNavigate, onLogout, fullName, roleLabel, firstInitial }: {
+function AdminSidebarContent({ visibleNav, onNavigate, onLogout, onChangePassword, fullName, roleLabel, firstInitial }: {
   visibleNav: typeof ADMIN_NAV
   onNavigate: () => void
   onLogout: () => void
+  onChangePassword: () => void
   fullName: string
   roleLabel: string
   firstInitial: string
@@ -61,6 +63,9 @@ function AdminSidebarContent({ visibleNav, onNavigate, onLogout, fullName, roleL
             <div className="text-enayi-muted text-[11px] truncate">{roleLabel}</div>
           </div>
         </div>
+        <button onClick={onChangePassword} className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all w-full">
+          <KeyRound size={14} /> Change Password
+        </button>
         <Link to="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-enayi-muted hover:text-enayi-text hover:bg-enayi-panel text-xs transition-all">
           ← Main Website
         </Link>
@@ -76,6 +81,7 @@ export default function AdminLayout() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const isManagerOrAdmin = user?.role === 'manager' || user?.role === 'admin'
   // Front Desk gets its own department/room/shared-scoped assets view
   // (the same room drill-down UI Bar/Kitchen/Housekeeping use) instead
@@ -105,7 +111,7 @@ export default function AdminLayout() {
     <div className="flex h-screen bg-enayi-bg overflow-hidden">
       {/* Desktop sidebar — always visible md and up */}
       <div className="hidden md:flex flex-shrink-0 h-full">
-        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} onLogout={handleLogout} fullName={fullName} roleLabel={roleLabel} firstInitial={firstInitial} />
+        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} onLogout={handleLogout} onChangePassword={() => setChangePasswordOpen(true)} fullName={fullName} roleLabel={roleLabel} firstInitial={firstInitial} />
       </div>
 
       {/* Mobile sidebar — ALWAYS rendered in the DOM below md, visibility
@@ -130,8 +136,10 @@ export default function AdminLayout() {
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} onLogout={handleLogout} fullName={fullName} roleLabel={roleLabel} firstInitial={firstInitial} />
+        <AdminSidebarContent visibleNav={visibleNav} onNavigate={closeDrawer} onLogout={handleLogout} onChangePassword={() => setChangePasswordOpen(true)} fullName={fullName} roleLabel={roleLabel} firstInitial={firstInitial} />
       </div>
+
+      <ChangePasswordModal open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Mobile-only top bar with hamburger — desktop has no header, sidebar is always visible */}
