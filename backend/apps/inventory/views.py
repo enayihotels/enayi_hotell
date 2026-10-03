@@ -46,19 +46,52 @@ def _effective_hotel(user, requested_hotel_id=None):
 
     - Owner/Admin sees every branch — can optionally narrow to one via
       a `?hotel=`/`hotel` param, but isn't required to.
-    - Everyone else (Manager, Front Desk Staff, Store Keeper, Bar
-      Staff, Kitchen Staff) is locked to their OWN account's `hotel`,
-      full stop — a requested_hotel_id from the client is deliberately
-      ignored for them, so there's no way to pass a different branch's
-      ID and touch its stock. An account of a branch-requiring role
-      with no branch assigned yet gets None back, which every caller
-      here treats as "show/do nothing" rather than "show everything".
+    - A Store Keeper with NO branch assigned (hotel is deliberately left
+      unset on their account) is a cross-branch Store Keeper — e.g. one
+      person covering both Rayfield and Zarmaganda — and is treated
+      exactly like Admin here: sees every branch, can narrow via
+      `?hotel=`. A Store Keeper WHO DOES have a branch set stays fully
+      restricted to it, same as everyone else below — this only ever
+      widens access for the specific case of "no branch on file",
+      never loosens it for a normal single-branch account.
+    - Everyone else (Manager, Front Desk Staff, Bar Staff, Kitchen
+      Staff, and a branch-assigned Store Keeper) is locked to their OWN
+      account's `hotel`, full stop — a requested_hotel_id from the
+      client is deliberately ignored for them, so there's no way to
+      pass a different branch's ID and touch its stock. An account of
+      a branch-requiring role with no branch assigned yet gets None
+      back, which every caller here treats as "show/do nothing" rather
+      than "show everything" — EXCEPT Store Keeper, per above.
     """
     if user.role == "admin":
+        return requested_hotel_id or None
+    if user.role == "store_keeper" and not user.hotel_id:
         return requested_hotel_id or None
     if user.requires_branch:
         return str(user.hotel_id) if user.hotel_id else False  # False = blocked, not "no filter"
     return None
+
+
+def _resolve_write_hotel(user, request_data):
+    """Which branch a CREATE/ADJUST action applies to — the write-side
+    counterpart to _effective_hotel's read-side scoping, for the same
+    two "picks a branch explicitly" accounts: Admin, and a Store Keeper
+    with no branch set on their own account (cross-branch). Both MUST
+    pass an explicit `hotel` in the request body, since there's no
+    single obvious branch to default to. Everyone else always writes
+    to their own account's branch, full stop — same as the read side.
+
+    Returns (hotel_id, error_response_or_None). On error, hotel_id is
+    None and the view should return the error response as-is.
+    """
+    if user.role == "admin" or (user.role == "store_keeper" and not user.hotel_id):
+        hotel_id = request_data.get("hotel")
+        if not hotel_id:
+            return None, Response({"error": "hotel is required."}, status=400)
+        return hotel_id, None
+    if not user.hotel_id:
+        return None, Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can do this."}, status=403)
+    return user.hotel_id, None
 
 
 # Kept for backward compatibility in case anything else imports these,
@@ -126,14 +159,9 @@ class InventoryCategoryListView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):
             return Response({"error": "Only the Store Keeper, Manager, or Owner can add categories."}, status=403)
-        if request.user.role == "admin":
-            hotel_id = request.data.get("hotel")
-            if not hotel_id:
-                return Response({"error": "hotel is required."}, status=400)
-        else:
-            if not request.user.hotel_id:
-                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can add categories."}, status=403)
-            hotel_id = request.user.hotel_id
+        hotel_id, err = _resolve_write_hotel(request.user, request.data)
+        if err:
+            return err
         data = request.data.copy()
         if not data.get("slug") and data.get("name"):
             data["slug"] = slugify(data["name"])
@@ -208,14 +236,9 @@ class InventoryItemListView(generics.ListCreateAPIView):
     def create(self, request, *args, **kwargs):
         if not _can_manage_catalog(request.user):
             return Response({"error": "Only the Store Keeper, Manager, or Owner can add items."}, status=403)
-        if request.user.role == "admin":
-            hotel_id = request.data.get("hotel")
-            if not hotel_id:
-                return Response({"error": "hotel is required."}, status=400)
-        else:
-            if not request.user.hotel_id:
-                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can add items."}, status=403)
-            hotel_id = request.user.hotel_id
+        hotel_id, err = _resolve_write_hotel(request.user, request.data)
+        if err:
+            return err
 
         # The category picked also needs to belong to this same branch —
         # otherwise an item could end up pointing at another branch's
@@ -436,14 +459,9 @@ class AdjustStockView(APIView):
         if not _can_adjust_location(request.user, location):
             return Response({"error": f"You don't have permission to adjust stock at {location}."}, status=403)
 
-        if request.user.role == "admin":
-            hotel_id = request.data.get("hotel")
-            if not hotel_id:
-                return Response({"error": "hotel is required."}, status=400)
-        else:
-            if request.user.requires_branch and not request.user.hotel_id:
-                return Response({"error": "Your account has no branch assigned yet — ask the Owner to set one before you can adjust stock."}, status=403)
-            hotel_id = request.user.hotel_id
+        hotel_id, err = _resolve_write_hotel(request.user, request.data)
+        if err:
+            return err
 
         try:
             delta = float(delta)
@@ -553,7 +571,13 @@ class StockRequisitionDecideView(APIView):
         except StockRequisition.DoesNotExist:
             return Response({"error": "Request not found."}, status=404)
 
-        if request.user.role != "admin":
+        # Admin, and a cross-branch Store Keeper (one with no single
+        # branch set on their account — see _effective_hotel), can act
+        # on a request from any branch. Everyone else, including a
+        # normal branch-assigned Store Keeper, stays locked to their
+        # own branch's requests only.
+        is_cross_branch_store_keeper = request.user.role == "store_keeper" and not request.user.hotel_id
+        if request.user.role != "admin" and not is_cross_branch_store_keeper:
             if not request.user.hotel_id or str(request.user.hotel_id) != str(req.hotel_id):
                 return Response({"error": "This request belongs to a different branch than your account."}, status=403)
 

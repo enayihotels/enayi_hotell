@@ -37,26 +37,32 @@ export default function AdminInventory() {
   const canManageCatalog = user?.role === 'store_keeper' || isManagerOrAdmin
   const canRequest = user?.role === 'bar_staff' || user?.role === 'kitchen_staff' || user?.role === 'housekeeper' || user?.role === 'laundry_staff'
   const canFulfill = user?.role === 'store_keeper' || isManagerOrAdmin
+  // A Store Keeper with no single branch on their account (e.g. one
+  // person covering both Rayfield and Zarmaganda) gets the same
+  // branch-picker Admin does — everyone else (including a normal,
+  // branch-assigned Store Keeper) only ever sees their own branch.
+  const isCrossBranchStoreKeeper = user?.role === 'store_keeper' && !user?.hotel
+  const canSwitchBranch = isAdmin || isCrossBranchStoreKeeper
 
   const [tab, setTab] = useState<'stock' | 'categories' | 'requests'>('stock')
   const [locationFilter, setLocationFilter] = useState<StockLocation | 'all'>(ownLocation ?? 'all')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
-  // Only the Owner operates across every branch — everyone else (including
-  // Manager) is scoped server-side to their own account's branch already,
-  // so this selector only ever renders for Admin.
+  // Only an account that can switch branches (Owner, or a cross-branch
+  // Store Keeper) needs this — everyone else is scoped server-side to
+  // their own account's branch already.
   const [hotelFilter, setHotelFilter] = useState<string>('')
 
   const { data: hotels } = useQuery<any[]>({
     queryKey: ['hotels-for-inventory'],
     queryFn: () => api.get('/hotels/').then(r => unwrapList(r.data)),
-    enabled: isAdmin,
+    enabled: canSwitchBranch,
   })
 
   useEffect(() => {
-    if (isAdmin && !hotelFilter && hotels && hotels.length > 0) {
+    if (canSwitchBranch && !hotelFilter && hotels && hotels.length > 0) {
       setHotelFilter(hotels[0].id)
     }
-  }, [isAdmin, hotelFilter, hotels])
+  }, [canSwitchBranch, hotelFilter, hotels])
 
   const { data: categories, isLoading: catsLoading } = useQuery<InventoryCategory[]>({
     queryKey: ['inventory-categories', hotelFilter],
@@ -73,7 +79,7 @@ export default function AdminInventory() {
   })
   const { data: menuCategories } = useQuery<MenuCategory[]>({
     queryKey: ['menu-categories-for-listing', hotelFilter, user?.hotel],
-    queryFn: () => api.get('/orders/menu/categories/', { params: { hotel: isAdmin ? hotelFilter : user?.hotel } }).then(r => unwrapList(r.data)),
+    queryFn: () => api.get('/orders/menu/categories/', { params: { hotel: canSwitchBranch ? hotelFilter : user?.hotel } }).then(r => unwrapList(r.data)),
     enabled: canManageCatalog,
   })
 
@@ -157,7 +163,7 @@ export default function AdminInventory() {
   const saveCat = useMutation({
     mutationFn: () => editingCat
       ? api.patch(`/inventory/categories/${editingCat.slug}/`, catForm)
-      : api.post('/inventory/categories/', { ...catForm, slug: catForm.slug || catForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ...(isAdmin ? { hotel: hotelFilter } : {}) }),
+      : api.post('/inventory/categories/', { ...catForm, slug: catForm.slug || catForm.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), ...(canSwitchBranch ? { hotel: hotelFilter } : {}) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['inventory-categories'], exact: false }); toast.success(editingCat ? 'Category updated.' : 'Category created.'); setCatModalOpen(false) },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -190,7 +196,7 @@ export default function AdminInventory() {
         cost_price: parseFloat(itemForm.cost_price) || 0,
         sale_price: itemForm.sale_price ? parseFloat(itemForm.sale_price) : null,
         reorder_threshold: parseInt(itemForm.reorder_threshold) || 0,
-        ...(isAdmin && !editingItem ? { hotel: hotelFilter } : {}),
+        ...(canSwitchBranch && !editingItem ? { hotel: hotelFilter } : {}),
       }
       return editingItem ? api.patch(`/inventory/items/${editingItem.id}/`, payload) : api.post('/inventory/items/', payload)
     },
@@ -211,7 +217,7 @@ export default function AdminInventory() {
   const adjustStock = useMutation({
     mutationFn: (delta: number) => api.post('/inventory/balances/adjust/', {
       item: adjustTarget!.item.id, location: adjustTarget!.location, delta, reason: adjustReason,
-      ...(isAdmin ? { hotel: hotelFilter } : {}),
+      ...(canSwitchBranch ? { hotel: hotelFilter } : {}),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['inventory-items'] })
@@ -225,7 +231,7 @@ export default function AdminInventory() {
   // numbers folded into the same row would be ambiguous, and every
   // adjustment needs exactly one branch anyway. The useEffect above
   // auto-selects the first branch once the list loads.
-  if (catsLoading || itemsLoading || (isAdmin && !hotelFilter)) return <PageSpinner />
+  if (catsLoading || itemsLoading || (canSwitchBranch && !hotelFilter)) return <PageSpinner />
 
   const balanceFor = (item: InventoryItem, loc: StockLocation) =>
     item.balances.find(b => b.location === loc)?.quantity ?? 0
@@ -250,7 +256,7 @@ export default function AdminInventory() {
           <p className="text-enayi-muted text-sm">
             {ownLocation ? `${LOCATION_LABEL[ownLocation]} stock and the shared item catalog.` : isAdmin && currentHotelName ? `Store, Bar, Kitchen, and Housekeeping stock at ${currentHotelName}.` : 'Store, Bar, Kitchen, and Housekeeping stock across the hotel.'}
           </p>
-          {(ownLocation || user?.role === 'manager') && !user?.hotel_name && (
+          {(ownLocation || user?.role === 'manager') && !user?.hotel_name && !canSwitchBranch && (
             <p className="text-red-400 text-xs mt-1">No branch assigned to your account yet — ask the Owner to set one in Django admin.</p>
           )}
         </div>
@@ -267,14 +273,16 @@ export default function AdminInventory() {
         </div>
       </div>
 
-      {isAdmin && hotels && hotels.length > 0 && (
+      {canSwitchBranch && hotels && hotels.length > 0 && (
         <div className="card p-3 flex items-center gap-3 flex-wrap bg-enayi-gold/5 border-enayi-gold/20">
           <Building2 size={16} className="text-enayi-gold flex-shrink-0" />
           <span className="text-enayi-muted text-xs">Viewing branch:</span>
           <Select value={hotelFilter} onChange={e => setHotelFilter(e.target.value)} className="max-w-[240px]">
             {hotels.map((h: any) => <option key={h.id} value={h.id}>{h.name}</option>)}
           </Select>
-          <span className="text-enayi-muted text-xs italic">Only the Owner can switch branches — everyone else only ever sees their own.</span>
+          <span className="text-enayi-muted text-xs italic">
+            {isAdmin ? 'Only the Owner can switch branches — everyone else only ever sees their own.' : 'Your account covers both branches — everyone else only ever sees their own.'}
+          </span>
         </div>
       )}
 

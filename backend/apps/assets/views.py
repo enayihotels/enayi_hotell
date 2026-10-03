@@ -71,8 +71,17 @@ def _effective_hotel(user, requested_hotel_id=None):
     """Same rule as everywhere else branch-scoped in this codebase:
     Owner sees every branch (optionally narrowed via ?hotel=), Front
     Desk/Manager/Bar/Kitchen/Housekeeping are locked to their own
-    account's branch regardless of what's requested."""
+    account's branch regardless of what's requested. A Store Keeper
+    with no branch assigned on their account is a deliberate
+    cross-branch account (e.g. one person covering both Rayfield and
+    Zarmaganda's property assets) and is treated like Admin here; a
+    Store Keeper who DOES have a branch set stays fully restricted to
+    it, same as everyone else — see apps.inventory.views._effective_hotel
+    for the fuller explanation (duplicated here rather than shared, same
+    as the rest of this file's pattern)."""
     if user.role == "admin":
+        return requested_hotel_id or None
+    if user.role == "store_keeper" and not user.hotel_id:
         return requested_hotel_id or None
     if user.requires_branch:
         return str(user.hotel_id) if user.hotel_id else False
