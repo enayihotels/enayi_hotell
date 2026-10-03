@@ -61,7 +61,16 @@ class Command(BaseCommand):
 
         payments = Payment.objects.all()
         bookings = Booking.objects.all()
-        guests = User.objects.filter(role="guest", bookings__isnull=False).distinct()
+        # Django won't allow .delete() on a queryset built with .distinct()
+        # (needed above only to count guests once each, since a guest with
+        # several bookings would otherwise join-duplicate) — so the
+        # resolve-which-guests-qualify step and the actual delete use two
+        # different, equivalent queries instead of sharing one `distinct`
+        # queryset between counting and deleting.
+        qualifying_guest_ids = list(
+            User.objects.filter(role="guest", bookings__isnull=False).distinct().values_list("id", flat=True)
+        )
+        guests = User.objects.filter(id__in=qualifying_guest_ids)
 
         self.stdout.write(self.style.MIGRATE_HEADING(f"Payments to delete: {payments.count()}"))
         by_status = {}
