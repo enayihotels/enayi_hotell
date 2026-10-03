@@ -13,23 +13,29 @@ Scope, precisely:
   - Every Payment record (any purpose, any status) — 70 at last count,
     69 Room Booking + 1 Laundry, including 27 marked "Successful".
   - Every Booking record — 50 at last count, 31 Rayfield + 19 Zarmaganda.
+  - Every Order record — 14 at last count, 11 Rayfield + 3 with no
+    branch set. Added after the first --apply attempt failed: 8 of the
+    14 qualifying guests also had Order history, which Order.guest's
+    PROTECT blocked deletion on — confirmed with Adrian to clear all
+    Orders too rather than leave those 8 accounts stranded.
   - Every Guest account that has placed at least one booking — 14 at
     last count. A Guest account that has NEVER booked is left alone
     (not in scope — Adrian's instruction was specifically "clients
-    that have ever placed a booking").
+    that have ever placed a booking"), even if that account happens to
+    have Order history of its own.
 
 Explicitly NOT touched, since they were never mentioned:
-  - Orders (14 at last count) and their own Payment-less history —
-    separate from Booking entirely.
-  - Guest accounts with zero bookings (8 at last count).
+  - Guest accounts with zero bookings (8 at last count) — even their
+    Orders are left alone, only a qualifying guest's data is cleared.
   - Staff/Manager/Admin accounts (never in scope regardless).
   - Rooms, Room Categories, menus, inventory — none of this touches
     the catalog, only guest transaction history.
 
 Deletion order matters: Payments first (nothing references a Payment,
 so nothing can block this), then Bookings (CheckoutApprovalRequest
-cascades with its Booking automatically; Order.booking is SET NULL,
-not blocked), then the now-unblocked Guest accounts last.
+cascades with its Booking automatically) and Orders (OrderItem cascades
+with its Order automatically) — both must be gone before the
+now-unblocked Guest accounts are deleted last.
 
 SAFETY: defaults to a DRY RUN — lists exactly what it would delete,
 touches nothing. Pass --apply to actually commit. There is no further
@@ -46,10 +52,11 @@ from django.db import transaction
 from apps.accounts.models import User
 from apps.bookings.models import Booking
 from apps.payments.models import Payment
+from apps.orders.models import Order
 
 
 class Command(BaseCommand):
-    help = "DESTRUCTIVE: delete every Payment, every Booking, and every Guest account that has booked, across both branches."
+    help = "DESTRUCTIVE: delete every Payment, every Booking, every Order, and every Guest account that has booked, across both branches."
 
     def add_arguments(self, parser):
         parser.add_argument("--apply", action="store_true", help="Actually commit changes. Without this flag, dry-run only.")
@@ -87,6 +94,15 @@ class Command(BaseCommand):
         for hotel_name, count in sorted(by_hotel.items()):
             self.stdout.write(f"  {hotel_name}: {count}")
 
+        orders = Order.objects.all()
+        self.stdout.write(self.style.MIGRATE_HEADING(f"\nOrders to delete: {orders.count()}"))
+        by_hotel_orders = {}
+        for o in orders.select_related("hotel"):
+            key = o.hotel.name if o.hotel_id else "(no branch set)"
+            by_hotel_orders[key] = by_hotel_orders.get(key, 0) + 1
+        for hotel_name, count in sorted(by_hotel_orders.items()):
+            self.stdout.write(f"  {hotel_name}: {count}")
+
         self.stdout.write(self.style.MIGRATE_HEADING(f"\nGuest accounts to delete: {guests.count()}"))
         for g in guests.order_by("email"):
             self.stdout.write(f"  {g.email!r:40} {g.get_full_name()} — {g.bookings.count()} booking(s)")
@@ -104,9 +120,11 @@ class Command(BaseCommand):
         with transaction.atomic():
             deleted_payments = payments.delete()
             deleted_bookings = bookings.delete()
+            deleted_orders = orders.delete()
             deleted_guests = guests.delete()
 
         self.stdout.write(self.style.SUCCESS(
             f"\n=== Done. Deleted {deleted_payments[0]} payment-related rows, "
-            f"{deleted_bookings[0]} booking-related rows, {deleted_guests[0]} guest-account-related rows. ==="
+            f"{deleted_bookings[0]} booking-related rows, {deleted_orders[0]} order-related rows, "
+            f"{deleted_guests[0]} guest-account-related rows. ==="
         ))
